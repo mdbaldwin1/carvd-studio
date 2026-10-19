@@ -117,6 +117,7 @@ export interface EndCutDraft {
   horizontalFlip: boolean;
   verticalAngle: number;
   verticalFlip: boolean;
+  band?: EndCutFeature['parameters']['band'];
 }
 
 export interface RectCutDraft {
@@ -134,6 +135,9 @@ export interface RectCutDraft {
   depth: number;
   /** Zero for a pocket chopped square; the bit radius for one routed. */
   cornerRadius: number;
+  wallAngle?: number;
+  sideWallAngle?: number;
+  taperAngle?: number;
   placementX: number;
   placementZ: number;
 }
@@ -172,6 +176,7 @@ export interface RoundedCutDraft {
   length: number;
   width: number;
   cornerRadius: number;
+  plateJoiner?: boolean;
   depthMode: RoundedCutFeature['parameters']['depthMode'];
   depth: number;
   placementPrimary: number;
@@ -301,17 +306,13 @@ const BLIND_ONLY_RECT_CUT_TYPES: RectCutFeature['cutType'][] = [
  * through mortise is an ordinary joint -- a wedged tenon needs one -- and
  * forcing it to be drawn as a Cutout instead costs the cut its identity in the
  * summary and the cut list, and the joint any chance of being understood as
- * one. Through mortises are only available on the top and bottom faces, since
- * a pocket cut into an edge has nowhere to come out.
+ * one. In a long edge, a through mortise exits the opposite edge.
  */
 const BLIND_BY_DEFAULT_RECT_CUT_TYPES: RectCutFeature['cutType'][] = [...BLIND_ONLY_RECT_CUT_TYPES, 'mortise'];
 
 /** Whether this cut, as targeted, can only ever be blind. */
-export function rectCutIsBlindOnly(cutType: RectCutFeature['cutType'], faceTarget?: FaceTarget): boolean {
-  if (BLIND_ONLY_RECT_CUT_TYPES.includes(cutType)) return true;
-  // A pocket cut into the front or back face runs across the thickness, so it
-  // has no far side to break out of.
-  return cutType === 'mortise' && (faceTarget === 'front_face' || faceTarget === 'back_face');
+export function rectCutIsBlindOnly(cutType: RectCutFeature['cutType']): boolean {
+  return BLIND_ONLY_RECT_CUT_TYPES.includes(cutType);
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -388,13 +389,16 @@ export function normalizeRectCutDraft(
     return normalized;
   };
 
-  normalized.depthMode = rectCutIsBlindOnly(normalized.cutType, normalized.faceTarget) ? 'blind' : normalized.depthMode;
+  normalized.depthMode = rectCutIsBlindOnly(normalized.cutType) ? 'blind' : normalized.depthMode;
   normalized.depth = sanitizeFinite(normalized.depth, 0.25);
   if (normalized.depthMode === 'blind') {
+    const cutsIntoWidth =
+      ['mortise', 'cutout', 'groove', 'stopped_groove'].includes(normalized.cutType) &&
+      (normalized.faceTarget === 'front_face' || normalized.faceTarget === 'back_face');
     normalized.depth = clamp(
       normalized.depth <= 0 ? 0.25 : normalized.depth,
-      0.125,
-      Math.max(0.125, partThickness - 0.001)
+      0.001,
+      Math.max(0.001, (cutsIntoWidth ? partWidth : partThickness) - 0.001)
     );
   }
 
@@ -426,9 +430,9 @@ export function normalizeRectCutDraft(
     return preserveInvalidOffsets();
   }
 
-  if (normalized.cutType === 'cutout' || normalized.cutType === 'mortise') {
+  if (['cutout', 'mortise', 'groove', 'stopped_groove'].includes(normalized.cutType)) {
     // Pockets may target top/bottom or the front/back side faces (side-face
-    // pockets recess into the board width and are always blind).
+    // pockets recess into the board width).
     if (
       normalized.faceTarget !== 'top_face' &&
       normalized.faceTarget !== 'bottom_face' &&
@@ -437,14 +441,10 @@ export function normalizeRectCutDraft(
     ) {
       normalized.faceTarget = 'top_face';
     }
-    if (normalized.faceTarget === 'front_face' || normalized.faceTarget === 'back_face') {
-      normalized.depthMode = 'blind';
-    }
   } else if (
     normalized.cutType === 'dado' ||
     normalized.cutType === 'stopped_dado' ||
-    normalized.cutType === 'groove' ||
-    normalized.cutType === 'stopped_groove'
+    normalized.cutType === 'half_lap'
   ) {
     if (normalized.faceTarget !== 'top_face' && normalized.faceTarget !== 'bottom_face') {
       normalized.faceTarget = 'top_face';
@@ -477,12 +477,12 @@ export function normalizeRectCutDraft(
     normalized.placementZ = 0;
   }
 
-  if (normalized.cutType === 'dado' || normalized.cutType === 'stopped_dado') {
+  if (normalized.cutType === 'dado') {
     normalized.sizeWidth = partWidth;
     normalized.placementZ = 0;
   }
 
-  if (normalized.cutType === 'mortise' || normalized.cutType === 'cutout') {
+  if (['mortise', 'cutout', 'stopped_dado'].includes(normalized.cutType)) {
     const limit = Math.min(normalized.sizeLength, normalized.sizeWidth) / 2;
     normalized.cornerRadius = clamp(sanitizeFinite(normalized.cornerRadius, 0), 0, limit);
   } else {
@@ -692,6 +692,15 @@ export function buildDraftFromPreset(preset: OperationPreset, defaults?: DraftPa
     };
   }
 
+  if (preset === 'stopped_dado') {
+    const width = defaults?.partWidth ?? 3;
+    const stop = Math.min(0.5, width / 4);
+    return normalizeRectCutDraft(
+      { ...getDefaultRectDraft(preset), sizeLength: 0.75, sizeWidth: width - 2 * stop, placementZ: stop },
+      defaults
+    );
+  }
+
   if (preset === 'half_lap') {
     // Default to an end lap -- a channel at the left end, the width of the
     // board it crosses. The maker moves it along for a cross lap. Depth is not
@@ -775,7 +784,8 @@ export function buildDraftFromFeature(
       horizontalAngle: feature.parameters.horizontalAngle,
       horizontalFlip: feature.parameters.horizontalFlip ?? false,
       verticalAngle: feature.parameters.verticalAngle ?? 0,
-      verticalFlip: feature.parameters.verticalFlip ?? false
+      verticalFlip: feature.parameters.verticalFlip ?? false,
+      band: feature.parameters.band ? { ...feature.parameters.band } : undefined
     };
   }
 
@@ -816,6 +826,7 @@ export function buildDraftFromFeature(
       length: feature.parameters.length,
       width: feature.parameters.width,
       cornerRadius: feature.parameters.cornerRadius,
+      plateJoiner: feature.parameters.plateJoiner,
       depthMode: feature.parameters.depthMode,
       depth: feature.parameters.depth ?? 0.25,
       placementPrimary: feature.placement.primary,
@@ -835,12 +846,21 @@ export function buildDraftFromFeature(
       edgeTarget: feature.target.type === 'edge' ? feature.target.edge : 'top_front_edge',
       cornerTarget: feature.target.type === 'corner' ? feature.target.corner : 'front_left_corner',
       sizeLength: feature.parameters.size.length,
-      sizeWidth: feature.parameters.size.width,
+      sizeWidth:
+        feature.cutType === 'stopped_dado' && !feature.parameters.stoppedSpan
+          ? (_part?.width ?? feature.parameters.size.width)
+          : feature.parameters.size.width,
       depthMode: feature.parameters.depthMode,
       depth: feature.parameters.depth ?? 0.25,
       cornerRadius: feature.parameters.cornerRadius ?? 0,
+      wallAngle: feature.parameters.wallAngle,
+      sideWallAngle: feature.parameters.sideWallAngle,
+      taperAngle: feature.parameters.taperAngle,
       placementX: feature.placement.x,
-      placementZ: feature.placement.z
+      placementZ:
+        feature.cutType === 'stopped_dado' && !feature.parameters.stoppedSpan && Number.isFinite(feature.placement.z)
+          ? 0
+          : feature.placement.z
     },
     _part ? { partLength: _part.length, partWidth: _part.width, partThickness: _part.thickness } : undefined
   );
@@ -931,6 +951,7 @@ export function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
         horizontalFlip: draft.horizontalFlip,
         verticalAngle: draft.cutType === 'mitre' ? undefined : draft.verticalAngle || undefined,
         verticalFlip: draft.cutType === 'mitre' ? undefined : draft.verticalFlip,
+        band: draft.band ? { ...draft.band } : undefined,
         reference:
           draft.referenceMode && draft.referenceValue !== null
             ? {
@@ -990,6 +1011,7 @@ export function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
         length: draft.length,
         width: draft.width,
         cornerRadius: draft.cutType === 'rounded_slot' ? draft.width / 2 : draft.cornerRadius,
+        ...(draft.plateJoiner ? { plateJoiner: true } : {}),
         depthMode: draft.depthMode,
         depth: draft.depthMode === 'blind' ? draft.depth : undefined
       },
@@ -1047,17 +1069,20 @@ export function buildFeatureFromDraft(draft: FeatureDraft): PartFeature {
         length: draft.sizeLength,
         width: draft.sizeWidth
       },
+      stoppedSpan: draft.cutType === 'stopped_dado' ? true : undefined,
       depthMode: draft.depthMode,
       depth: draft.depthMode === 'blind' ? draft.depth : undefined,
       // Absent rather than zero for a square pocket, so a file only carries
       // the field when a bit actually left something behind.
-      cornerRadius: draft.cornerRadius > 0 ? draft.cornerRadius : undefined
+      cornerRadius: draft.cornerRadius > 0 ? draft.cornerRadius : undefined,
+      wallAngle: draft.wallAngle,
+      sideWallAngle: draft.sideWallAngle,
+      taperAngle: draft.taperAngle
     },
     placement: {
       x: draft.cutType === 'corner_notch' && Number.isFinite(draft.placementX) ? 0 : draft.placementX,
       z:
-        (draft.cutType === 'corner_notch' || draft.cutType === 'dado' || draft.cutType === 'stopped_dado') &&
-        Number.isFinite(draft.placementZ)
+        (draft.cutType === 'corner_notch' || draft.cutType === 'dado') && Number.isFinite(draft.placementZ)
           ? 0
           : draft.placementZ
     }
@@ -1128,6 +1153,12 @@ export function applyTargetToFeatureDraft(draft: FeatureDraft, target: PartFeatu
 
   if (draft.cutType === 'edge_notch' || draft.cutType === 'rabbet') {
     return target.type === 'edge' ? { ...draft, edgeTarget: target.edge } : draft;
+  }
+
+  if (['mortise', 'cutout', 'groove', 'stopped_groove'].includes(draft.cutType)) {
+    return target.type === 'face' && ['top_face', 'bottom_face', 'front_face', 'back_face'].includes(target.face)
+      ? { ...draft, faceTarget: target.face }
+      : draft;
   }
 
   return target.type === 'face' && (target.face === 'top_face' || target.face === 'bottom_face')

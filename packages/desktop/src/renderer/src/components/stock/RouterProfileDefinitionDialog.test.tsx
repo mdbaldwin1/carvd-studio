@@ -1,13 +1,24 @@
+import userEvent from '@testing-library/user-event';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { RouterProfileDefinitionDialog } from './RouterProfileDefinitionDialog';
 
 describe('RouterProfileDefinitionDialog', () => {
+  it('accepts a leading decimal while typing a profile dimension', async () => {
+    const user = userEvent.setup();
+    render(<RouterProfileDefinitionDialog open onOpenChange={vi.fn()} onSave={vi.fn()} />);
+    const endpoint = screen.getByLabelText('Segment 1 endpoint inset');
+    await user.clear(endpoint);
+    await user.type(endpoint, '.375');
+    await user.tab();
+    expect(endpoint).toHaveValue(0.375);
+  });
+
   it('starts with a useful face-to-face removal boundary', () => {
     render(<RouterProfileDefinitionDialog open onOpenChange={vi.fn()} onSave={vi.fn()} />);
     expect(screen.getByRole('group', { name: 'Start Point' })).toBeInTheDocument();
-    expect(screen.getByLabelText('Segment 1 endpoint U')).toHaveValue(0.25);
-    expect(screen.getByLabelText('Segment 1 endpoint V')).toHaveValue(0);
+    expect(screen.getByLabelText('Segment 1 endpoint inset')).toHaveValue(0.25);
+    expect(screen.getByLabelText('Segment 1 endpoint depth')).toHaveValue(0);
     expect(screen.getByText('Profile is valid and ready to save.')).toBeInTheDocument();
   });
 
@@ -18,7 +29,7 @@ describe('RouterProfileDefinitionDialog', () => {
     fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Shop Cove' } });
     fireEvent.click(screen.getByRole('button', { name: 'Add Segment' }));
     fireEvent.change(screen.getByLabelText('Segment 2 kind'), { target: { value: 'ellipseArc' } });
-    expect(screen.getByLabelText('Segment 2 radius U')).toBeInTheDocument();
+    expect(screen.getByLabelText('Segment 2 horizontal radius')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Save Profile' }));
     await waitFor(() => expect(onSave).toHaveBeenCalled());
     expect(onSave.mock.calls[0][0]).toMatchObject({
@@ -38,20 +49,20 @@ describe('RouterProfileDefinitionDialog', () => {
   it('converts a segment to an accessible cubic Bezier while preserving its endpoint', () => {
     render(<RouterProfileDefinitionDialog open onOpenChange={vi.fn()} onSave={vi.fn()} />);
     fireEvent.change(screen.getByLabelText('Segment 1 kind'), { target: { value: 'cubicBezier' } });
-    expect(screen.getByLabelText('Segment 1 endpoint U')).toHaveValue(0.25);
-    expect(screen.getByLabelText('Segment 1 endpoint V')).toHaveValue(0);
-    expect(Number((screen.getByLabelText('Segment 1 control 1 U') as HTMLInputElement).value)).toBeCloseTo(1 / 12);
-    expect(Number((screen.getByLabelText('Segment 1 control 1 V') as HTMLInputElement).value)).toBeCloseTo(1 / 6);
-    expect(Number((screen.getByLabelText('Segment 1 control 2 U') as HTMLInputElement).value)).toBeCloseTo(1 / 6);
-    expect(Number((screen.getByLabelText('Segment 1 control 2 V') as HTMLInputElement).value)).toBeCloseTo(1 / 12);
-    expect(screen.getByLabelText('Segment 1 control 1 U')).toHaveValue(0.0833);
+    expect(screen.getByLabelText('Segment 1 endpoint inset')).toHaveValue(0.25);
+    expect(screen.getByLabelText('Segment 1 endpoint depth')).toHaveValue(0);
+    expect(Number((screen.getByLabelText('Segment 1 control 1 inset') as HTMLInputElement).value)).toBeCloseTo(1 / 12);
+    expect(Number((screen.getByLabelText('Segment 1 control 1 depth') as HTMLInputElement).value)).toBeCloseTo(1 / 6);
+    expect(Number((screen.getByLabelText('Segment 1 control 2 inset') as HTMLInputElement).value)).toBeCloseTo(1 / 6);
+    expect(Number((screen.getByLabelText('Segment 1 control 2 depth') as HTMLInputElement).value)).toBeCloseTo(1 / 12);
+    expect(screen.getByLabelText('Segment 1 control 1 inset')).toHaveValue(0.0833);
   });
 
   it('formats generated cubic values for display without rounding stored precision', async () => {
     const onSave = vi.fn();
     render(<RouterProfileDefinitionDialog open onOpenChange={vi.fn()} onSave={onSave} />);
     fireEvent.change(screen.getByLabelText('Segment 1 kind'), { target: { value: 'cubicBezier' } });
-    expect(screen.getByLabelText('Segment 1 control 1 U')).toHaveValue(0.0833);
+    expect(screen.getByLabelText('Segment 1 control 1 inset')).toHaveValue(0.0833);
     fireEvent.click(screen.getByRole('button', { name: 'Save Profile' }));
     await waitFor(() => expect(onSave).toHaveBeenCalled());
     expect(onSave.mock.calls[0][0].boundary.segments[0].control1.u).toBe(1 / 12);
@@ -60,17 +71,17 @@ describe('RouterProfileDefinitionDialog', () => {
   it('resets cubic controls to exact straight one-third and two-third positions', () => {
     render(<RouterProfileDefinitionDialog open onOpenChange={vi.fn()} onSave={vi.fn()} />);
     fireEvent.change(screen.getByLabelText('Segment 1 kind'), { target: { value: 'cubicBezier' } });
-    fireEvent.change(screen.getByLabelText('Segment 1 control 1 U'), { target: { value: '0.01' } });
+    fireEvent.change(screen.getByLabelText('Segment 1 control 1 inset'), { target: { value: '0.01' } });
     fireEvent.click(screen.getByRole('button', { name: 'Reset cubic controls to straight' }));
-    expect(Number((screen.getByLabelText('Segment 1 control 1 U') as HTMLInputElement).value)).toBeCloseTo(1 / 12);
+    expect(Number((screen.getByLabelText('Segment 1 control 1 inset') as HTMLInputElement).value)).toBeCloseTo(1 / 12);
   });
 
   it('saves edited cubic controls losslessly', async () => {
     const onSave = vi.fn();
     render(<RouterProfileDefinitionDialog open onOpenChange={vi.fn()} onSave={onSave} />);
     fireEvent.change(screen.getByLabelText('Segment 1 kind'), { target: { value: 'cubicBezier' } });
-    fireEvent.change(screen.getByLabelText('Segment 1 control 1 U'), { target: { value: '0.04' } });
-    fireEvent.change(screen.getByLabelText('Segment 1 control 2 V'), { target: { value: '0.03' } });
+    fireEvent.change(screen.getByLabelText('Segment 1 control 1 inset'), { target: { value: '0.04' } });
+    fireEvent.change(screen.getByLabelText('Segment 1 control 2 depth'), { target: { value: '0.03' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save Profile' }));
     await waitFor(() => expect(onSave).toHaveBeenCalled());
     expect(onSave.mock.calls[0][0].boundary.segments[0]).toMatchObject({
@@ -92,13 +103,13 @@ describe('RouterProfileDefinitionDialog', () => {
       boundary: { start: { u: 0, v: 0 }, segments: [{ kind: 'line' as const, to: { u: 0.25, v: 0.25 } }] }
     };
     render(<RouterProfileDefinitionDialog open initialProfile={initial} onOpenChange={vi.fn()} onSave={vi.fn()} />);
-    fireEvent.change(screen.getByLabelText('Segment 1 endpoint U'), { target: { value: '0.5' } });
+    fireEvent.change(screen.getByLabelText('Segment 1 endpoint inset'), { target: { value: '0.5' } });
     expect(initial.boundary.segments[0].to.u).toBe(0.25);
   });
 
   it('undoes and redoes a coalesced numeric edit without stealing input undo', () => {
     render(<RouterProfileDefinitionDialog open onOpenChange={vi.fn()} onSave={vi.fn()} />);
-    const endpoint = screen.getByLabelText('Segment 1 endpoint U');
+    const endpoint = screen.getByLabelText('Segment 1 endpoint inset');
     fireEvent.change(endpoint, { target: { value: '0.4' } });
     fireEvent.change(endpoint, { target: { value: '0.45' } });
     expect(endpoint).toHaveValue(0.45);
@@ -138,9 +149,9 @@ describe('RouterProfileDefinitionDialog', () => {
       'Smooth 1 eligible join'
     );
     fireEvent.click(screen.getByRole('button', { name: 'Confirm smooth joins' }));
-    expect(screen.getByLabelText('Segment 2 control 1 U')).not.toHaveValue(0.5);
+    expect(screen.getByLabelText('Segment 2 control 1 inset')).not.toHaveValue(0.5);
     fireEvent.click(screen.getByRole('button', { name: 'Undo last profile edit' }));
-    expect(screen.getByLabelText('Segment 2 control 1 U')).toHaveValue(0.5);
+    expect(screen.getByLabelText('Segment 2 control 1 inset')).toHaveValue(0.5);
   });
 });
 
@@ -180,8 +191,8 @@ describe('RouterProfileDefinitionDialog metadata and segment ordering', () => {
     const onSave = vi.fn();
     render(<RouterProfileDefinitionDialog open onOpenChange={vi.fn()} onSave={onSave} />);
     const start = within(screen.getByRole('group', { name: 'Start Point' }));
-    fireEvent.change(start.getByLabelText('U'), { target: { value: '0' } });
-    fireEvent.change(start.getByLabelText('V'), { target: { value: '0.375' } });
+    fireEvent.change(start.getByLabelText('In from edge'), { target: { value: '0' } });
+    fireEvent.change(start.getByLabelText('Depth from face'), { target: { value: '0.375' } });
     fireEvent.click(screen.getByRole('button', { name: /^Save/ }));
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1));
     expect(onSave.mock.calls[0][0].boundary.start).toEqual({ u: 0, v: 0.375 });
@@ -190,16 +201,16 @@ describe('RouterProfileDefinitionDialog metadata and segment ordering', () => {
   it('reorders segments and disables the moves that would run off the ends', () => {
     render(<RouterProfileDefinitionDialog open onOpenChange={vi.fn()} onSave={vi.fn()} />);
     addSegment();
-    fireEvent.change(screen.getByLabelText('Segment 1 endpoint U'), { target: { value: '0.1' } });
-    fireEvent.change(screen.getByLabelText('Segment 2 endpoint U'), { target: { value: '0.2' } });
+    fireEvent.change(screen.getByLabelText('Segment 1 endpoint inset'), { target: { value: '0.1' } });
+    fireEvent.change(screen.getByLabelText('Segment 2 endpoint inset'), { target: { value: '0.2' } });
 
     expect(screen.getByLabelText('Move segment 1 up')).toBeDisabled();
     expect(screen.getByLabelText('Move segment 2 down')).toBeDisabled();
 
     fireEvent.click(screen.getByLabelText('Move segment 2 up'));
-    expect(screen.getByLabelText('Segment 1 endpoint U')).toHaveValue(0.2);
+    expect(screen.getByLabelText('Segment 1 endpoint inset')).toHaveValue(0.2);
     fireEvent.click(screen.getByLabelText('Move segment 1 down'));
-    expect(screen.getByLabelText('Segment 1 endpoint U')).toHaveValue(0.1);
+    expect(screen.getByLabelText('Segment 1 endpoint inset')).toHaveValue(0.1);
   });
 
   it('exposes radius and direction once a segment becomes an arc', () => {
@@ -241,7 +252,7 @@ describe('RouterProfileDefinitionDialog metadata and segment ordering', () => {
     fireEvent.change(mode, { target: { value: 'mirrored' } });
     expect(mode).toHaveValue('mirrored');
     fireEvent.click(screen.getByRole('button', { name: 'Confirm smooth joins' }));
-    expect(screen.getByLabelText('Segment 2 control 1 U')).not.toHaveValue(0.5);
+    expect(screen.getByLabelText('Segment 2 control 1 inset')).not.toHaveValue(0.5);
   });
 
   it('abandons an edit without saving', () => {

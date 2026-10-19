@@ -111,7 +111,7 @@ function App() {
   useDevTools(); // Dev tools for testing (only active in dev mode)
 
   // Auto-recovery for crash protection
-  const { hasRecovery, recoveryInfo, restoreRecovery, discardRecovery } = useAutoRecovery();
+  const { hasRecovery, recoveryInfo, restoreRecovery, discardRecovery, prepareRecoveryForClose } = useAutoRecovery();
 
   // Library import check - detects project items not in library
   const {
@@ -216,6 +216,7 @@ function App() {
     isFileActionBusy,
     handleGoHome
   } = useFileOperations({
+    prepareRecoveryForClose,
     isEditingTemplate,
     onSaveTemplate: saveTemplateDirectly,
     isEditingAssembly,
@@ -975,11 +976,12 @@ function App() {
                           ? 'default'
                           : 'outline'
                     }
-                    size="icon"
+                    size={isEditingPartCuts ? 'sm' : 'icon'}
                     onClick={handlePrimarySave}
-                    title="Save (Cmd+S)"
+                    title={isEditingPartCuts ? 'Apply cuts to project (Cmd+S)' : 'Save (Cmd+S)'}
                   >
                     <Save size={18} />
+                    {isEditingPartCuts && 'Apply cuts'}
                   </Button>
                 </div>
                 <Separator orientation="vertical" className="h-7" />

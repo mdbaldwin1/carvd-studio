@@ -39,6 +39,25 @@ function createRectCut(overrides?: {
 }
 
 describe('rectCutUtils', () => {
+  it('resolves explicit stopped spans without changing legacy full-width cuts', () => {
+    const feature = createRectCut({
+      cutType: 'stopped_dado',
+      size: { length: 0.75, width: 6 },
+      placement: { x: 5, z: 1 }
+    });
+    feature.parameters.stoppedSpan = true;
+    feature.parameters.cornerRadius = 0.375;
+    const resolved = getResolvedRectCutFeature(feature, PART);
+    expect(resolved.parameters.size.width).toBe(6);
+    expect(resolved.placement.z).toBe(1);
+    expect(validateRectCutFeature(feature, PART)).toBeNull();
+    feature.placement.z = 3;
+    expect(validateRectCutFeature(feature, PART)).toContain('past the board edge');
+    delete feature.parameters.stoppedSpan;
+    expect(getResolvedRectCutFeature(feature, PART).parameters.size.width).toBe(8);
+    expect(getResolvedRectCutFeature(feature, PART).placement.z).toBe(0);
+  });
+
   it('normalizes dado geometry to a full-width blind face cut', () => {
     const resolved = getResolvedRectCutFeature(
       {

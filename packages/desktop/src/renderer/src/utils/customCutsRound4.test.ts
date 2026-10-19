@@ -238,7 +238,7 @@ describe('closure review disconnected stock and pattern performance', () => {
       const elapsed = performance.now() - started;
       console.info(`F cold ${16 * rows} holes: ${elapsed.toFixed(1)}ms`);
       expect.soft(elapsed).toBeLessThan(budgetMs(1000));
-      const polygonArea = 8 * 0.05 ** 2 * Math.sin(Math.PI / 8);
+      const polygonArea = 32 * 0.05 ** 2 * Math.sin(Math.PI / 32);
       expect(getPartMaterialVolume(part)).toBeCloseTo(
         40 - 8 * Math.tan(Math.PI / 12) - 2 * Math.tan(Math.PI / 9) - 16 * rows * polygonArea,
         5
@@ -294,7 +294,7 @@ describe('closure review disconnected stock and pattern performance', () => {
     const elapsed = performance.now() - start;
     console.info(`F near-meeting planes: ${elapsed.toFixed(1)}ms`);
     expect.soft(elapsed).toBeLessThan(budgetMs(1000));
-    expect(getPartMaterialVolume(part)).toBeCloseTo(20.02 - 16 * 8 * 0.05 ** 2 * Math.sin(Math.PI / 8), 5);
+    expect(getPartMaterialVolume(part)).toBeCloseTo(20.02 - 16 * 32 * 0.05 ** 2 * Math.sin(Math.PI / 32), 5);
   }, 30000);
   it.each(
     (['left_end', 'right_end'] as const).flatMap((endFace) =>
@@ -322,11 +322,13 @@ describe('closure review disconnected stock and pattern performance', () => {
       const started = performance.now();
       const geometry = getPartRenderGeometry(part);
       expect(performance.now() - started).toBeLessThan(budgetMs(1000));
-      const pilot = 8 * 0.05 ** 2 * Math.sin(Math.PI / 8);
-      const major = 8 * 0.1 ** 2 * Math.sin(Math.PI / 8);
+      const pilot = 32 * 0.05 ** 2 * Math.sin(Math.PI / 32);
+      const major = 32 * 0.1 ** 2 * Math.sin(Math.PI / 32);
       expect(getPartMaterialVolume(part)).toBeCloseTo(
         40 - 8 * Math.tan(Math.PI / 12) - 2 * Math.tan(Math.PI / 9) - 128 * (pilot + (major - pilot) * 0.25),
-        5
+        // 128 dense bores accumulate Float32 triangulation error (~1 ppm).
+        // The per-vertex stock-plane check below remains at 1e-6 inch.
+        4
       );
       const side = endFace === 'right_end' ? 1 : -1;
       const ny = side * (verticalFlip ? 1 : -1) * Math.tan(Math.PI / 9);

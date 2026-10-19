@@ -127,6 +127,21 @@ describe('useMenuCommands', () => {
       expect(requestDeleteParts).not.toHaveBeenCalled();
     });
 
+    it('selects focused position text without selecting project parts', async () => {
+      const input = document.createElement('input');
+      input.value = '3/8';
+      document.body.append(input);
+      input.focus();
+      const selectParts = vi.fn();
+      useSelectionStore.setState({ selectParts });
+      renderHook(() => useMenuCommands());
+      await menuCommandHandler('select-all');
+      expect(input.selectionStart).toBe(0);
+      expect(input.selectionEnd).toBe(3);
+      expect(selectParts).not.toHaveBeenCalled();
+      input.remove();
+    });
+
     it('handles select-all command', async () => {
       const selectParts = vi.fn();
       useProjectStore.setState({

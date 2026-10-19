@@ -20,6 +20,23 @@ import {
 
 const PART_DEFAULTS = { partLength: 24, partWidth: 8, partThickness: 0.75 };
 
+describe('joinery shaping survives editing', () => {
+  it.each(['taperAngle', 'wallAngle', 'sideWallAngle'] as const)('preserves %s when relabeling a socket', (angle) => {
+    const original = buildFeatureFromDraft(createRectDraft({ [angle]: 10 }));
+    const draft = buildDraftFromFeature(original, { length: 24, width: 8, thickness: 0.75 });
+    const saved = buildFeatureFromDraft({ ...draft, label: 'Relabeled socket' });
+    expect(saved.parameters).toMatchObject({ [angle]: 10 });
+  });
+
+  it('preserves the narrow mitred lip of a secret dovetail', () => {
+    const original = buildFeatureFromDraft(
+      createEndCutDraft({ cutType: 'bevel', verticalAngle: 45, band: { from: 0, to: 0.25 } })
+    );
+    const saved = buildFeatureFromDraft({ ...buildDraftFromFeature(original), label: 'Mitred lip' });
+    expect(saved.parameters).toMatchObject({ band: { from: 0, to: 0.25 } });
+  });
+});
+
 type RectDraft = Extract<FeatureDraft, { mode: 'rect_cut' }>;
 type EndCutDraft = Extract<FeatureDraft, { mode: 'end_cut' }>;
 
@@ -149,23 +166,22 @@ describe('partFeatureEditorState', () => {
       const blindMortise = (depth: number) => createRectDraft({ cutType: 'mortise', depthMode: 'blind', depth });
       expect(normalizeRectCutDraft(blindMortise(0), PART_DEFAULTS).depth).toBe(0.25);
       expect(normalizeRectCutDraft(blindMortise(Number.NaN), PART_DEFAULTS).depth).toBe(0.25);
-      expect(normalizeRectCutDraft(blindMortise(0.01), PART_DEFAULTS).depth).toBe(0.125);
+      expect(normalizeRectCutDraft(blindMortise(0.01), PART_DEFAULTS).depth).toBe(0.01);
     });
 
-    it('lets a mortise be taken through, but not one cut into an edge', () => {
+    it('lets a mortise be taken through a face or a long edge', () => {
       // A wedged tenon needs a through mortise, and drawing it as a Cutout
       // instead costs the cut its identity everywhere it is later described.
       expect(
         normalizeRectCutDraft(createRectDraft({ cutType: 'mortise', depthMode: 'through' }), PART_DEFAULTS).depthMode
       ).toBe('through');
-      // A pocket cut into the front face runs across the thickness and has no
-      // far side to break out of.
+      // An edge mortise exits the opposite edge, as in an open bridle.
       expect(
         normalizeRectCutDraft(
           createRectDraft({ cutType: 'mortise', faceTarget: 'front_face', depthMode: 'through' }),
           PART_DEFAULTS
         ).depthMode
-      ).toBe('blind');
+      ).toBe('through');
       // A new mortise is still blind, which is what one usually is.
       expect(normalizeRectCutDraft(createRectDraft({ cutType: 'mortise' }), PART_DEFAULTS).depth).toBeGreaterThan(0);
     });
@@ -183,15 +199,15 @@ describe('partFeatureEditorState', () => {
 
     it('coerces face targets per cut type, keeping side faces for pockets', () => {
       // Channels stay on top/bottom where run semantics are defined.
-      for (const cutType of ['dado', 'stopped_dado', 'groove', 'stopped_groove'] as const) {
+      for (const cutType of ['dado', 'stopped_dado', 'half_lap'] as const) {
         const normalized = normalizeRectCutDraft(createRectDraft({ cutType, faceTarget: 'front_face' }), PART_DEFAULTS);
         expect(normalized.faceTarget).toBe('top_face');
       }
-      // Pockets may sink into side faces and become blind there.
-      for (const cutType of ['cutout', 'mortise'] as const) {
+      // Pockets and grooves retain long-edge targets.
+      for (const cutType of ['cutout', 'mortise', 'groove', 'stopped_groove'] as const) {
         const normalized = normalizeRectCutDraft(createRectDraft({ cutType, faceTarget: 'front_face' }), PART_DEFAULTS);
         expect(normalized.faceTarget).toBe('front_face');
-        expect(normalized.depthMode).toBe('blind');
+        expect(normalized.depthMode).toBe(cutType === 'cutout' || cutType === 'mortise' ? 'through' : 'blind');
       }
       const bottom = normalizeRectCutDraft(createRectDraft({ faceTarget: 'bottom_face' }), PART_DEFAULTS);
       expect(bottom.faceTarget).toBe('bottom_face');
@@ -238,8 +254,8 @@ describe('partFeatureEditorState', () => {
       expect(normalized.placementZ).toBe(0);
     });
 
-    it('locks dado and stopped dado width to the part width', () => {
-      for (const cutType of ['dado', 'stopped_dado'] as const) {
+    it('locks through-running dado width to the part width', () => {
+      for (const cutType of ['dado'] as const) {
         const normalized = normalizeRectCutDraft(
           createRectDraft({ cutType, sizeWidth: 3, placementZ: 2 }),
           PART_DEFAULTS
@@ -247,6 +263,27 @@ describe('partFeatureEditorState', () => {
         expect(normalized.sizeWidth).toBe(8);
         expect(normalized.placementZ).toBe(0);
       }
+    });
+
+    it('preserves a stopped dado span, radius and offset through editing', () => {
+      const normalized = normalizeRectCutDraft(
+        createRectDraft({
+          cutType: 'stopped_dado',
+          sizeLength: 0.75,
+          sizeWidth: 6,
+          placementZ: 1,
+          cornerRadius: 0.375
+        }),
+        PART_DEFAULTS
+      );
+      expect(normalized.sizeWidth).toBe(6);
+      expect(normalized.placementZ).toBe(1);
+      const feature = buildFeatureFromDraft(normalized);
+      expect(buildDraftFromFeature(feature, { length: 24, width: 8, thickness: 0.75 })).toMatchObject({
+        sizeWidth: 6,
+        placementZ: 1,
+        cornerRadius: 0.375
+      });
     });
 
     it('locks groove run to the part length', () => {

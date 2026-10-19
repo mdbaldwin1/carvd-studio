@@ -16,7 +16,11 @@ export default function ShortcutsPage() {
       />
       <h2 className="text-4xl font-bold mb-xl">Keyboard Shortcuts</h2>
 
-      <div className="grid grid-cols-2 gap-xl">
+      <p className="text-muted mb-xl">
+        Use Cmd on macOS or Ctrl on Windows. While typing in a measurement or
+        text field, finish the entry before using canvas shortcuts.
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-xl">
         <div className="rounded-lg border border-border bg-surface p-[var(--space-lg)] transition-all duration-250 hover:border-accent hover:shadow-[var(--shadow-md)]">
           <h3 className="text-xl font-bold mb-[var(--space-sm)]">
             File Operations
@@ -162,6 +166,58 @@ export default function ShortcutsPage() {
         </div>
       </div>
 
+      <section id="part-cuts" className="site-section p-6 mt-xl scroll-mt-28">
+        <h3 className="text-2xl font-bold mb-4">Inside Part Cuts</h3>
+        <p className="text-muted mb-4">
+          The cut editor has its own selection and undo history. These commands
+          affect the cut being edited.
+        </p>
+        <dl className="grid gap-3 text-sm">
+          <div>
+            <dt className="font-bold">Cmd/Ctrl + Z / Cmd/Ctrl + Shift + Z</dt>
+            <dd className="text-muted">Undo or redo a cut edit.</dd>
+          </div>
+          <div>
+            <dt className="font-bold">Arrow keys / Shift + Arrow</dt>
+            <dd className="text-muted">
+              Nudge a supported selected cut by 1/4 inch / 1 inch along its
+              editable directions. These are cut-editor steps; they do not use
+              the project’s grid size.
+            </dd>
+          </div>
+          <div>
+            <dt className="font-bold">F or Home</dt>
+            <dd className="text-muted">Frame the part in the preview.</dd>
+          </div>
+          <div>
+            <dt className="font-bold">Delete / Backspace</dt>
+            <dd className="text-muted">Remove the selected cut.</dd>
+          </div>
+          <div>
+            <dt className="font-bold">Escape</dt>
+            <dd className="text-muted">
+              Deselect the cut first. With no cut selected, request exit from
+              the editor.
+            </dd>
+          </div>
+          <div>
+            <dt className="font-bold">Cmd/Ctrl + S</dt>
+            <dd className="text-muted">
+              Apply cuts to the project. Save the project file after returning
+              to the main editor.
+            </dd>
+          </div>
+        </dl>
+      </section>
+      <section className="site-section p-6 mt-xl">
+        <h3 className="text-2xl font-bold mb-4">Dragging modifiers</h3>
+        <p className="text-muted">
+          Alt/Option + drag temporarily bypasses part snapping. Shift + drag
+          constrains part movement to the ground plane. Shift + drag on a
+          rotation ring instead gives fine rotation control. These modifiers
+          depend on the control you are using.
+        </p>
+      </section>
       <DocsPrevNext />
     </section>
   );

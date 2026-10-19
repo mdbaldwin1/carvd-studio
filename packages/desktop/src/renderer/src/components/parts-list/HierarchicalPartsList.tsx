@@ -1,6 +1,7 @@
 import { Badge } from '@renderer/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@renderer/components/ui/tooltip';
 import { Button } from '@renderer/components/ui/button';
+import { Checkbox } from '@renderer/components/ui/checkbox';
 import { getFeatureBadgeLabel, getPrimaryFeatureText } from '@renderer/utils/partFeatureSummary';
 import { AlertTriangle, ChevronDown, ChevronRight, Layers } from 'lucide-react';
 import React, { useCallback, useEffect, useMemo } from 'react';
@@ -12,7 +13,7 @@ import type { WorkspaceSceneGraph } from '../../interaction/sceneGraph';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useUIStore } from '../../store/uiStore';
 import { Group, GroupMember, Part, PartValidationIssue } from '../../types';
-import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { formatReadableMeasurement } from '../../utils/fractions';
 import { getAncestorGroupIds } from '../../utils/interactionSelection';
 import { IconButton } from '../common/IconButton';
 
@@ -272,7 +273,7 @@ const PartItem = React.memo(function PartItem({
   onDelete,
   onIssueClick
 }: PartItemProps) {
-  const dimsText = `${formatMeasurementWithUnit(part.length, units)} × ${formatMeasurementWithUnit(part.width, units)} × ${formatMeasurementWithUnit(part.thickness, units)}`;
+  const dimsText = `${formatReadableMeasurement(part.length, units)} × ${formatReadableMeasurement(part.width, units)} × ${formatReadableMeasurement(part.thickness, units)}`;
   const featureBadge = getFeatureBadgeLabel(part.features);
   const featureSummary = getPrimaryFeatureText(part.features, units);
   // Issues get their own tooltip on the icon below, so they are left out of
@@ -286,6 +287,13 @@ const PartItem = React.memo(function PartItem({
       onClick={(e) => onPartClick(part.id, e)}
       title={titleText}
     >
+      <Checkbox
+        aria-label={`Select ${part.name}`}
+        checked={isSelected}
+        onClick={(event) => event.stopPropagation()}
+        onChange={() => useSelectionStore.getState().togglePartSelection(part.id)}
+        className="shrink-0"
+      />
       <span className="part-color w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: part.color }} />
       {(hasError || hasWarning) && (
         <Tooltip>

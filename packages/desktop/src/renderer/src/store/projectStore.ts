@@ -1,3 +1,4 @@
+import { MIN_DIMENSION_INCHES } from '../constants';
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { v4 as uuidv4 } from 'uuid';
@@ -31,7 +32,11 @@ import { useSnapStore } from './snapStore';
 import { useClipboardStore } from './clipboardStore';
 import { useLicenseStore } from './licenseStore';
 import { detectGroupFeatureMateSnaps, getPartBounds } from '../utils/snapToPartsUtil';
-import { resolveSafeTranslationDelta, wouldTransformedPartsOverlap } from '../utils/overlapPolicy';
+import {
+  resolveSafeNudgeTranslationDelta,
+  resolveSafeTranslationDelta,
+  wouldTransformedPartsOverlap
+} from '../utils/overlapPolicy';
 import {
   clonePartFeaturesForCopy,
   getAssemblyPartCopyMap,
@@ -46,13 +51,18 @@ import { boreThroughAssembly as boreThroughAssemblyHoles } from '../utils/boreTh
 import { planTenonFit, resolveTenonAndMortiseParts } from '../utils/fitJoinery';
 import { findGrainCutMismatches } from '../utils/grainDirectionCuts';
 import { planHousingFit, resolveHousingRoles } from '../utils/fitHousing';
+import { isRoundStock, resolveStockForm } from '../../../shared/stock';
+import { getFactoryBlankShape } from '../utils/partShape';
 import { validateRectCutFeature } from '../utils/rectCutUtils';
+import { normalizeSavedCutList } from '../utils/cutListVersion';
+import { validateRoutedPath } from '../utils/routedPathValidation';
 import { validateEndCutFeature } from '../utils/endCutUtils';
 import { validateCircularCut, validateRoundedCut } from '../utils/roundCutUtils';
 import { getPartFeatureConflicts } from '../utils/partFeatureConflicts';
 import { getFeatureTargetLabel } from '../utils/partFeatureSummary';
 import { analyzeEdgeProfileToolFeasibility } from '../utils/edgeProfileToolFeasibility';
 import { buildWorkspaceSceneGraph } from '../interaction/sceneGraph';
+import { resolveRotateBatchGrounding } from '../utils/interactionMovement';
 import { rotationTool } from '../interaction/tools/rotationTool';
 import { resolveSelectedGroupIdsWithDescendants, resolveTransformSelectedPartIds } from '../utils/interactionSelection';
 import { dragDebug } from '../utils/dragDebug';
@@ -361,6 +371,16 @@ const getDuplicateOffset = (partsToDuplicate: Part[]): { x: number; y: number; z
 let historyStepMark: number | null = null;
 
 /** Validate parts for cut list generation, returning any issues found. */
+/** Keep nesting orientation coherent when a constrained stock is assigned or edited. */
+function withStockGrain(part: Part, stock: Stock | undefined, constrained: boolean): Part {
+  if (!stock || !constrained) return part;
+  return {
+    ...part,
+    grainSensitive: stock.grainDirection !== 'none',
+    grainDirection: stock.grainDirection === 'none' ? part.grainDirection : stock.grainDirection
+  };
+}
+
 export const validatePartsForCutList = (
   parts: Part[],
   stocks: Stock[],
@@ -394,6 +414,41 @@ export const validatePartsForCutList = (
       const cutLength = part.length + (part.extraLength || 0);
       const cutWidth = part.width + (part.extraWidth || 0);
 
+      if (
+        resolveStockForm(stock) === 'insert' &&
+        (Math.abs(part.length - stock.length) > 1e-6 ||
+          Math.abs(part.width - stock.width) > 1e-6 ||
+          Math.abs(part.thickness - stock.thickness) > 1e-6 ||
+          part.blankShape !== getFactoryBlankShape(stock) ||
+          part.extraLength ||
+          part.extraWidth)
+      ) {
+        issues.push({
+          partId: part.id,
+          partName: part.name,
+          type: 'purchased_size_mismatch',
+          severity: 'error',
+          message:
+            'Purchased insert dimensions and shape must match its catalog stock exactly, without blank allowances. Assign matching stock, or use Reset to Stock and recheck its cuts and mating sockets.'
+        });
+      }
+
+      if (
+        isRoundStock(stock) &&
+        (Math.abs(part.width - stock.thickness) > 1e-6 ||
+          Math.abs(part.thickness - stock.thickness) > 1e-6 ||
+          part.extraWidth)
+      ) {
+        issues.push({
+          partId: part.id,
+          partName: part.name,
+          type: 'stock_thickness_mismatch',
+          severity: 'error',
+          message:
+            'Part diameter must match round stock in both width and thickness, without width allowance. Assign stock with the correct diameter, or use Reset to Stock and recheck its cuts and mating sockets.'
+        });
+      }
+
       // Check thickness
       if (part.thickness > stock.thickness) {
         issues.push({
@@ -401,6 +456,18 @@ export const validatePartsForCutList = (
           partName: part.name,
           type: 'exceeds_thickness',
           message: `Thickness (${part.thickness}") exceeds stock (${stock.thickness}")`,
+          severity: 'error'
+        });
+      }
+
+      // Sheet goods cannot be thicknessed like solid lumber. A thinner part
+      // needs its own sheet stock; otherwise its purchase and nesting are wrong.
+      if (resolveStockForm(stock) === 'sheet' && part.thickness < stock.thickness - 0.000001) {
+        issues.push({
+          partId: part.id,
+          partName: part.name,
+          type: 'stock_thickness_mismatch',
+          message: `Part thickness (${part.thickness}") differs from sheet stock (${stock.thickness}"). Assign sheet stock with the actual finished thickness.`,
           severity: 'error'
         });
       }
@@ -478,7 +545,9 @@ export const validatePartsForCutList = (
               ? validateRoundedCut(feature, part)
               : feature.kind === 'end_cut'
                 ? validateEndCutFeature(feature, part)
-                : null;
+                : feature.kind === 'routed_path'
+                  ? validateRoutedPath(feature, part, units)
+                  : null;
       if (!featureIssue) continue;
 
       const featureLabel =
@@ -552,6 +621,38 @@ export const validatePartsForCutList = (
   return issues;
 };
 
+const projectHistoryState = (state: ProjectState) => ({
+  projectName: state.projectName,
+  parts: state.parts,
+  stocks: state.stocks,
+  groups: state.groups,
+  groupMembers: state.groupMembers,
+  assemblies: state.assemblies,
+  units: state.units,
+  gridSize: state.gridSize,
+  kerfWidth: state.kerfWidth,
+  overageFactor: state.overageFactor,
+  projectNotes: state.projectNotes,
+  stockConstraints: state.stockConstraints,
+  snapGuides: state.snapGuides,
+  customShoppingItems: state.customShoppingItems,
+  cutList: state.cutList,
+  version: state.version,
+  createdAt: state.createdAt
+});
+
+// Savepoints belong to the document, never to an undo entry. Timestamps are
+// bookkeeping; returning to the same saved content should remove the dirty dot.
+let savedProjectContent = '';
+function projectContentSnapshot(state: ProjectState): string {
+  return JSON.stringify(projectHistoryState(state));
+}
+function reconcileDirtyAfterHistory(): void {
+  const state = useProjectStore.getState();
+  const isDirty = projectContentSnapshot(state) !== savedProjectContent;
+  if (state.isDirty !== isDirty) useProjectStore.setState({ isDirty });
+}
+
 export const useProjectStore = create<ProjectState>()(
   temporal(
     (set, get) => ({
@@ -592,7 +693,32 @@ export const useProjectStore = create<ProjectState>()(
           return null;
         }
 
-        const newPart = createDefaultPart(partOverrides);
+        const newPart = withStockGrain(
+          createDefaultPart(partOverrides),
+          get().stocks.find((stock) => stock.id === partOverrides?.stockId),
+          get().stockConstraints.constrainGrain
+        );
+        newPart.blankShape =
+          partOverrides?.blankShape ?? getFactoryBlankShape(get().stocks.find((stock) => stock.id === newPart.stockId));
+        const insertStock = get().stocks.find((stock) => stock.id === newPart.stockId);
+        if (insertStock && isRoundStock(insertStock))
+          Object.assign(newPart, { width: insertStock.thickness, thickness: insertStock.thickness });
+        if (insertStock?.form === 'insert')
+          Object.assign(newPart, {
+            length: insertStock.length,
+            width: insertStock.width,
+            thickness: insertStock.thickness
+          });
+        if (!partOverrides?.position) {
+          const bounds = getPartBounds(newPart);
+          newPart.position.y -= bounds.minY;
+          if (parts.length > 0) {
+            // Put fresh stock beside the work, with room to pick it up and
+            // size it before assembly. Explicit drop/import positions win.
+            const rightEdge = Math.max(...parts.map((part) => getPartBounds(part).maxX));
+            newPart.position.x += rightEdge + 2 - bounds.minX;
+          }
+        }
         set((state) => ({
           parts: [...state.parts, newPart],
           isDirty: true
@@ -609,13 +735,30 @@ export const useProjectStore = create<ProjectState>()(
           if (!existingPart) return state;
 
           let nextPart = { ...existingPart, ...updates };
+          if (updates.stockId !== undefined && updates.stockId !== existingPart.stockId) {
+            const stock = state.stocks.find((stock) => stock.id === updates.stockId);
+            nextPart = withStockGrain(nextPart, stock, state.stockConstraints.constrainGrain);
+            nextPart.blankShape = getFactoryBlankShape(stock);
+            if (stock && isRoundStock(stock))
+              Object.assign(nextPart, { width: stock.thickness, thickness: stock.thickness });
+            if (stock?.form === 'insert')
+              Object.assign(nextPart, { length: stock.length, width: stock.width, thickness: stock.thickness });
+            if (!updates.position && Math.abs(getPartBounds(existingPart).minY) < 1e-7) {
+              nextPart = {
+                ...nextPart,
+                position: { ...nextPart.position, y: nextPart.position.y - getPartBounds(nextPart).minY }
+              };
+            }
+          }
           const affectsOverlap =
             updates.position !== undefined ||
             updates.rotation !== undefined ||
             updates.ignoreOverlap !== undefined ||
             updates.length !== undefined ||
             updates.width !== undefined ||
-            updates.thickness !== undefined;
+            updates.thickness !== undefined ||
+            updates.stockId !== undefined ||
+            updates.blankShape !== undefined;
 
           if (state.stockConstraints.preventOverlap && affectsOverlap) {
             const transformed = new Map<string, Part>([[id, nextPart]]);
@@ -724,14 +867,26 @@ export const useProjectStore = create<ProjectState>()(
             const changes = updateMap.get(part.id);
             if (!changes) continue;
 
-            transformed.set(part.id, { ...part, ...changes });
+            const proposed = { ...part, ...changes };
+            transformed.set(
+              part.id,
+              changes.stockId !== undefined
+                ? withStockGrain(
+                    proposed,
+                    state.stocks.find((stock) => stock.id === changes.stockId),
+                    state.stockConstraints.constrainGrain
+                  )
+                : proposed
+            );
             if (
               changes.position !== undefined ||
               changes.rotation !== undefined ||
               changes.ignoreOverlap !== undefined ||
               changes.length !== undefined ||
               changes.width !== undefined ||
-              changes.thickness !== undefined
+              changes.thickness !== undefined ||
+              changes.stockId !== undefined ||
+              Object.prototype.hasOwnProperty.call(changes, 'blankShape')
             ) {
               affectsOverlap = true;
             }
@@ -917,7 +1072,7 @@ export const useProjectStore = create<ProjectState>()(
         const second = parts.find((part) => part.id === secondPartId);
         if (!first || !second) return false;
 
-        const roles = resolveHousingRoles(first, second);
+        const roles = resolveHousingRoles(first, second, get().stocks);
         if (!roles) {
           useUIStore
             .getState()
@@ -925,7 +1080,7 @@ export const useProjectStore = create<ProjectState>()(
           return false;
         }
 
-        const plan = planHousingFit(roles.shelfPart, roles.housingPart);
+        const plan = planHousingFit(roles.shelfPart, roles.housingPart, get().stocks);
         if (!plan) return false;
         if (!plan.changed) {
           useUIStore.getState().showToast('That housing already fits.', 'info');
@@ -1027,6 +1182,7 @@ export const useProjectStore = create<ProjectState>()(
         if (partIdsToMove.size === 0) return;
 
         let effectiveDelta = delta;
+        let mateInsertionNormal: { x: number; y: number; z: number } | undefined;
         if (useSnapStore.getState().snapToPartsEnabled) {
           const movingParts = parts.filter((part) => partIdsToMove.has(part.id));
           const anchorPart = movingParts[0];
@@ -1045,6 +1201,7 @@ export const useProjectStore = create<ProjectState>()(
               0.5
             );
             if (mate.mateHostPartId) {
+              mateInsertionNormal = mate.mateInsertionNormal;
               effectiveDelta = {
                 x: delta.x + mate.adjustedPosition.x - anchorPosition.x,
                 y: delta.y + mate.adjustedPosition.y - anchorPosition.y,
@@ -1054,7 +1211,7 @@ export const useProjectStore = create<ProjectState>()(
           }
         }
         if (stockConstraints.preventOverlap) {
-          const safeDelta = resolveSafeTranslationDelta(parts, partIdsToMove, effectiveDelta);
+          const safeDelta = resolveSafeNudgeTranslationDelta(parts, partIdsToMove, effectiveDelta, mateInsertionNormal);
           if (!safeDelta) {
             dragDebug('projectStore:moveSelectedParts:noSafeDelta', {
               requestedDelta: delta,
@@ -1158,6 +1315,23 @@ export const useProjectStore = create<ProjectState>()(
             },
             rotation: rotationPreview.rotation
           });
+        }
+
+        // Ground the selection as one rigid assembly before per-part render
+        // effects see it. Independent corrections would pull seated joints apart.
+        const grounded = resolveRotateBatchGrounding({
+          startingParts: parts.filter((part) => partIdsToRotate.has(part.id)),
+          projectParts: parts,
+          groupMembers,
+          updates: [...transformed.values()].map((part) => ({
+            partId: part.id,
+            position: part.position,
+            rotation: part.rotation
+          }))
+        });
+        for (const update of grounded.updates) {
+          const part = transformed.get(update.partId)!;
+          transformed.set(update.partId, { ...part, position: update.position });
         }
 
         if (stockConstraints.preventOverlap && wouldTransformedPartsOverlap(parts, transformed)) {
@@ -1430,13 +1604,18 @@ export const useProjectStore = create<ProjectState>()(
 
             return {
               ...p,
+              blankShape: getFactoryBlankShape(stock),
               length: stock.length,
               width: stock.width,
               thickness: stock.thickness,
               color: stock.color,
-              grainDirection: stock.grainDirection === 'none' ? p.grainDirection : stock.grainDirection
+              grainDirection: stock.grainDirection === 'none' ? p.grainDirection : stock.grainDirection,
+              grainSensitive: stock.grainDirection !== 'none',
+              extraLength: 0,
+              extraWidth: 0
             };
           }),
+          cutList: state.cutList ? { ...state.cutList, isStale: true } : null,
           isDirty: true
         }));
       },
@@ -1464,16 +1643,25 @@ export const useProjectStore = create<ProjectState>()(
         // Validate dimensions are > 0
         const validatedUpdates = { ...updates };
         if (validatedUpdates.length !== undefined) {
-          validatedUpdates.length = Math.max(0.001, validatedUpdates.length);
+          validatedUpdates.length = Math.max(MIN_DIMENSION_INCHES, validatedUpdates.length);
         }
         if (validatedUpdates.width !== undefined) {
-          validatedUpdates.width = Math.max(0.001, validatedUpdates.width);
+          validatedUpdates.width = Math.max(MIN_DIMENSION_INCHES, validatedUpdates.width);
         }
         if (validatedUpdates.thickness !== undefined) {
-          validatedUpdates.thickness = Math.max(0.001, validatedUpdates.thickness);
+          validatedUpdates.thickness = Math.max(MIN_DIMENSION_INCHES, validatedUpdates.thickness);
         }
         set((state) => ({
           stocks: state.stocks.map((s) => (s.id === id ? { ...s, ...validatedUpdates } : s)),
+          parts:
+            validatedUpdates.grainDirection === undefined
+              ? state.parts
+              : state.parts.map((part) => {
+                  const stock = state.stocks.find((candidate) => candidate.id === id);
+                  return part.stockId === id && stock
+                    ? withStockGrain(part, { ...stock, ...validatedUpdates }, state.stockConstraints.constrainGrain)
+                    : part;
+                }),
           isDirty: true
         }));
         get().markCutListStale();
@@ -1490,36 +1678,33 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       assignStockToSelectedParts: (stockId) => {
-        const { stocks } = get();
+        const state = get();
         const { selectedPartIds } = useSelectionStore.getState();
-        if (selectedPartIds.length === 0) return;
-
-        if (stockId === null) {
-          // Unassign stock from all selected parts
-          set((state) => ({
-            parts: state.parts.map((p) => (selectedPartIds.includes(p.id) ? { ...p, stockId: null } : p)),
-            isDirty: true
-          }));
-        } else {
-          const stock = stocks.find((s) => s.id === stockId);
-          if (!stock) return;
-
-          // Assign stock and inherit color + grain direction
-          set((state) => ({
-            parts: state.parts.map((p) =>
-              selectedPartIds.includes(p.id)
-                ? {
-                    ...p,
-                    stockId,
-                    color: stock.color,
-                    grainDirection: stock.grainDirection === 'none' ? p.grainDirection : stock.grainDirection
-                  }
-                : p
-            ),
-            isDirty: true
-          }));
-        }
-        get().markCutListStale();
+        const stock = state.stocks.find((candidate) => candidate.id === stockId);
+        if (!selectedPartIds.length || (stockId !== null && !stock)) return;
+        const updates = state.parts
+          .filter((part) => selectedPartIds.includes(part.id))
+          .map((part) => {
+            const changes: Partial<Part> = { stockId, blankShape: getFactoryBlankShape(stock) };
+            if (stock) {
+              changes.color = stock.color;
+              if (state.stockConstraints.constrainGrain) {
+                changes.grainDirection = stock.grainDirection === 'none' ? part.grainDirection : stock.grainDirection;
+                changes.grainSensitive = stock.grainDirection !== 'none';
+              }
+              if (isRoundStock(stock)) Object.assign(changes, { width: stock.thickness, thickness: stock.thickness });
+              if (stock.form === 'insert')
+                Object.assign(changes, { length: stock.length, width: stock.width, thickness: stock.thickness });
+              if (Math.abs(getPartBounds(part).minY) < 1e-7) {
+                changes.position = {
+                  ...part.position,
+                  y: part.position.y - getPartBounds({ ...part, ...changes }).minY
+                };
+              }
+            }
+            return { id: part.id, changes };
+          });
+        state.batchUpdateParts(updates);
       },
 
       // Assembly actions
@@ -1634,6 +1819,7 @@ export const useProjectStore = create<ProjectState>()(
             },
             rotation: part.rotation,
             stockId: part.stockId,
+            blankShape: part.blankShape,
             grainSensitive: part.grainSensitive,
             grainDirection: part.grainDirection,
             color: part.color,
@@ -1814,6 +2000,7 @@ export const useProjectStore = create<ProjectState>()(
             },
             rotation: cp.rotation,
             stockId: resolvedStockId,
+            blankShape: cp.blankShape,
             grainSensitive: cp.grainSensitive,
             grainDirection: cp.grainDirection,
             color: cp.color,
@@ -1900,6 +2087,7 @@ export const useProjectStore = create<ProjectState>()(
           customShoppingItems: [],
           cutList: null
         });
+        get().markClean();
         useClipboardStore.getState().clearClipboard();
         useSelectionStore.setState({
           selectedPartIds: [],
@@ -1950,8 +2138,9 @@ export const useProjectStore = create<ProjectState>()(
           modifiedAt: project.modifiedAt || new Date().toISOString(),
           snapGuides: project.snapGuides || [],
           customShoppingItems: project.customShoppingItems || [],
-          cutList: project.cutList || null
+          cutList: normalizeSavedCutList(project.cutList)
         });
+        get().markClean();
         useClipboardStore.getState().clearClipboard();
         useSelectionStore.setState({
           selectedPartIds: [],
@@ -1973,7 +2162,10 @@ export const useProjectStore = create<ProjectState>()(
 
       setFilePath: (path) => set({ filePath: path }),
       markDirty: () => set({ isDirty: true, modifiedAt: new Date().toISOString() }),
-      markClean: () => set({ isDirty: false }),
+      markClean: () => {
+        savedProjectContent = projectContentSnapshot(get());
+        set({ isDirty: false });
+      },
 
       // Project settings actions
       setProjectName: (projectName) => set({ projectName, isDirty: true }),
@@ -1988,7 +2180,22 @@ export const useProjectStore = create<ProjectState>()(
         get().markCutListStale();
       },
       setProjectNotes: (projectNotes) => set({ projectNotes, isDirty: true }),
-      setStockConstraints: (stockConstraints) => set({ stockConstraints, isDirty: true }),
+      setStockConstraints: (stockConstraints) =>
+        set((state) => ({
+          stockConstraints,
+          parts:
+            !state.stockConstraints.constrainGrain && stockConstraints.constrainGrain
+              ? state.parts.map((part) =>
+                  withStockGrain(
+                    part,
+                    state.stocks.find((stock) => stock.id === part.stockId),
+                    true
+                  )
+                )
+              : state.parts,
+          cutList: state.cutList ? { ...state.cutList, isStale: true } : null,
+          isDirty: true
+        })),
 
       // Snap guide actions
       addSnapGuide: (axis, position, label) => {
@@ -2314,16 +2521,18 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       markCutListStale: () => {
-        // Use functional setter to avoid race condition with concurrent state updates
-        set((state) => {
-          if (state.cutList && !state.cutList.isStale) {
-            return {
-              cutList: { ...state.cutList, isStale: true },
-              isDirty: true
-            };
-          }
-          return {};
-        });
+        if (!get().cutList || get().cutList?.isStale) return;
+        // Invalidation is derived from the preceding edit, not a second undo
+        // step. Otherwise Undo can mark an obsolete report current while the
+        // edited model remains unchanged. Preserve an existing history pause.
+        const history = useProjectStore.temporal.getState();
+        const wasTracking = history.isTracking;
+        if (wasTracking) history.pause();
+        try {
+          set((state) => (state.cutList ? { cutList: { ...state.cutList, isStale: true }, isDirty: true } : {}));
+        } finally {
+          if (wasTracking) history.resume();
+        }
       },
 
       clearCutList: () => {
@@ -2358,26 +2567,23 @@ export const useProjectStore = create<ProjectState>()(
       }
     }),
     {
-      partialize: (state) => ({
-        projectName: state.projectName,
-        parts: state.parts,
-        stocks: state.stocks,
-        groups: state.groups,
-        groupMembers: state.groupMembers,
-        assemblies: state.assemblies,
-        units: state.units,
-        gridSize: state.gridSize,
-        kerfWidth: state.kerfWidth,
-        overageFactor: state.overageFactor,
-        projectNotes: state.projectNotes,
-        stockConstraints: state.stockConstraints,
-        snapGuides: state.snapGuides,
-        customShoppingItems: state.customShoppingItems,
-        cutList: state.cutList,
-        version: state.version,
-        createdAt: state.createdAt,
-        modifiedAt: state.modifiedAt
-      }),
+      partialize: projectHistoryState,
+      wrapTemporal: (initialize) => (set, get, store) => {
+        const history = initialize(set, get, store);
+        return {
+          ...history,
+          undo: (steps) => {
+            const changed = get().pastStates.length > 0;
+            history.undo(steps);
+            if (changed) reconcileDirtyAfterHistory();
+          },
+          redo: (steps) => {
+            const changed = get().futureStates.length > 0;
+            history.redo(steps);
+            if (changed) reconcileDirtyAfterHistory();
+          }
+        };
+      },
       limit: 100,
       equality: (pastState, currentState) => JSON.stringify(pastState) === JSON.stringify(currentState)
     }
@@ -2385,3 +2591,5 @@ export const useProjectStore = create<ProjectState>()(
 );
 
 // Selection change subscription bridge is in selectionStore.ts to avoid circular init issues
+
+savedProjectContent = projectContentSnapshot(useProjectStore.getState());

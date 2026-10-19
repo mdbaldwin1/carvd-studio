@@ -139,6 +139,15 @@ export function bindWindowPointerSession(
   };
 }
 
+/** Ordinary snaps may only change coordinates exposed by the drag plane. */
+export function getPlaneSnapAxes(normal: { x: number; y: number; z: number }) {
+  return {
+    x: Math.abs(normal.x) < 1 - 1e-6,
+    y: Math.abs(normal.y) < 1 - 1e-6,
+    z: Math.abs(normal.z) < 1 - 1e-6
+  };
+}
+
 export interface PointerRafTarget {
   requestAnimationFrame(callback: () => void): number;
   cancelAnimationFrame(frameId: number): void;
@@ -149,6 +158,7 @@ export function createPointerRafQueue(
   onFrame: (event: PointerEvent) => void
 ): {
   schedule(event: PointerEvent): void;
+  flush(): void;
   cancel(): void;
 } {
   let frameId: number | null = null;
@@ -162,10 +172,20 @@ export function createPointerRafQueue(
       frameId = target.requestAnimationFrame(() => {
         frameId = null;
         const eventForFrame = latestEvent;
+        latestEvent = null;
         if (!eventForFrame) return;
 
         onFrame(eventForFrame);
       });
+    },
+    flush() {
+      if (frameId !== null) {
+        target.cancelAnimationFrame(frameId);
+        frameId = null;
+      }
+      const event = latestEvent;
+      latestEvent = null;
+      if (event) onFrame(event);
     },
     cancel() {
       if (frameId !== null) {

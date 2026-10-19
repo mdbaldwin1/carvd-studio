@@ -5,6 +5,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
+  failOnFlakyTests: !!process.env.CI,
   workers: process.env.CI ? 1 : 4,
   reporter: 'html',
   use: {

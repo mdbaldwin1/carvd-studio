@@ -167,6 +167,21 @@ describe('CutListDiagramsTab', () => {
       expect(screen.getByText(/Selected: Top \(24" x 12"\)/)).toBeInTheDocument();
     });
 
+    it.each([
+      ['imperial', '4"', '0.47"'],
+      ['metric', '101.6mm', '11.938mm']
+    ] as const)('preserves narrow blank dimensions in %s diagram details', async (units, length, width) => {
+      const user = userEvent.setup();
+      const board = createBoard();
+      board.placements = [{ ...board.placements[0], partName: 'T-slot bar', width: 4, height: 0.47 }];
+      render(<CutListDiagramsTab {...defaultProps} units={units} cutList={createCutList({ stockBoards: [board] })} />);
+
+      await user.click(screen.getByRole('button', { name: 'Open Board #1 cutting diagram details' }));
+      await user.click(screen.getByRole('button', { name: `T-slot bar, ${length} × ${width}` }));
+      expect(screen.getByText(`Selected: T-slot bar (${length} x ${width})`)).toBeInTheDocument();
+      expect(screen.getByText(width, { selector: 'text' })).toBeInTheDocument();
+    });
+
     it('renders utilization percentage', () => {
       render(<CutListDiagramsTab {...defaultProps} />);
       expect(screen.getByText('8.8% used')).toBeInTheDocument();

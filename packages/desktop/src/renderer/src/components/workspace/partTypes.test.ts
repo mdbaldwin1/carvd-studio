@@ -166,3 +166,18 @@ describe('partTypes', () => {
     });
   });
 });
+
+it('preserves coordinates outside the drag plane during grid release', () => {
+  for (const fixed of ['x', 'y', 'z'] as const) {
+    const axes = { x: true, y: true, z: true, [fixed]: false };
+    const result = resolveLiveGridReleasePosition(
+      { x: 0.375, y: 0.375, z: 0.375 },
+      { x: false, y: false, z: false },
+      true,
+      1,
+      axes
+    );
+    expect(result[fixed]).toBe(0.375);
+    for (const axis of ['x', 'y', 'z'] as const) if (axis !== fixed) expect(result[axis]).toBe(0);
+  }
+});

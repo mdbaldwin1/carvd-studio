@@ -135,14 +135,14 @@ export function getResolvedRectCutFeature(
         ...feature.parameters,
         size: {
           length: feature.parameters.size.length,
-          width: part.width
+          width: feature.parameters.stoppedSpan ? feature.parameters.size.width : part.width
         },
         depthMode: 'blind',
         depth: feature.parameters.depth
       },
       placement: {
         x: feature.placement.x,
-        z: 0
+        z: feature.parameters.stoppedSpan ? feature.placement.z : 0
       }
     };
   }
@@ -261,7 +261,7 @@ export function isSideFaceTarget(feature: RectCutFeature): boolean {
   );
 }
 
-/** Rectangle in blank coordinates: X from Left and Z from Front. */
+/** Rectangle in blank coordinates: X from Left and Z from Back. */
 export function getRectCutPlanBounds(feature: RectCutFeature, part: Pick<Part, 'length' | 'width' | 'thickness'>) {
   const resolved = getResolvedRectCutFeature(feature, part);
   const { length, width } = resolved.parameters.size;
@@ -458,6 +458,8 @@ export function validateRectCutFeature(
     if (resolvedFeature.parameters.depthMode !== 'blind') return 'Stopped dado currently uses blind depth only.';
     if (resolvedFeature.placement.x < 0) return 'Stopped dado offset cannot be negative.';
     if (resolvedFeature.placement.x + sizeLength > part.length) return 'Stopped dado run extends past the blank.';
+    if (resolvedFeature.placement.z < 0) return 'Stopped dado stop distance cannot be negative.';
+    if (resolvedFeature.placement.z + sizeWidth > part.width + 1e-9) return 'Stopped dado extends past the board edge.';
   }
 
   if (resolvedFeature.cutType === 'groove') {

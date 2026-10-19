@@ -1,3 +1,4 @@
+import { formatStockMeasurement } from '@renderer/utils/stockMeasurements';
 import { ColorPicker } from '@renderer/components/common/ColorPicker';
 import { HelpTooltip } from '@renderer/components/common/HelpTooltip';
 import { Label } from '@renderer/components/ui/label';
@@ -36,13 +37,16 @@ export function SinglePartMaterialCard({
     <div className="properties-card">
       <div className="property-group">
         <div className="flex items-center gap-1">
-          <Label className="m-0">Stock</Label>
+          <Label htmlFor="part-stock" className="m-0">
+            Stock
+          </Label>
           <HelpTooltip
             text="Assign a stock material to this part. Color and grain direction are inherited from the assigned stock."
             docsSection="stock"
           />
         </div>
         <Select
+          id="part-stock"
           value={selectedPart.stockId || ''}
           onChange={(e) => {
             const value = e.target.value;
@@ -56,7 +60,7 @@ export function SinglePartMaterialCard({
           <option value="">No stock assigned</option>
           {stocks.map((stock) => (
             <option key={stock.id} value={stock.id}>
-              {stock.name} ({formatMeasurementWithUnit(stock.thickness, units)})
+              {stock.name} ({formatStockMeasurement(stock.thickness, stock, units)})
             </option>
           ))}
           <option value="___create___">+ Add New Stock...</option>

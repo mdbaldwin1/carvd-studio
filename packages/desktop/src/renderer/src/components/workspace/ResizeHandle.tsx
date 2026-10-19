@@ -41,7 +41,12 @@ export const ResizeHandle = memo(
 
     // Positions relative to center (group position handles world offset)
     const handleX = handlePos.x === 0 ? 0 : handlePos.x * halfLength;
-    const handleY = handlePos.y === 0 ? 0 : handlePos.y * halfThickness;
+    const lengthOnly = handlePos.x !== 0 && handlePos.y === 0 && handlePos.z === 0;
+    // The pin cap center already carries a rotation control. Put the length
+    // grip beyond the round body's silhouette; its descriptor remains at the
+    // physical end, so the resize anchor and dimension math do not move.
+    const lengthGripOffset = lengthOnly ? halfThickness + (hitScale * 0.45) / 2 + 0.08 : 0;
+    const handleY = lengthOnly ? lengthGripOffset : handlePos.y === 0 ? 0 : handlePos.y * halfThickness;
     const handleZ = handlePos.z === 0 ? 0 : handlePos.z * halfWidth;
 
     // Determine cursor based on handle type
@@ -74,6 +79,12 @@ export const ResizeHandle = memo(
 
     return (
       <group position={[handleX, handleY, handleZ]}>
+        {lengthOnly && (
+          <mesh raycast={NOOP_RAYCAST} position={[0, -lengthGripOffset / 2, 0]}>
+            <cylinderGeometry args={[0.008, 0.008, lengthGripOffset, 6]} />
+            <meshBasicMaterial color={baseColor} transparent opacity={0.65} depthWrite={false} />
+          </mesh>
+        )}
         {/* Larger near-invisible hit target keeps handles easy to grab even when visually scaled down */}
         <mesh
           userData={{ blocksPartSelection: true, hitTarget: hitDescriptor }}

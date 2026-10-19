@@ -88,6 +88,12 @@ export function formatFabricationMeasurement(inches: number, units: 'imperial' |
   return `${exact ?? Number(inches.toPrecision(12))}"`;
 }
 
+/** Readable display without rounding metric stock to a different imperial fraction. */
+export function formatReadableMeasurement(inches: number, units: 'imperial' | 'metric'): string {
+  if (units === 'metric') return `${Number((inches * INCHES_TO_MM).toFixed(3))}mm`;
+  return `${decimalToExactFraction(inches) ?? Number(inches.toFixed(4))}"`;
+}
+
 /**
  * Parse user input based on units, returning inches.
  * @param input - User input string
@@ -97,16 +103,20 @@ export function formatFabricationMeasurement(inches: number, units: 'imperial' |
 export function parseInput(input: string, units: 'imperial' | 'metric'): number | null {
   const trimmed = input.trim();
   if (!trimmed) return null;
-
-  if (units === 'metric') {
-    // For metric, parse as a decimal mm value
-    const mm = parseFloat(trimmed);
-    if (isNaN(mm)) return null;
-    return mmToInches(mm);
-  }
-
-  // For imperial, use the existing fraction parser
-  return fractionToDecimal(trimmed);
+  const explicit = trimmed.match(/^(.*?)\s*(mm|cm|inches|inch|in|["″])$/i);
+  const measurement = (explicit?.[1] ?? trimmed).trim();
+  // Do not silently interpret "20mm" or an unknown suffix as 20 inches.
+  if (
+    !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(measurement) &&
+    !/^-?\d+(?:\s+\d+)?\/\d+$/.test(measurement)
+  )
+    return null;
+  const value = fractionToDecimal(measurement);
+  if (value === null || !Number.isFinite(value)) return null;
+  const unit = explicit?.[2].toLowerCase();
+  if (unit === 'cm') return mmToInches(value * 10);
+  if (unit === 'mm' || (!unit && units === 'metric')) return mmToInches(value);
+  return value;
 }
 
 /**

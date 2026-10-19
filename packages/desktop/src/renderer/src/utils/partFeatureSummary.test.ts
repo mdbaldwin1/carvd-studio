@@ -13,12 +13,13 @@ import {
   getEnabledFeatureCount,
   getFeatureBadgeLabel,
   getFeatureSummary,
+  getFeaturePlacementSummary,
   getFeatureTargetLabel,
   getPrimaryFeatureText
 } from './partFeatureSummary';
 
 function createEndCut(overrides?: {
-  face?: 'left_end' | 'right_end';
+  face?: EndCutFeature['target']['face'];
   cutType?: EndCutFeature['cutType'];
   parameters?: Partial<EndCutFeature['parameters']>;
   enabled?: boolean;
@@ -153,6 +154,26 @@ describe('partFeatureSummary', () => {
   });
 
   describe('getFeatureSummary — end cuts', () => {
+    it.each(['mitre', 'bevel', 'compound'] as const)(
+      'shows the partial-thickness %s band measured from Bottom',
+      (cutType) => {
+        const feature = createEndCut({
+          cutType,
+          parameters: { horizontalAngle: 45, verticalAngle: 15, band: { from: 0.375, to: 0.75 } }
+        });
+        expect(getFeatureSummary(feature, 'imperial')).toContain('Cut band 3/8" to 3/4" from Bottom');
+        expect(getFeatureSummary(feature, 'metric')).toContain('Cut band 9.525mm to 19.05mm from Bottom');
+      }
+    );
+    it('retains the band in a long-edge bevel summary', () => {
+      const feature = createEndCut({
+        cutType: 'bevel',
+        face: 'front_face',
+        parameters: { horizontalAngle: 0, verticalAngle: 45, band: { from: 0, to: 0.375 } }
+      });
+      expect(getFeatureSummary(feature, 'imperial')).toContain('Cut band 0" to 3/8" from Bottom');
+    });
+
     it('summarizes a mitre with its angle and long point direction', () => {
       expect(getFeatureSummary(createEndCut({ cutType: 'mitre' }), 'imperial')).toBe(
         'Mitre 45° on Left End · Long point on Front'
@@ -305,6 +326,17 @@ describe('partFeatureSummary', () => {
       ).toBe('Mortise on Top Face · 2" × 3/4" × 1/2" deep · square corners');
     });
 
+    it.each([5, -5])('includes signed mortise end-wall shaping (%s degrees)', (wallAngle) => {
+      const feature = createRectCut({ cutType: 'mortise', depthMode: 'blind', depth: 1 });
+      feature.parameters.wallAngle = wallAngle;
+      feature.parameters.sideWallAngle = 3;
+      for (const units of ['imperial', 'metric'] as const) {
+        const summary = getFeatureSummary(feature, units);
+        expect(summary).toContain(`5° end walls, ${wallAngle > 0 ? 'widening' : 'narrowing'} with depth`);
+        expect(summary).toContain('3° side walls, widening with depth');
+      }
+    });
+
     it('reports a zero depth when a blind cut has no stored depth', () => {
       expect(
         getFeatureSummary(
@@ -342,6 +374,28 @@ describe('partFeatureSummary', () => {
   });
 
   describe('getFeatureSummary — round and rounded cuts', () => {
+    it.each(['round_hole', 'counterbore', 'countersink'] as const)(
+      'uses the editor face angle for a 15-degree %s, including patterns',
+      (cutType) => {
+        const cut = createCircularCut({
+          cutType,
+          parameters: {
+            diameter: 0.25,
+            depthMode: 'blind',
+            depth: 1,
+            tilt: 75,
+            direction: 180,
+            counterbore: { diameter: 0.5, depth: 0.125 },
+            countersink: { majorDiameter: 0.5, includedAngle: 82 }
+          }
+        });
+        expect(getFeatureSummary(cut, 'imperial')).toContain('15° from face toward 180°');
+        expect(
+          getFeatureSummary({ ...cut, pattern: { type: 'linear', count: 2, spacing: 1, direction: 0 } }, 'metric')
+        ).toContain('15° from face toward 180°');
+      }
+    );
+
     it('summarizes through, angled blind, countersunk, and counterbored holes', () => {
       expect(getFeatureSummary(createCircularCut(), 'imperial')).toBe(
         'Round Hole on Top Face · 3/8" diameter · Through'
@@ -353,7 +407,7 @@ describe('partFeatureSummary', () => {
           }),
           'imperial'
         )
-      ).toBe('Round Hole on Top Face · 1/4" diameter × 1" deep · 15° tilt toward 90°');
+      ).toBe('Round Hole on Top Face · 1/4" diameter × 1" deep · 75° from face toward 90°');
       expect(
         getFeatureSummary(
           createCircularCut({
@@ -461,7 +515,7 @@ describe('partFeatureSummary', () => {
     it.each([
       [
         { profile: 'dovetail', diameter: 0.5, shankDiameter: 0.25, includedAngle: 14 } as const,
-        'Dovetail 14° · 1/4" shank'
+        'Dovetail 7° slope · 1/4" shank'
       ],
       [
         { profile: 't_slot', diameter: 0.75, shankDiameter: 0.25, cutterHeight: 0.125 } as const,
@@ -614,5 +668,29 @@ describe('partFeatureSummary', () => {
       'imperial'
     );
     expect(summary).toBe('Edge Bevel 45\u00b0 on Front Edge \u00b7 High point on Top');
+  });
+});
+
+describe('edge groove placement notes', () => {
+  it.each(['front_face', 'back_face'] as const)('measures a %s groove from the bottom', (face) => {
+    const cut = createRectCut({ cutType: 'groove', target: { type: 'face', face } });
+    cut.placement.z = 0.25;
+    expect(getFeaturePlacementSummary(cut, 'imperial')).toBe('1/4" from Bottom; full length');
+  });
+});
+
+describe('rectangular cut reference edges', () => {
+  it.each(['top_face', 'bottom_face'] as const)('uses the back edge for rectangular cuts on %s', (face) => {
+    for (const cutType of ['groove', 'stopped_groove', 'mortise', 'cutout'] as const) {
+      const cut = createRectCut({ cutType, target: { type: 'face', face } });
+      expect(getFeaturePlacementSummary(cut, 'imperial')).toContain('1" from Back');
+    }
+  });
+
+  it('uses the back edge for a short-edge notch but preserves the tenon shoulder convention', () => {
+    const notch = createRectCut({ cutType: 'edge_notch', target: { type: 'edge', edge: 'top_left_edge' } });
+    expect(getFeaturePlacementSummary(notch, 'imperial')).toBe('1" from Back along the selected edge');
+    const tenon = createRectCut({ cutType: 'tenon', target: { type: 'face', face: 'right_end' } });
+    expect(getFeaturePlacementSummary(tenon, 'imperial')).toContain('1" from Front');
   });
 });

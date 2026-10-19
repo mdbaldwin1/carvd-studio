@@ -1,4 +1,6 @@
+import { CircleRouteLayout } from './CircleRouteLayout';
 import { FractionInput } from '@renderer/components/common/FractionInput';
+import { useEffect, useState } from 'react';
 import {
   EDGE_NOTCH_SIDE_LABELS,
   EDGE_NOTCH_SIDES,
@@ -25,6 +27,42 @@ import { EdgeProfileSelector } from './EdgeProfileSelector';
 import { EdgeProfileLibraryControls } from './EdgeProfileLibraryControls';
 import { getCutHint } from './cutHints';
 import { bitReachesDepth, DRILL_BIT_CATALOG, findBitForDiameter } from '../../../../shared/drillBits';
+
+function JointAngleInput({
+  id,
+  value,
+  limit,
+  minimum = -limit,
+  onChange
+}: {
+  id: string;
+  value: number;
+  limit: number;
+  minimum?: number;
+  onChange: (value: number) => void;
+}) {
+  const [text, setText] = useState(String(value));
+  useEffect(() => setText(String(value)), [value]);
+  return (
+    <Input
+      id={id}
+      type="number"
+      min={minimum}
+      max={limit}
+      step={0.1}
+      value={text}
+      onChange={(event) => setText(event.target.value)}
+      onBlur={() => {
+        const next = Number(text);
+        if (text.trim() && Number.isFinite(next)) onChange(next);
+        else setText(String(value));
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter') event.currentTarget.blur();
+      }}
+    />
+  );
+}
 
 /**
  * The selected cut's fields, laid out the way the project editor lays out a
@@ -71,7 +109,7 @@ export function CutProperties() {
   // Only a four-cornered pocket has corners a rotating bit can round. A dado
   // or a groove runs out to an edge and has none.
   const isRoundablePocket =
-    inspectorDraft.mode === 'rect_cut' && (inspectorDraft.cutType === 'mortise' || inspectorDraft.cutType === 'cutout');
+    inspectorDraft.mode === 'rect_cut' && ['mortise', 'cutout', 'stopped_dado'].includes(inspectorDraft.cutType);
   // Routed with a bit the pocket's own width, which is the usual way, the ends
   // come out half-round. A narrower bit in several passes leaves less.
   const routedCornerRadius =
@@ -95,7 +133,7 @@ export function CutProperties() {
       : inspectorDraft.cutType === 'dado'
         ? 'Dado spans the full board width. Set the channel width along the blank and the blind depth.'
         : inspectorDraft.cutType === 'stopped_dado'
-          ? 'Stopped dado spans full board width, but the run is limited along the blank. Set run length, start offset, and blind depth. For a channel stopped before a side edge, use Mortise; use Stopped Groove for a limited lengthwise channel.'
+          ? 'Measure the dado from the left end, then set how far it stops from the front and back edges. A zero stop opens that end.'
           : inspectorDraft.cutType === 'rabbet'
             ? 'Rabbet runs the full edge length. Set the shoulder width and blind depth.'
             : inspectorDraft.cutType === 'groove'
@@ -117,9 +155,11 @@ export function CutProperties() {
         ? 'Tenon Length'
         : inspectorDraft.cutType === 'rabbet'
           ? 'Shoulder Width'
-          : inspectorDraft.cutType === 'groove'
-            ? 'Full Board Run'
-            : 'Run Along Blank';
+          : inspectorDraft.cutType === 'dado' || inspectorDraft.cutType === 'stopped_dado'
+            ? 'Dado Width'
+            : inspectorDraft.cutType === 'groove'
+              ? 'Full Board Run'
+              : 'Run Along Blank';
 
   const crossLabel =
     !isRect || inspectorDraft.mode !== 'rect_cut'
@@ -179,9 +219,7 @@ export function CutProperties() {
     inspectorDraft.mode === 'rect_cut' &&
     inspectorDraft.cutType !== 'corner_notch' &&
     inspectorDraft.cutType !== 'edge_notch' &&
-    inspectorDraft.cutType !== 'dado' &&
-    inspectorDraft.cutType !== 'rabbet' &&
-    inspectorDraft.cutType !== 'groove';
+    inspectorDraft.cutType !== 'rabbet';
 
   // Cut types whose blind recess direction is worth stating. Some of them
   // (a corner notch, a rabbet) have no offsets at all, so this has to keep
@@ -371,7 +409,7 @@ export function CutProperties() {
         )}
 
         {inspectorDraft.mode === 'rect_cut' &&
-          ['cutout', 'dado', 'stopped_dado', 'groove', 'stopped_groove', 'mortise'].includes(
+          ['cutout', 'dado', 'stopped_dado', 'groove', 'stopped_groove', 'mortise', 'half_lap'].includes(
             inspectorDraft.cutType
           ) && (
             <div className="property-group">
@@ -509,6 +547,45 @@ export function CutProperties() {
           </>
         )}
 
+        {inspectorDraft.mode === 'end_cut' && !isEdgeBevelTarget(inspectorDraft.targetFace) && (
+          <div className="property-group">
+            <label className="flex items-center gap-2">
+              <Checkbox
+                checked={Boolean(inspectorDraft.band)}
+                onChange={(event) =>
+                  setDraft({
+                    ...inspectorDraft,
+                    band: event.target.checked ? { from: 0, to: part.thickness / 3 } : undefined
+                  })
+                }
+              />
+              Cut only a lip
+            </label>
+            {inspectorDraft.band && (
+              <>
+                <p className="my-2 text-[11px] text-text-muted">
+                  Limit the cut to a band of thickness, measured from the bottom face. Useful for a hidden dovetail's
+                  mitred lip.
+                </p>
+                <Label>Band Start From Bottom</Label>
+                <FractionInput
+                  ariaLabel="Band Start From Bottom"
+                  value={inspectorDraft.band.from}
+                  min={0}
+                  onChange={(from) => setDraft({ ...inspectorDraft, band: { ...inspectorDraft.band!, from } })}
+                />
+                <Label>Band End From Bottom</Label>
+                <FractionInput
+                  ariaLabel="Band End From Bottom"
+                  value={inspectorDraft.band.to}
+                  min={0}
+                  onChange={(to) => setDraft({ ...inspectorDraft, band: { ...inspectorDraft.band!, to } })}
+                />
+              </>
+            )}
+          </div>
+        )}
+
         {inspectorDraft.mode === 'circular_cut' && (
           <>
             <div className="property-group">
@@ -631,6 +708,12 @@ export function CutProperties() {
         {inspectorDraft.mode === 'rounded_cut' && (
           <>
             <div className="property-group">
+              {inspectorDraft.plateJoiner && (
+                <p className="text-xs text-text-muted">
+                  Plate-joiner slot: length is the blade’s opening at the edge; width is its kerf. The curved ends lie
+                  inside the board.
+                </p>
+              )}
               <Label>Opening Length</Label>
               <FractionInput
                 ariaLabel="Opening Length"
@@ -760,13 +843,12 @@ export function CutProperties() {
             {(['v_bit', 'engraving', 'dovetail'] as const).some((profile) => profile === inspectorDraft.bitProfile) && (
               <div className="property-group">
                 <Label htmlFor="router-bit-angle">Included Angle</Label>
-                <Input
+                <JointAngleInput
                   id="router-bit-angle"
-                  type="number"
-                  min={1}
-                  max={179}
+                  limit={179}
+                  minimum={1}
                   value={inspectorDraft.bitAngle}
-                  onChange={(event) => setDraft({ ...inspectorDraft, bitAngle: Number(event.target.value) })}
+                  onChange={(bitAngle) => setDraft({ ...inspectorDraft, bitAngle })}
                 />
                 {inspectorDraft.bitProfile === 'dovetail' && (
                   <p className="mt-1 text-[11px] text-text-muted">Full angle between the two sloped cutting faces.</p>
@@ -930,7 +1012,9 @@ export function CutProperties() {
 
             <div className="property-group">
               <Label>{crossLabel}</Label>
-              {inspectorUsesDerivedCrossWidth ? (
+              {inspectorDraft.cutType === 'stopped_dado' ? (
+                <div className="text-sm text-text">{formatMeasurementWithUnit(inspectorDraft.sizeWidth, units)}</div>
+              ) : inspectorUsesDerivedCrossWidth ? (
                 <div className="text-sm text-text">
                   {formatMeasurementWithUnit(
                     inspectorDraft.cutType === 'rabbet'
@@ -949,16 +1033,48 @@ export function CutProperties() {
                   min={0.125}
                 />
               )}
-              {['dado', 'stopped_dado', 'rabbet', 'groove'].includes(inspectorDraft.cutType) && (
+              {['dado', 'rabbet'].includes(inspectorDraft.cutType) && (
                 <p className="mt-1 text-[11px] text-text-muted">
                   {inspectorDraft.cutType === 'dado' || inspectorDraft.cutType === 'stopped_dado'
                     ? 'Derived from blank width.'
-                    : inspectorDraft.cutType === 'rabbet'
-                      ? 'Runs the full edge length.'
-                      : 'Derived from blank length.'}
+                    : 'Runs the full edge length.'}
                 </p>
               )}
             </div>
+
+            {inspectorDraft.cutType === 'stopped_dado' && (
+              <>
+                <div className="property-group">
+                  <Label>Stop from Back Edge</Label>
+                  <FractionInput
+                    ariaLabel="Stop from Back Edge"
+                    value={inspectorDraft.placementZ}
+                    min={0}
+                    max={inspectorDraft.placementZ + inspectorDraft.sizeWidth - 0.125}
+                    onChange={(stop) =>
+                      updateRectDraft({
+                        placementZ: stop,
+                        sizeWidth: inspectorDraft.sizeWidth + inspectorDraft.placementZ - stop
+                      })
+                    }
+                  />
+                </div>
+                <div className="property-group">
+                  <Label>Stop from Front Edge</Label>
+                  <FractionInput
+                    ariaLabel="Stop from Front Edge"
+                    value={part.width - inspectorDraft.placementZ - inspectorDraft.sizeWidth}
+                    min={0}
+                    max={part.width - inspectorDraft.placementZ - 0.125}
+                    onChange={(stop) => updateRectDraft({ sizeWidth: part.width - inspectorDraft.placementZ - stop })}
+                  />
+                </div>
+                <p className="text-xs text-text-muted">
+                  Notch the shelf where the housing stops, or shorten its tongue to clear those ends. Allow for the
+                  cutter radius at routed stops. The shelf is not changed automatically.
+                </p>
+              </>
+            )}
 
             {isRoundablePocket && (
               <div className="property-group">
@@ -1014,13 +1130,60 @@ export function CutProperties() {
                     ariaLabel={blindDepthLabel}
                     value={inspectorDraft.depth}
                     onChange={(value) => updateRectDraft({ depth: value })}
-                    min={0.125}
+                    min={0.001}
                   />
                 </div>
               ))}
           </>
         )}
       </div>
+
+      {inspectorDraft.mode === 'rect_cut' &&
+        ['cutout', 'mortise', 'dado', 'stopped_dado', 'groove', 'stopped_groove'].includes(inspectorDraft.cutType) && (
+          <details
+            className="properties-card"
+            open={Boolean(inspectorDraft.wallAngle || inspectorDraft.sideWallAngle || inspectorDraft.taperAngle)}
+          >
+            <summary className="cursor-pointer text-sm font-semibold">Dovetail shaping</summary>
+            <p className="my-2 text-[11px] text-text-muted">
+              Angles are measured from square. Leave them at zero for straight sockets.
+            </p>
+            {(
+              [
+                [
+                  'taperAngle',
+                  'Tail Splay',
+                  'Flare the socket across the face along its run. Positive widens toward the far end.',
+                  30
+                ],
+                [
+                  'sideWallAngle',
+                  'Socket Side Angle',
+                  'Lean the long walls through the cut depth. Positive widens at the floor; negative narrows.',
+                  45
+                ],
+                [
+                  'wallAngle',
+                  'Socket End Angle',
+                  'Lean the end walls through the cut depth, as for a sliding dovetail housing. Positive widens at the floor.',
+                  45
+                ]
+              ] as const
+            ).map(([field, label, help, limit]) => (
+              <div className="property-group" key={field}>
+                <Label htmlFor={`cut-${field}`}>{label}</Label>
+                <JointAngleInput
+                  key={`${inspectorDraft.featureId}-${field}`}
+                  id={`cut-${field}`}
+                  limit={limit}
+                  value={inspectorDraft[field] ?? 0}
+                  onChange={(value) => updateRectDraft({ [field]: value })}
+                />
+                <p className="mt-1 text-[11px] text-text-muted">{help}</p>
+              </div>
+            ))}
+          </details>
+        )}
 
       {inspectorDraft.mode === 'routed_path' && (
         <div className="properties-card">
@@ -1047,6 +1210,10 @@ export function CutProperties() {
             </div>
             <p className="mt-1 text-[11px] text-text-muted">Coordinates are measured from the center of the face.</p>
           </div>
+          <CircleRouteLayout
+            key={inspectorDraft.featureId}
+            onApply={(points) => setDraft({ ...inspectorDraft, points, closed: true })}
+          />
           {inspectorDraft.points.map((point, index) => (
             <div className="property-group" key={index}>
               <div className="mb-1 flex items-center justify-between gap-2">
@@ -1080,6 +1247,7 @@ export function CutProperties() {
               <div className="grid grid-cols-2 gap-2">
                 <FractionInput
                   ariaLabel={`Point ${index + 1} along face`}
+                  min={-Infinity}
                   value={point.primary}
                   onChange={(primary) =>
                     setDraft({
@@ -1092,6 +1260,7 @@ export function CutProperties() {
                 />
                 <FractionInput
                   ariaLabel={`Point ${index + 1} across face`}
+                  min={-Infinity}
                   value={point.secondary}
                   onChange={(secondary) =>
                     setDraft({
@@ -1164,6 +1333,7 @@ export function CutProperties() {
                 <Label>Offset Along Face</Label>
                 <FractionInput
                   ariaLabel="Offset Along Face"
+                  min={-Infinity}
                   value={inspectorDraft.placementPrimary}
                   onChange={(placementPrimary) => setDraft({ ...inspectorDraft, placementPrimary })}
                 />
@@ -1172,6 +1342,7 @@ export function CutProperties() {
                 <Label>Offset Across Face</Label>
                 <FractionInput
                   ariaLabel="Offset Across Face"
+                  min={-Infinity}
                   value={inspectorDraft.placementSecondary}
                   onChange={(placementSecondary) => setDraft({ ...inspectorDraft, placementSecondary })}
                 />
@@ -1182,18 +1353,34 @@ export function CutProperties() {
           {inspectorDraft.mode === 'circular_cut' && (
             <>
               <div className="property-group">
-                <Label htmlFor="hole-tilt">Tilt From Square (degrees)</Label>
+                <Label htmlFor="hole-tilt">Drill angle from face (degrees)</Label>
                 <Input
                   id="hole-tilt"
                   type="number"
-                  min={0}
-                  max={89}
-                  value={inspectorDraft.tilt}
-                  onChange={(event) => setDraft({ ...inspectorDraft, tilt: Number(event.target.value) })}
+                  min={1}
+                  max={90}
+                  value={90 - inspectorDraft.tilt}
+                  onChange={(event) => setDraft({ ...inspectorDraft, tilt: 90 - Number(event.target.value) })}
                 />
+                <p className="text-[11px] text-text-muted">
+                  90° drills square into the face. A 15° pocket hole runs nearly along it.
+                </p>
+                <svg
+                  viewBox="0 0 180 70"
+                  role="img"
+                  aria-label="Drilling angle measured from the board face"
+                  className="h-16 w-full"
+                >
+                  <path d="M15 55 H165 V65 H15 Z" fill="currentColor" opacity=".2" />
+                  <path d="M35 55 L145 25 M35 55 H95" fill="none" stroke="currentColor" strokeWidth="2" />
+                  <path d="M75 55 A40 40 0 0 0 74 44" fill="none" stroke="var(--color-accent)" strokeWidth="2" />
+                  <text x="82" y="44" fill="currentColor" fontSize="11">
+                    15° from face
+                  </text>
+                </svg>
               </div>
               <div className="property-group">
-                <Label htmlFor="hole-direction">Tilt Toward (degrees)</Label>
+                <Label htmlFor="hole-direction">Drill direction across face (degrees)</Label>
                 <Input
                   id="hole-direction"
                   type="number"
@@ -1242,7 +1429,7 @@ export function CutProperties() {
 
           {inspectorDraft.mode === 'rect_cut' && showRectOffsets && (
             <>
-              {inspectorDraft.cutType !== 'tenon' && (
+              {inspectorDraft.cutType !== 'tenon' && inspectorDraft.cutType !== 'groove' && (
                 <div className="property-group">
                   <Label>Offset Along Length</Label>
                   <FractionInput
@@ -1251,31 +1438,37 @@ export function CutProperties() {
                     onChange={(value) => updateRectDraft({ placementX: value })}
                     min={0}
                   />
+                  {inspectorDraft.cutType === 'dado' && (
+                    <p className="mt-1 text-[11px] text-text-muted">
+                      Measure from the left end to the near edge of the dado.
+                    </p>
+                  )}
                 </div>
               )}
-              <div className="property-group">
-                <Label>{acrossOffsetLabel}</Label>
-                <FractionInput
-                  ariaLabel={acrossOffsetLabel}
-                  value={inspectorDraft.placementZ}
-                  onChange={(value) => updateRectDraft({ placementZ: value })}
-                  min={0}
-                  disabled={inspectorDraft.cutType === 'stopped_dado'}
-                />
-                {inspectorDraft.cutType === 'stopped_dado' && (
-                  <p className="mt-1 text-[11px] text-text-muted">
-                    Stopped dados span the full board width, so this offset stays fixed.
-                  </p>
-                )}
-              </div>
+              {!['dado', 'stopped_dado'].includes(inspectorDraft.cutType) && (
+                <div className="property-group">
+                  <Label>{acrossOffsetLabel}</Label>
+                  <FractionInput
+                    ariaLabel={acrossOffsetLabel}
+                    value={inspectorDraft.placementZ}
+                    onChange={(value) => updateRectDraft({ placementZ: value })}
+                    min={0}
+                  />
+                  {inspectorDraft.cutType === 'groove' && (
+                    <p className="mt-1 text-[11px] text-text-muted">
+                      Measure from the {isSideFace ? 'bottom' : 'back'} edge to the near edge of the groove.
+                    </p>
+                  )}
+                </div>
+              )}
             </>
           )}
 
           {showBlindRecessNote && (
             <p className="text-[11px] text-text-muted">
               {isSideFace
-                ? 'Side-face pockets recess into the board width from the face you picked.'
-                : 'Blind previews use top or bottom targets so the recess direction stays clear.'}
+                ? 'Depth is measured into the board width from the face you picked.'
+                : 'Depth is measured into the board thickness from the face you picked.'}
             </p>
           )}
         </div>

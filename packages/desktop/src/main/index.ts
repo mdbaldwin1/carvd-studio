@@ -1,6 +1,7 @@
 import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import { join, normalize, isAbsolute, dirname } from 'path';
 import { setImmediate } from 'node:timers';
+import { projectFilesFromArguments } from './projectFileArguments';
 
 // Enable CDP for automation when explicitly opted in via env. Off in normal dev,
 // so it doesn't keep a debugging port open by default. Set CARVD_REMOTE_DEBUG=1
@@ -70,6 +71,7 @@ import {
   getStoredLicenseData
 } from './license';
 import { initializeAutoUpdater, checkForUpdates, downloadUpdate, quitAndInstall, getUpdateInfo } from './updater';
+import { createUpdateRestart } from './updateRestart';
 import {
   getTrialStatus,
   acknowledgeTrialExpired,
@@ -282,9 +284,11 @@ const pendingSaveDialogs = new Map<number, Promise<Electron.SaveDialogReturnValu
 // Electron cancels app.quit() when a close listener prevents the first close.
 // Keep the user's intent until every window approves, or any renderer cancels.
 let quitRequested = false;
+const updateRestart = createUpdateRestart({ requestQuit: () => app.quit(), install: quitAndInstall });
 app.on('before-quit', () => {
   quitRequested = true;
 });
+app.on('will-quit', (event) => updateRestart.onWillQuit(event));
 
 // Splash window reference and timing
 let splashWindow: BrowserWindow | null = null;
@@ -1247,8 +1251,13 @@ ipcMain.handle('confirm-close', (event) => {
 });
 
 // Window close cancellation - called by renderer to cancel close
-ipcMain.handle('cancel-close', () => {
+ipcMain.handle('cancel-close', (_event, reason?: 'save-failed') => {
+  // The save-error dialog remains open and can retry Save. Keep its quit/update
+  // intent until the user explicitly cancels; never start installation here.
+  if (reason === 'save-failed') return;
+  if (reason !== undefined) throw new Error('Invalid close cancellation reason');
   quitRequested = false;
+  updateRestart.cancel();
 });
 
 // Called only after the renderer's unsaved-change guard approves the action.
@@ -1362,7 +1371,7 @@ ipcMain.handle('download-update', async () => {
 });
 
 ipcMain.handle('quit-and-install', () => {
-  quitAndInstall();
+  updateRestart.request();
 });
 
 ipcMain.handle('get-update-info', () => {
@@ -1467,11 +1476,16 @@ app.whenReady().then(async () => {
   // Create application menu
   createApplicationMenu();
 
-  // If a file was double-clicked before app was ready, open it
-  // Otherwise create a normal window
-  if (pendingFileToOpen) {
-    createWindow(pendingFileToOpen);
-    pendingFileToOpen = null;
+  // macOS sends open-file; Windows/Linux launchers pass project paths in argv.
+  const launchFiles = pendingFileToOpen
+    ? [pendingFileToOpen]
+    : projectFilesFromArguments(process.argv.slice(app.isPackaged ? 1 : 2));
+  pendingFileToOpen = null;
+  if (launchFiles.length > 0) {
+    for (const filePath of launchFiles) {
+      addRecentProject(filePath);
+      createWindow(filePath);
+    }
   } else {
     createWindow();
   }

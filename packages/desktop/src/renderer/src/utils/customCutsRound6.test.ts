@@ -137,7 +137,7 @@ describe('full review round 3 remediation', () => {
     console.info(`K1 ${rows * 16} holes cold collision: ${elapsed.toFixed(1)} ms`);
     expect(elapsed).toBeLessThan(budgetMs(1000));
     expect(topHits(part, -4, -1.5)).toHaveLength(0);
-    const polygonArea = 8 * 0.05 * 0.05 * Math.sin(Math.PI / 8); // Literal adaptive 16-sided small bore.
+    const polygonArea = 32 * 0.05 * 0.05 * Math.sin(Math.PI / 32); // Independent area of the rendered 64-sided bore.
     expect(getPartMaterialVolume(part)).toBeCloseTo(
       40 - 8 * Math.tan(Math.PI / 12) - 2 * Math.tan(Math.PI / 9) - rows * 16 * polygonArea,
       4
@@ -193,7 +193,7 @@ describe('full review round 3 remediation', () => {
     const board = { ...blank([cut]), thickness: 4, rotation, position: { x: 12.3, y: 9.1, z: -7.4 } };
     expect(validateCircularCut(cut, board)).toBeNull();
     const frame = getFaceFrame(board, face);
-    const angle = Math.PI / 24; // Mid-normal of one rendered 24-segment bore facet.
+    const angle = Math.PI / 64; // Mid-normal of one rendered 64-segment bore facet.
     const ex = new THREE.Vector3(frame.primaryAxis.x, frame.primaryAxis.y, frame.primaryAxis.z)
       .multiplyScalar(Math.cos(angle))
       .addScaledVector(
@@ -217,7 +217,8 @@ describe('full review round 3 remediation', () => {
         .add(new THREE.Vector3(12.3, 9.1, -7.4));
       const timber = createTestPart({
         length: 0.25,
-        width: 0.25,
+        // Remain within the single facet being probed; its chord is about 0.098 inch.
+        width: 0.0625,
         thickness: 24,
         position,
         rotation: { x: (euler.x * 180) / Math.PI, y: (euler.y * 180) / Math.PI, z: (euler.z * 180) / Math.PI }

@@ -23,6 +23,7 @@ export interface AssemblyPart {
   relativePosition: { x: number; y: number; z: number }; // position relative to assembly origin
   rotation: Rotation3D;
   stockId: string | null;
+  blankShape?: 'domino' | 'biscuit' | 'round';
   grainSensitive: boolean;
   grainDirection: 'length' | 'width';
   color: string;
@@ -182,6 +183,8 @@ export interface RectCutFeature extends PartFeatureBase {
       length: number;
       width: number;
     };
+    /** Explicit cross-board span; absent preserves legacy full-width stopped dados. */
+    stoppedSpan?: boolean;
     depthMode: 'through' | 'blind';
     depth?: number;
     /**
@@ -292,6 +295,8 @@ export interface RoundedCutFeature extends PartFeatureBase {
     length: number;
     width: number;
     cornerRadius: number;
+    /** Circular plate-joiner blade; its arc lies in the board plane, not across the kerf. */
+    plateJoiner?: boolean;
     depthMode: 'through' | 'blind';
     depth?: number;
   };
@@ -486,6 +491,8 @@ export interface Part {
   position: { x: number; y: number; z: number };
   rotation: Rotation3D; // degrees around each axis
   stockId: string | null; // assigned stock (null = unassigned)
+  /** Explicit factory blank; absent keeps existing rectangular project geometry. */
+  blankShape?: 'domino' | 'biscuit' | 'round';
   grainSensitive: boolean;
   grainDirection: 'length' | 'width'; // which way the grain runs on this part
   color: string; // inherited from stock when assigned
@@ -717,6 +724,8 @@ export interface PartValidationIssue {
     | 'no_stock'
     | 'exceeds_dimensions'
     | 'exceeds_thickness'
+    | 'stock_thickness_mismatch'
+    | 'purchased_size_mismatch'
     | 'grain_mismatch'
     | 'grain_cut_direction'
     | 'joint_fit'
@@ -730,9 +739,11 @@ export interface PartValidationIssue {
 
 // Represents a single part's cut instructions
 export interface CutInstruction {
-  stage?: 'post_glue_up'; // Absent means a stock blank; retained for legacy cut lists.
+  stage?: 'post_glue_up' | 'post_purchase'; // Absent means a stock blank; retained for legacy cut lists.
   partId: string;
   partName: string;
+  finishedLength?: number; // Modeled envelope before authored cuts; excludes blank allowance.
+  finishedWidth?: number;
   cutLength: number; // length + extraLength
   cutWidth: number; // width + extraWidth
   thickness: number;
@@ -813,6 +824,7 @@ export interface CutListStatistics {
 
 // The complete cut list
 export interface CutList {
+  formatVersion?: number; // Version of derived fabrication output, independent of project format.
   id: string;
   generatedAt: string; // ISO timestamp
   projectModifiedAt: string; // project modifiedAt when generated
@@ -823,6 +835,8 @@ export interface CutList {
   // Finished-panel machining, performed after assembling the optimized strips.
   // Separate from stock blanks so it never consumes stock or multiplies per strip.
   postGlueUpInstructions?: CutInstruction[];
+  postPurchaseInstructions?: CutInstruction[];
+  validationIssues?: PartValidationIssue[];
 
   // Per-stock optimization results
   stockBoards: StockBoard[];
@@ -866,13 +880,15 @@ export interface CustomShoppingItem {
 // older builds, while featured projects make old builds warn instead of
 // silently showing uncut boxes.
 /** Highest file version this build writes and can open. */
-export const CARVD_FILE_VERSION = 3;
+export const CARVD_FILE_VERSION = 4;
 /** A project with no cuts and only sheet or board stock. */
 export const CARVD_FILE_VERSION_BASE = 1;
 /** A project that uses part cuts. */
 export const CARVD_FILE_VERSION_FEATURES = 2;
 /** A project that uses rod or insert stock. */
 export const CARVD_FILE_VERSION_STOCK_FORMS = 3;
+/** Explicit factory blanks and stopped spans require geometry-aware readers. */
+export const CARVD_FILE_VERSION_JOINERY_LAYOUT = 4;
 
 // The .carvd file format - plain JSON structure
 export interface CarvdFile {

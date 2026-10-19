@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js';
 import polygonClipping from 'polygon-clipping';
 import { ADDITION, Brush, Evaluator, INTERSECTION, SUBTRACTION } from 'three-bvh-csg';
 import { mergeGeometries, mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -52,6 +53,7 @@ function featureKey(part: Part): string {
     length: part.length,
     width: part.width,
     thickness: part.thickness,
+    blankShape: part.blankShape,
     features: (part.features ?? [])
       .filter((feature) => feature.enabled)
       .map((feature) => {
@@ -150,7 +152,7 @@ function getEnabledFeatures(part: Part): PartFeature[] {
 }
 
 export function hasRenderablePartFeatures(part: Part): boolean {
-  return getEnabledFeatures(part).length > 0;
+  return Boolean(part.blankShape) || getEnabledFeatures(part).length > 0;
 }
 
 function hasOnlyEndCutFeatures(part: Part): boolean {
@@ -218,7 +220,11 @@ const ROUNDABLE_RECT_CUT_TYPES: RectCutFeature['cutType'][] = ['mortise', 'cutou
 const CORNER_ARC_STEPS = 8;
 
 export function getRectCutCornerRadius(feature: RectCutFeature, part: Part): number {
-  if (!ROUNDABLE_RECT_CUT_TYPES.includes(feature.cutType)) return 0;
+  if (
+    !ROUNDABLE_RECT_CUT_TYPES.includes(feature.cutType) &&
+    !(feature.cutType === 'stopped_dado' && feature.parameters.stoppedSpan)
+  )
+    return 0;
   const radius = feature.parameters.cornerRadius ?? 0;
   if (!(radius > 0)) return 0;
   const bounds = getRectCutPlanBounds(feature, part);
@@ -232,8 +238,8 @@ function getRectCutHole(feature: RectCutFeature, part: Part): Point2[] {
   const maxX = bounds.maxX - part.length / 2;
   // The contour is punched in a plan whose second axis runs against the
   // part's own, so an offset taken from the back edge turns round here.
-  const minZ = part.width / 2 - bounds.maxZ;
-  const maxZ = part.width / 2 - bounds.minZ;
+  let minZ = part.width / 2 - bounds.maxZ;
+  let maxZ = part.width / 2 - bounds.minZ;
 
   // A dovetail's flare lives in the face, not in the thickness: the far end
   // of the pocket is wider than the near one and the walls stay square to the
@@ -243,6 +249,12 @@ function getRectCutHole(feature: RectCutFeature, part: Part): Point2[] {
   const flare = taper ? Math.tan((taper * Math.PI) / 180) * (maxX - minX) : 0;
 
   const radius = getRectCutCornerRadius(feature, part);
+  // Zero stop means the cutter runs out of the stock. Extend its rounded
+  // envelope beyond that edge so the opening is the full dado width.
+  if (radius > 0 && feature.cutType === 'stopped_dado' && feature.parameters.stoppedSpan) {
+    if (bounds.minZ <= 1e-9) maxZ += radius;
+    if (bounds.maxZ >= part.width - 1e-9) minZ -= radius;
+  }
   if (radius <= 0) {
     return [
       { x: minX, z: minZ },
@@ -275,7 +287,7 @@ function getCircularCutHoles(
   y: number,
   diameter = feature.parameters.diameter
 ): Point2[][] {
-  const segments = Math.min(64, Math.max(16, Math.ceil(diameter * 12)));
+  const segments = 64; // Match the dowel tessellation; coarse bores reject a nominally equal pin.
   const radius = diameter / 2;
   return expandCircularCut(feature, part).map(({ entryPoint, axis }) => {
     const travel = Math.abs(axis.y) > 1e-9 ? (y - entryPoint.y) / axis.y : 0;
@@ -362,38 +374,6 @@ function getSplayedRectCutHole(feature: RectCutFeature, part: Part, yMid: number
 }
 
 /**
- * How many slices trace the arc of a rounded opening cut into an edge.
- *
- * An edge slot's curve lies in the plane the part is sliced along, so unlike
- * a slot in a face it cannot be one outline. Each layer takes a rectangle as
- * long as the slot is at that height, and the stack of them makes the curve.
- */
-const SIDE_ROUNDED_SLICES = 12;
-
-/** Half the opening's length, measured across its width from the middle. */
-function roundedHalfLengthAt(feature: RoundedCutFeature, offset: number): number {
-  const halfLength = feature.parameters.length / 2;
-  const halfWidth = feature.parameters.width / 2;
-  // A slot is a stadium: its ends are half-circles the full width of the cut,
-  // whatever corner radius happens to be stored on it.
-  const radius = feature.cutType === 'rounded_slot' ? halfWidth : Math.min(feature.parameters.cornerRadius, halfWidth);
-  const distance = Math.abs(offset);
-  if (distance >= halfWidth) return 0;
-  const straight = halfWidth - radius;
-  if (distance <= straight) return halfLength;
-  const into = distance - straight;
-  return halfLength - radius + Math.sqrt(Math.max(0, radius * radius - into * into));
-}
-
-/** Where a side-face rounded cut sits across the part's thickness. */
-function sideRoundedBand(feature: RoundedCutFeature, part: Part): { center: number; half: number } {
-  return {
-    center: referencedFeatureOffset(feature.placement.secondary, part.thickness, feature.reference.secondaryFrom),
-    half: feature.parameters.width / 2
-  };
-}
-
-/**
  * How far a rectangular cut reaches in from the long edge it was taken in.
  *
  * Through means right out of the far face, which is what a bridle's open
@@ -403,36 +383,6 @@ function sideRoundedBand(feature: RoundedCutFeature, part: Part): { center: numb
 function sideRectDepth(feature: RectCutFeature, part: Part): number {
   if (feature.parameters.depthMode === 'through') return part.width;
   return Math.min(feature.parameters.depth ?? 0, part.width);
-}
-
-/** How deep a rounded cut goes in from the edge it was cut into. */
-function sideRoundedDepth(feature: RoundedCutFeature, part: Part): number {
-  return feature.parameters.depthMode === 'through' ? part.width : (feature.parameters.depth ?? 0);
-}
-
-/** One slice of a rounded opening cut into a long edge. */
-function getSideRoundedCutHole(feature: RoundedCutFeature, part: Part, yMid: number): Point2[] | null {
-  const depth = sideRoundedDepth(feature, part);
-  if (depth <= 0) return null;
-  const band = sideRoundedBand(feature, part);
-  const halfLength = roundedHalfLengthAt(feature, yMid - band.center);
-  if (halfLength <= 0) return null;
-
-  const centerX = referencedFeatureOffset(feature.placement.primary, part.length, feature.reference.primaryFrom);
-  // Plan coordinates run opposite the face frame's second axis, which is why
-  // the front edge is the one at negative plan z. Rect cuts reach the same
-  // place through getRectCutPlanBounds; this arrives at it directly, so the
-  // sign has to be applied here.
-  const isBack = feature.target.type === 'face' && feature.target.face === 'back_face';
-  const halfWidth = part.width / 2;
-  const minZ = isBack ? halfWidth - depth : -halfWidth;
-  const maxZ = isBack ? halfWidth : -halfWidth + depth;
-  return [
-    { x: centerX - halfLength, z: minZ },
-    { x: centerX + halfLength, z: minZ },
-    { x: centerX + halfLength, z: maxZ },
-    { x: centerX - halfLength, z: maxZ }
-  ];
 }
 
 function getRoundedCutHole(feature: RoundedCutFeature, part: Part): Point2[] {
@@ -568,6 +518,15 @@ function createEndCutOnlyGeometry(part: Part): THREE.BufferGeometry {
 }
 
 function createFeatureGeometry(part: Part): THREE.BufferGeometry {
+  const edgeSlots = getEnabledFeatures(part).filter(
+    (feature): feature is RoundedCutFeature =>
+      feature.kind === 'rounded_cut' && (feature.target.face === 'front_face' || feature.target.face === 'back_face')
+  );
+  if (edgeSlots.length) {
+    const ids = new Set(edgeSlots.map((feature) => feature.id));
+    const base = createFeatureGeometry({ ...part, features: part.features?.filter((feature) => !ids.has(feature.id)) });
+    return subtractRoundedEdgeSlots(base, part, edgeSlots);
+  }
   if (hasOnlyEndCutFeatures(part)) {
     return createEndCutOnlyGeometry(part);
   }
@@ -594,12 +553,6 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
       feature.kind === 'rounded_cut' &&
       feature.target.type === 'face' &&
       (feature.target.face === 'top_face' || feature.target.face === 'bottom_face')
-  );
-  const sideRoundedCuts = getEnabledFeatures(part).filter(
-    (feature): feature is RoundedCutFeature =>
-      feature.kind === 'rounded_cut' &&
-      feature.target.type === 'face' &&
-      (feature.target.face === 'front_face' || feature.target.face === 'back_face')
   );
   const sliceY = new Set<number>([-part.thickness / 2, part.thickness / 2]);
 
@@ -649,16 +602,7 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
     if (feature.target.face === 'top_face') sliceY.add(part.thickness / 2 - feature.parameters.depth);
     else sliceY.add(-part.thickness / 2 + feature.parameters.depth);
   }
-  for (const feature of sideRoundedCuts) {
-    if (sideRoundedDepth(feature, part) <= 0) continue;
-    // Slice across the slot's width so each layer can take a different
-    // length; that stack of steps is what renders the curved ends.
-    const band = sideRoundedBand(feature, part);
-    for (let step = 0; step <= SIDE_ROUNDED_SLICES; step += 1) {
-      const y = band.center - band.half + (step * 2 * band.half) / SIDE_ROUNDED_SLICES;
-      if (y > -part.thickness / 2 && y < part.thickness / 2) sliceY.add(y);
-    }
-  }
+
   for (const feature of circularCuts) {
     const recessDepth = feature.cutType === 'counterbore' ? (feature.parameters.counterbore?.depth ?? 0) : 0;
     if (recessDepth <= 0) continue;
@@ -781,10 +725,6 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
           : yMid <= -part.thickness / 2 + Number(feature.parameters.depth));
       if (active) layerHoles.push(getRoundedCutHole(feature, part));
     }
-    for (const feature of sideRoundedCuts) {
-      const hole = getSideRoundedCutHole(feature, part, yMid);
-      if (hole) layerHoles.push(hole);
-    }
 
     let layer = getLayerGeometry(contour, layerHoles, layerDepth, yMin);
     if (stock) {
@@ -809,6 +749,29 @@ function createFeatureGeometry(part: Part): THREE.BufferGeometry {
   const leaned = subtractLeanedPockets(geometry, part);
   if (leaned !== geometry) geometry.dispose();
   geometry = leaned;
+
+  // CSG stores Float32 vertices. Intersections of dense circular walls with
+  // compound end planes can leave tiny outward slivers. Project only numerical
+  // overshoot back onto the authored stock boundary; retain larger discrepancies
+  // so real clipping defects remain observable.
+  const boundaryPlanes = getPartStockPlanes(part).filter((plane) => !plane.band);
+  const positions = geometry.getAttribute('position');
+  for (let pass = 0; pass < 2; pass += 1) {
+    for (let i = 0; i < positions.count; i += 1) {
+      let x = positions.getX(i),
+        y = positions.getY(i),
+        z = positions.getZ(i);
+      for (const { normal, limit } of boundaryPlanes) {
+        const excess = normal.x * x + normal.y * y + normal.z * z - limit;
+        if (excess <= 0 || excess > 0.001) continue;
+        const correction = (excess + 1e-7) / (normal.x ** 2 + normal.y ** 2 + normal.z ** 2);
+        x -= normal.x * correction;
+        y -= normal.y * correction;
+        z -= normal.z * correction;
+      }
+      positions.setXYZ(i, x, y, z);
+    }
+  }
 
   geometry.computeVertexNormals();
   if (geometry.getAttribute('position').count === 0) {
@@ -954,10 +917,49 @@ function getGeometryVolume(geometry: THREE.BufferGeometry): number {
 }
 
 /** Compare the remaining solids, including openings on any face. */
-export function partsOverlapInMaterial(a: Part, b: Part, tolerance = 1e-6): boolean {
+export function partsOverlapInMaterial(
+  a: Part,
+  b: Part,
+  tolerance = 1e-6,
+  /** Internal: exact swept hull is only valid for an uncut convex moving blank. */
+  convexSweep?: { x: number; y: number; z: number }
+): boolean {
+  // Compare in A's local frame. Applying a shared world rotation to Float32
+  // vertices can turn exactly touching joinery faces into tiny intersections.
+  const inverseFrame = new THREE.Quaternion()
+    .setFromEuler(
+      new THREE.Euler(
+        THREE.MathUtils.degToRad(a.rotation.x),
+        THREE.MathUtils.degToRad(a.rotation.y),
+        THREE.MathUtils.degToRad(a.rotation.z),
+        'XYZ'
+      )
+    )
+    .invert();
   const geometryFor = (part: Part) => {
     const source = getPartRenderGeometry(part);
-    const geometry = hasRenderablePartFeatures(part) ? source.clone() : source;
+    let geometry = hasRenderablePartFeatures(part) ? source.clone() : source;
+    if (part === a && convexSweep) {
+      const localDelta = new THREE.Vector3(convexSweep.x, convexSweep.y, convexSweep.z).applyQuaternion(inverseFrame);
+      const points: THREE.Vector3[] = [];
+      if (a.blankShape === 'round') {
+        const positions = source.getAttribute('position');
+        for (let i = 0; i < positions.count; i++) {
+          const point = new THREE.Vector3().fromBufferAttribute(positions, i);
+          points.push(point, point.clone().add(localDelta));
+        }
+      } else
+        for (const x of [-a.length / 2, a.length / 2]) {
+          for (const y of [-a.thickness / 2, a.thickness / 2]) {
+            for (const z of [-a.width / 2, a.width / 2]) {
+              const point = new THREE.Vector3(x, y, z);
+              points.push(point, point.clone().add(localDelta));
+            }
+          }
+        }
+      geometry.dispose();
+      geometry = new ConvexGeometry(points);
+    }
     const rotation = new THREE.Euler(
       (part.rotation.x * Math.PI) / 180,
       (part.rotation.y * Math.PI) / 180,
@@ -970,8 +972,8 @@ export function partsOverlapInMaterial(a: Part, b: Part, tolerance = 1e-6): bool
           part.position.x - a.position.x,
           part.position.y - a.position.y,
           part.position.z - a.position.z
-        ),
-        new THREE.Quaternion().setFromEuler(rotation),
+        ).applyQuaternion(inverseFrame),
+        new THREE.Quaternion().setFromEuler(rotation).premultiply(inverseFrame),
         new THREE.Vector3(1, 1, 1)
       )
     );
@@ -981,11 +983,31 @@ export function partsOverlapInMaterial(a: Part, b: Part, tolerance = 1e-6): bool
     second = geometryFor(b);
   try {
     if (!first.getAttribute('position').count || !second.getAttribute('position').count) return false;
-    const treeA = new MeshBVH(first),
-      treeB = new MeshBVH(second);
-    const direction = new THREE.Vector3(0.371, 0.529, 0.763).normalize();
-    const inside = (tree: MeshBVH, point: THREE.Vector3): boolean => {
-      if (!tree.geometry.boundingBox!.containsPoint(point)) return false;
+    return geometryOverlapsMaterialTree(first, new MeshBVH(second), tolerance);
+  } finally {
+    first.dispose();
+    second.dispose();
+  }
+}
+
+/** Test against a prepared stationary solid; callers own both geometries. */
+function geometryOverlapsMaterialTree(first: THREE.BufferGeometry, treeB: MeshBVH, tolerance: number): boolean {
+  first.computeBoundingBox();
+  if (!first.boundingBox!.intersectsBox(treeB.geometry.boundingBox!)) return false;
+  const treeA = new MeshBVH(first);
+  const directions = [
+    new THREE.Vector3(0.371, 0.529, 0.763).normalize(),
+    new THREE.Vector3(-0.613, 0.731, 0.297).normalize(),
+    new THREE.Vector3(0.817, -0.419, 0.397).normalize()
+  ];
+  const inside = (tree: MeshBVH, point: THREE.Vector3): boolean => {
+    if (!tree.geometry.boundingBox!.containsPoint(point)) return false;
+    // A ray crossing a Boolean seam can miss one of two adjacent faces.
+    // Require agreement from two directions, so a bore/mortise seam does not
+    // classify empty space as material during a tangential translation.
+    let votes = 0;
+    for (let rayIndex = 0; rayIndex < directions.length; rayIndex++) {
+      const direction = directions[rayIndex];
       const hits = tree
         .raycast(new THREE.Ray(point, direction), THREE.DoubleSide)
         .sort((a, b) => a.distance - b.distance);
@@ -1007,47 +1029,215 @@ export function partsOverlapInMaterial(a: Part, b: Part, tolerance = 1e-6): bool
           winding += Math.sign(orientation);
         }
       }
-      return winding > 0;
-    };
-    const inBoth = (point: THREE.Vector3) => inside(treeA, point) && inside(treeB, point);
-    const normalA = new THREE.Vector3(),
-      normalB = new THREE.Vector3(),
-      point = new THREE.Vector3();
-    const surfaceSample = (tree: MeshBVH) =>
-      tree.shapecast({
-        intersectsBounds: () => true,
-        intersectsTriangle: (triangle) => {
-          triangle.getNormal(normalA);
-          triangle.getMidpoint(point).addScaledVector(normalA, -tolerance * 2);
-          return inBoth(point);
-        }
-      });
-    if (surfaceSample(treeA) || surfaceSample(treeB)) return true;
-    const line = new THREE.Line3();
-    return treeA.bvhcast(treeB, new THREE.Matrix4(), {
-      intersectsTriangles: (triangleA, triangleB) => {
-        triangleA.getNormal(normalA);
-        triangleB.getNormal(normalB);
-        const dot = normalA.dot(normalB);
-        // Coplanar/tangent surfaces cannot establish strict volume overlap;
-        // their interior is covered by the surface samples above.
-        if (
-          Math.abs(dot) > 1 - 1e-10 ||
-          !triangleA.intersectsTriangle(triangleB, line, true) ||
-          line.distanceSq() <= tolerance * tolerance
-        )
-          return false;
-        line
-          .getCenter(point)
-          .addScaledVector(normalA, (-tolerance * 2) / (1 + dot))
-          .addScaledVector(normalB, (-tolerance * 2) / (1 + dot));
+      // Most samples are outside. Only corroborate a positive candidate;
+      // the extra directions resolve seam false positives without doubling
+      // the common negative-query cost.
+      if (rayIndex === 0 && winding <= 0) return false;
+      if (winding > 0) votes++;
+      if (votes === 2) return true;
+      if (rayIndex + 1 - votes === 2) return false;
+    }
+    return false;
+  };
+  const inBoth = (point: THREE.Vector3) =>
+    treeA.geometry.boundingBox!.containsPoint(point) &&
+    treeB.geometry.boundingBox!.containsPoint(point) &&
+    inside(treeA, point) &&
+    inside(treeB, point);
+  const normalA = new THREE.Vector3(),
+    normalB = new THREE.Vector3(),
+    point = new THREE.Vector3();
+  const surfaceSample = (tree: MeshBVH, other: MeshBVH) => {
+    // A sample can only lie in both solids near their common bounds. Include
+    // the inward sampling offset so pruning cannot discard a valid sample.
+    const sampleBounds = other.geometry.boundingBox!.clone().expandByScalar(tolerance * 2);
+    return tree.shapecast({
+      intersectsBounds: (bounds) => bounds.intersectsBox(sampleBounds),
+      intersectsTriangle: (triangle) => {
+        triangle.getNormal(normalA);
+        triangle.getMidpoint(point).addScaledVector(normalA, -tolerance * 2);
         return inBoth(point);
       }
     });
-  } finally {
-    first.dispose();
-    second.dispose();
+  };
+  if (surfaceSample(treeA, treeB) || surfaceSample(treeB, treeA)) return true;
+  const line = new THREE.Line3();
+  return treeA.bvhcast(treeB, new THREE.Matrix4(), {
+    intersectsTriangles: (triangleA, triangleB) => {
+      triangleA.getNormal(normalA);
+      triangleB.getNormal(normalB);
+      const dot = normalA.dot(normalB);
+      // Coplanar/tangent surfaces cannot establish strict volume overlap;
+      // their interior is covered by the surface samples above.
+      if (
+        Math.abs(dot) > 1 - 1e-10 ||
+        !triangleA.intersectsTriangle(triangleB, line, true) ||
+        line.distanceSq() <= tolerance * tolerance
+      )
+        return false;
+      line
+        .getCenter(point)
+        .addScaledVector(normalA, (-tolerance * 2) / (1 + dot))
+        .addScaledVector(normalB, (-tolerance * 2) / (1 + dot));
+      return inBoth(point);
+    }
+  });
+}
+
+/** Prepare an exact translation sweep of a featured solid's rendered material.
+ * New occupied volume is swept by its forward-facing boundary triangles.
+ * Each triangle's six-vertex prism is tested independently, preserving holes
+ * and concavities without computing a costly Boolean union. The caller checks
+ * initial overlap/escape policy and must dispose the prepared geometry.
+ */
+export function createPartTranslationMaterialTest(moving: Part, fixed: Part) {
+  const rotation = (part: Part) =>
+    new THREE.Quaternion().setFromEuler(
+      new THREE.Euler(
+        THREE.MathUtils.degToRad(part.rotation.x),
+        THREE.MathUtils.degToRad(part.rotation.y),
+        THREE.MathUtils.degToRad(part.rotation.z),
+        'XYZ'
+      )
+    );
+  const inverse = rotation(moving).invert();
+  const ownGeometry = (part: Part) => {
+    const source = getPartRenderGeometry(part);
+    return hasRenderablePartFeatures(part) ? source.clone() : source;
+  };
+  const source = ownGeometry(moving),
+    host = ownGeometry(fixed);
+  host.applyMatrix4(
+    new THREE.Matrix4().compose(
+      new THREE.Vector3(
+        fixed.position.x - moving.position.x,
+        fixed.position.y - moving.position.y,
+        fixed.position.z - moving.position.z
+      ).applyQuaternion(inverse),
+      rotation(fixed).premultiply(inverse),
+      new THREE.Vector3(1, 1, 1)
+    )
+  );
+  const positions = source.getAttribute('position'),
+    indices = source.index;
+  const triangles: Array<{ points: THREE.Vector3[]; normal: THREE.Vector3 }> = [];
+  for (let i = 0; i < (indices?.count ?? positions.count); i += 3) {
+    const points = [0, 1, 2].map((offset) =>
+      new THREE.Vector3().fromBufferAttribute(positions, indices ? indices.getX(i + offset) : i + offset)
+    );
+    const normal = new THREE.Triangle(...(points as [THREE.Vector3, THREE.Vector3, THREE.Vector3])).getNormal(
+      new THREE.Vector3()
+    );
+    triangles.push({ points, normal });
   }
+  const tree = host.getAttribute('position').count ? new MeshBVH(host) : null;
+  return {
+    overlaps(delta: { x: number; y: number; z: number }): boolean {
+      if (!tree) return false;
+      const localDelta = new THREE.Vector3(delta.x, delta.y, delta.z).applyQuaternion(inverse);
+      const bounds = new THREE.Box3();
+      for (const triangle of triangles) {
+        if (triangle.normal.dot(localDelta) <= 1e-12) continue;
+        const points = triangle.points.flatMap((point) => [point, point.clone().add(localDelta)]);
+        bounds.setFromPoints(points);
+        if (!bounds.intersectsBox(host.boundingBox!)) continue;
+        const prism = new ConvexGeometry(points);
+        try {
+          if (geometryOverlapsMaterialTree(prism, tree, 1e-6)) return true;
+        } finally {
+          prism.dispose();
+        }
+      }
+      return false;
+    },
+    dispose() {
+      source.dispose();
+      host.dispose();
+    }
+  };
+}
+
+/** A routed edge opening is a continuous extrusion, not a staircase of thickness slices. */
+function subtractRoundedEdgeSlots(
+  base: THREE.BufferGeometry,
+  part: Part,
+  features: RoundedCutFeature[]
+): THREE.BufferGeometry {
+  const evaluator = new Evaluator();
+  evaluator.attributes = ['position', 'normal'];
+  evaluator.useGroups = false;
+  let current = new Brush(base);
+  current.updateMatrixWorld(true);
+  for (const feature of features) {
+    const frame = getFaceFrame(part, feature.target.face);
+    const a = feature.parameters.length / 2;
+    const b = feature.parameters.width / 2;
+    const r = feature.cutType === 'rounded_slot' ? b : feature.parameters.cornerRadius;
+    const shape = new THREE.Shape();
+    shape.moveTo(-a + r, -b);
+    shape.lineTo(a - r, -b);
+    shape.absarc(a - r, -b + r, r, -Math.PI / 2, 0, false);
+    shape.lineTo(a, b - r);
+    shape.absarc(a - r, b - r, r, 0, Math.PI / 2, false);
+    shape.lineTo(-a + r, b);
+    shape.absarc(-a + r, b - r, r, Math.PI / 2, Math.PI, false);
+    shape.lineTo(-a, -b + r);
+    shape.absarc(-a + r, -b + r, r, Math.PI, Math.PI * 1.5, false);
+    shape.closePath();
+    const normal = new THREE.Vector3(frame.inwardNormal.x, frame.inwardNormal.y, frame.inwardNormal.z);
+    const angle = THREE.MathUtils.degToRad(feature.placement.rotation);
+    const along = new THREE.Vector3(frame.primaryAxis.x, frame.primaryAxis.y, frame.primaryAxis.z)
+      .multiplyScalar(Math.cos(angle))
+      .addScaledVector(
+        new THREE.Vector3(frame.secondaryAxis.x, frame.secondaryAxis.y, frame.secondaryAxis.z),
+        Math.sin(angle)
+      );
+    const across = new THREE.Vector3().crossVectors(normal, along);
+    const center = new THREE.Vector3(frame.origin.x, frame.origin.y, frame.origin.z)
+      .addScaledVector(
+        new THREE.Vector3(frame.primaryAxis.x, frame.primaryAxis.y, frame.primaryAxis.z),
+        referencedFeatureOffset(feature.placement.primary, frame.primarySize, feature.reference.primaryFrom)
+      )
+      .addScaledVector(
+        new THREE.Vector3(frame.secondaryAxis.x, frame.secondaryAxis.y, frame.secondaryAxis.z),
+        referencedFeatureOffset(feature.placement.secondary, frame.secondarySize, feature.reference.secondaryFrom)
+      )
+      .addScaledVector(normal, -0.002);
+    const depth =
+      feature.parameters.depthMode === 'through' ? part.width + 0.004 : (feature.parameters.depth ?? 0) + 0.002;
+    let cutterGeometry: THREE.BufferGeometry = new THREE.ExtrudeGeometry(shape, {
+      depth,
+      bevelEnabled: false,
+      curveSegments: 32
+    });
+    cutterGeometry.applyMatrix4(new THREE.Matrix4().makeBasis(along, across, normal).setPosition(center));
+    if (feature.parameters.plateJoiner) {
+      // The blade's chord at the edge is the opening length; its sagitta is depth.
+      // The kerf is square through thickness, while the circular ends lie in plan.
+      const penetration = feature.parameters.depth!;
+      const radius = (a * a + penetration * penetration) / (2 * penetration);
+      const blade = new THREE.CylinderGeometry(radius, radius, feature.parameters.width, 192);
+      const entry = center.clone().addScaledVector(normal, 0.002);
+      blade.translate(
+        entry.x + normal.x * (penetration - radius),
+        entry.y,
+        entry.z + normal.z * (penetration - radius)
+      );
+      cutterGeometry.dispose();
+      cutterGeometry = blade;
+    }
+    const cutter = new Brush(cutterGeometry);
+    cutter.updateMatrixWorld(true);
+    const result = evaluator.evaluate(current, cutter, SUBTRACTION) as Brush;
+    current.geometry.dispose();
+    cutterGeometry.dispose();
+    current = result;
+    current.updateMatrixWorld(true);
+  }
+  current.geometry.computeVertexNormals();
+  current.geometry.computeBoundingBox();
+  current.geometry.computeBoundingSphere();
+  return current.geometry;
 }
 
 function subtractSolidCircularCuts(baseGeometry: THREE.BufferGeometry, part: Part): THREE.BufferGeometry {
@@ -1083,14 +1273,7 @@ function subtractSolidCircularCuts(baseGeometry: THREE.BufferGeometry, part: Par
         const end = startOffset + length + 0.002;
         const cutterLength = end - start;
         const extendedEntryRadius = endRadius + taper * cutterLength;
-        const cutterGeometry = new THREE.CylinderGeometry(
-          endRadius,
-          extendedEntryRadius,
-          cutterLength,
-          Math.min(64, Math.max(16, Math.ceil(Math.max(entryRadius, endRadius) * 24))),
-          1,
-          false
-        );
+        const cutterGeometry = new THREE.CylinderGeometry(endRadius, extendedEntryRadius, cutterLength, 64, 1, false);
         const cutter = new Brush(cutterGeometry);
         cutter.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis);
         cutter.position
@@ -1202,7 +1385,7 @@ function getRoutedCorner(
   return { incoming, outgoing, arc };
 }
 
-function expandRoutedPath(feature: RoutedPathFeature, part: Part): THREE.Vector3[] {
+export function expandRoutedPath(feature: RoutedPathFeature, part: Part): THREE.Vector3[] {
   const frame = getFaceFrame(part, feature.target.face);
   const normal = new THREE.Vector3(frame.inwardNormal.x, frame.inwardNormal.y, frame.inwardNormal.z).normalize();
   const authored = feature.path.points.map((point) => routedPoint(feature, frame, point));
@@ -1369,6 +1552,67 @@ function subtractRoutedPaths(baseGeometry: THREE.BufferGeometry, part: Part): TH
       feature.parameters.depthMode === 'through' ? diagonal * 2 : Number(feature.parameters.depth ?? 0);
     if (!(diameter > 0) || !(requestedDepth > 0)) continue;
 
+    // Union a flat cutter's footprint in 2D before one subtraction. Sequential
+    // CSG for every span and cap makes circular jigs block the editor.
+    if (
+      points.length > 2 &&
+      ['straight', 'mortising', 'spiral_upcut', 'spiral_downcut', 'compression', 'surfacing'].includes(
+        feature.bit.profile
+      )
+    ) {
+      const primary = new THREE.Vector3(frame.primaryAxis.x, frame.primaryAxis.y, frame.primaryAxis.z);
+      const secondary = new THREE.Vector3().crossVectors(normal, primary).normalize();
+      const origin = new THREE.Vector3(frame.origin.x, frame.origin.y, frame.origin.z);
+      const local = points.map((point) => {
+        const relative = point.clone().sub(origin);
+        return [relative.dot(primary), relative.dot(secondary)] as [number, number];
+      });
+      const radius = diameter / 2;
+      const footprints: polygonClipping.Polygon[] = [];
+      for (let index = 0; index < local.length; index += 1) {
+        const [x, y] = local[index];
+        footprints.push([
+          Array.from({ length: 32 }, (_, step) => {
+            const angle = (step * Math.PI) / 16;
+            return [x + radius * Math.cos(angle), y + radius * Math.sin(angle)] as [number, number];
+          })
+        ]);
+        if (index === 0) continue;
+        const [px, py] = local[index - 1];
+        const length = Math.hypot(x - px, y - py);
+        if (length < 1e-9) continue;
+        const ox = (-(y - py) * radius) / length;
+        const oy = ((x - px) * radius) / length;
+        footprints.push([
+          [
+            [px + ox, py + oy],
+            [x + ox, y + oy],
+            [x - ox, y - oy],
+            [px - ox, py - oy]
+          ]
+        ]);
+      }
+      const union = polygonClipping.union(footprints[0], ...footprints.slice(1));
+      const shapes = union.map((rings) =>
+        shapeFromContour(
+          rings[0].slice(0, -1).map(([x, z]) => ({ x, z })),
+          rings.slice(1).map((ring) => ring.slice(0, -1).map(([x, z]) => ({ x, z })))
+        )
+      );
+      const padding = 0.002;
+      const geometry = new THREE.ExtrudeGeometry(shapes, {
+        depth: requestedDepth + padding,
+        bevelEnabled: false,
+        steps: 1,
+        curveSegments: 1
+      });
+      geometry.applyMatrix4(
+        new THREE.Matrix4().makeBasis(primary, secondary, normal).setPosition(origin.addScaledVector(normal, -padding))
+      );
+      subtract(geometry);
+      continue;
+    }
+
     for (let index = 0; index < points.length - 1; index += 1) {
       const start = points[index];
       const end = points[index + 1];
@@ -1391,7 +1635,10 @@ function subtractRoutedPaths(baseGeometry: THREE.BufferGeometry, part: Part): TH
         } else {
           cavityHeight = feature.bit.cutterHeight;
         }
-        if (!(cavityHeight > 0) || cavityHeight > requestedDepth) continue;
+        // Diameter/angle conversions can put a flush cutter one ULP past
+        // its authored depth. Do not silently drop the entire route for that.
+        if (!(cavityHeight > 0) || cavityHeight > requestedDepth + 1e-10) continue;
+        cavityHeight = Math.min(cavityHeight, requestedDepth);
         const cavityTop = requestedDepth - cavityHeight;
         const shankHalf = shankDiameter / 2;
         const cutterHalf = diameter / 2;
@@ -1462,8 +1709,12 @@ function subtractRoutedPaths(baseGeometry: THREE.BufferGeometry, part: Part): TH
           : diameter;
       const halfWidth = topWidth / 2;
       const profile = new THREE.Shape();
-      profile.moveTo(-halfWidth, -padding);
-      profile.lineTo(halfWidth, -padding);
+      // Extend the cone above the face without changing its flank angle.
+      // Keeping the surface radius at the padded plane narrows the actual
+      // entry and leaves interfering material in complementary V-cut joints.
+      const paddedHalfWidth = isTaperedPoint ? (halfWidth * (depth + padding)) / depth : halfWidth;
+      profile.moveTo(-paddedHalfWidth, -padding);
+      profile.lineTo(paddedHalfWidth, -padding);
       if (isTaperedPoint) {
         profile.lineTo(0, depth);
       } else {
@@ -1485,7 +1736,7 @@ function subtractRoutedPaths(baseGeometry: THREE.BufferGeometry, part: Part): TH
       const capRotation = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), normal);
       for (const endpoint of index === 0 ? [start, end] : [end]) {
         const cap = isTaperedPoint
-          ? new THREE.ConeGeometry(halfWidth, capHeight, 32, 1, false)
+          ? new THREE.ConeGeometry(paddedHalfWidth, capHeight, 32, 1, false)
           : new THREE.CylinderGeometry(halfWidth, halfWidth, capHeight, 32, 1, false);
         subtract(cap, endpoint.clone().addScaledVector(normal, (depth - padding) / 2), capRotation);
       }
@@ -1637,7 +1888,9 @@ function getTenonLayerRemovals(part: Part, tenons: RectCutFeature[], yMid: numbe
     if (Math.abs(yMid) > tongueThickness / 2) {
       removeBand(-halfWidth, halfWidth);
     } else {
-      const minZ = -halfWidth + feature.placement.z;
+      // Layer contours reverse local Z, just like getRectCutHole. Preserve
+      // the same physical reference edge for an off-center tongue.
+      const minZ = halfWidth - feature.placement.z - feature.parameters.size.width;
       removeBand(-halfWidth, minZ);
       removeBand(minZ + feature.parameters.size.width, halfWidth);
     }
@@ -1719,7 +1972,24 @@ export function getPartRenderGeometry(part: Part): THREE.BufferGeometry {
     return cached;
   }
 
-  const geometry = createFeatureGeometry(part);
+  let geometry: THREE.BufferGeometry;
+  if (part.blankShape) {
+    geometry = createFactoryBlankGeometry(part);
+    if (getEnabledFeatures(part).length) {
+      const machined = createFeatureGeometry(part);
+      const evaluator = new Evaluator();
+      evaluator.attributes = ['position', 'normal'];
+      evaluator.useGroups = false;
+      const factory = new Brush(geometry);
+      const cuts = new Brush(machined);
+      factory.updateMatrixWorld(true);
+      cuts.updateMatrixWorld(true);
+      const result = evaluator.evaluate(factory, cuts, INTERSECTION);
+      geometry.dispose();
+      machined.dispose();
+      geometry = result.geometry;
+    }
+  } else geometry = createFeatureGeometry(part);
   if (geometryCache.size >= MAX_GEOMETRY_CACHE_ENTRIES) {
     const oldestKey = geometryCache.keys().next().value;
     if (oldestKey !== undefined) {
@@ -1732,6 +2002,40 @@ export function getPartRenderGeometry(part: Part): THREE.BufferGeometry {
     }
   }
   geometryCache.set(key, geometry);
+  return geometry;
+}
+
+/** Purchased inserts have a factory outline, without user-authored machining. */
+function createFactoryBlankGeometry(part: Part): THREE.BufferGeometry {
+  if (part.blankShape === 'round') return getRodRenderGeometry(part.length, part.thickness).clone();
+  const shape = new THREE.Shape();
+  if (part.blankShape === 'domino') {
+    const radius = Math.min(part.thickness, part.width) / 2;
+    const straight = part.width / 2 - radius;
+    shape.moveTo(-straight, -radius);
+    shape.lineTo(straight, -radius);
+    shape.absarc(straight, 0, radius, -Math.PI / 2, Math.PI / 2, false);
+    shape.lineTo(-straight, radius);
+    shape.absarc(-straight, 0, radius, Math.PI / 2, Math.PI * 1.5, false);
+    const geometry = new THREE.ExtrudeGeometry(shape, { depth: part.length, bevelEnabled: false, curveSegments: 16 });
+    // Cross-section coordinates become local Z/Y; extrusion becomes local X.
+    geometry.translate(0, 0, -part.length / 2);
+    geometry.rotateY(Math.PI / 2);
+    return geometry;
+  }
+  // Two circular arcs meeting at the biscuit tips. R follows from the chord
+  // length and the half-width sagitta, so the supplied overall size is exact.
+  const halfLength = part.length / 2;
+  const halfWidth = part.width / 2;
+  const radius = (halfLength * halfLength + halfWidth * halfWidth) / (2 * halfWidth);
+  const center = radius - halfWidth;
+  shape.moveTo(-halfLength, 0);
+  shape.absarc(0, -center, radius, Math.atan2(center, -halfLength), Math.atan2(center, halfLength), true);
+  shape.absarc(0, center, radius, Math.atan2(-center, halfLength), Math.atan2(-center, -halfLength), true);
+  shape.closePath();
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth: part.thickness, bevelEnabled: false, curveSegments: 24 });
+  geometry.translate(0, 0, -part.thickness / 2);
+  geometry.rotateX(Math.PI / 2);
   return geometry;
 }
 
@@ -1749,6 +2053,9 @@ export function getPartOutlineGeometry(part: Part): THREE.BufferGeometry {
   if (cached) return cached;
   const positionOnly = new THREE.BufferGeometry();
   positionOnly.setAttribute('position', renderGeometry.getAttribute('position').clone());
+  // Indexed CSG meshes must retain their triangle topology before welding.
+  // Treating the vertex pool as triangles draws spurious lines across faces.
+  if (renderGeometry.index) positionOnly.setIndex(renderGeometry.index.clone());
   const welded = mergeVertices(positionOnly, 1e-5);
   positionOnly.dispose();
   outlineGeometryCache.set(renderGeometry, welded);
@@ -1767,6 +2074,32 @@ export function getPartGeometryCacheSizeForTests(): number {
  * present the left/right X positions are adjusted per cross-section corner,
  * and duplicate vertices are removed to keep the hull minimal.
  */
+const hullEdgeCache = new WeakMap<object, Array<[THREE.Vector3, THREE.Vector3]>>();
+
+/** Hull vertices from mixed CSG cuts have no contour order or top/bottom pairing. */
+export function getPartLocalHullEdges(part: Part): Array<[THREE.Vector3, THREE.Vector3]> {
+  const vertices = getPartLocalConvexVertices(part);
+  const cached = hullEdgeCache.get(vertices);
+  if (cached) return cached;
+  const hull = new ConvexHull().setFromPoints(vertices.map((v) => new THREE.Vector3(v.x, v.y, v.z)));
+  const edges: Array<[THREE.Vector3, THREE.Vector3]> = [];
+  const seen = new Set<string>();
+  for (const face of hull.faces) {
+    for (let index = 0; index < 3; index++) {
+      const edge = face.getEdge(index);
+      if (edge.twin && face.normal.dot(edge.twin.face.normal) > 1 - 1e-6) continue;
+      const a = edge.tail().point;
+      const b = edge.head().point;
+      const key = [a.toArray().join(','), b.toArray().join(',')].sort().join('|');
+      if (seen.has(key)) continue;
+      seen.add(key);
+      edges.push([a, b]);
+    }
+  }
+  hullEdgeCache.set(vertices, edges);
+  return edges;
+}
+
 export function getPartLocalConvexVertices(part: Part): Array<{ x: number; y: number; z: number }> {
   const features = getEnabledFeatures(part);
   if (

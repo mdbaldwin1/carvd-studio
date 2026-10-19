@@ -1,10 +1,10 @@
+import { formatStockMeasurement } from '@renderer/utils/stockMeasurements';
 import { Plus } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { STOCK_COLORS } from '../../constants';
 import { useProjectStore } from '../../store/projectStore';
 import { Stock } from '../../types';
-import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { Button } from '@renderer/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
 import {
@@ -303,9 +303,9 @@ export function AddStockModal({ isOpen, onClose, onAddStock, stockLibrary, onAdd
                         Dimensions (L × W × T)
                       </label>
                       <span>
-                        {formatMeasurementWithUnit(displayedStock.length, units)} ×{' '}
-                        {formatMeasurementWithUnit(displayedStock.width, units)} ×{' '}
-                        {formatMeasurementWithUnit(displayedStock.thickness, units)}
+                        {formatStockMeasurement(displayedStock.length, displayedStock, units)} ×{' '}
+                        {formatStockMeasurement(displayedStock.width, displayedStock, units)} ×{' '}
+                        {formatStockMeasurement(displayedStock.thickness, displayedStock, units)}
                       </span>
                     </div>
 

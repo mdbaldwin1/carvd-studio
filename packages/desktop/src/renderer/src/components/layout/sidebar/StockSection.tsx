@@ -1,8 +1,8 @@
+import { formatStockMeasurement } from '@renderer/utils/stockMeasurements';
 import { Button } from '@renderer/components/ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@renderer/components/ui/collapsible';
 import { SidebarGroup, SidebarGroupLabel } from '@renderer/components/ui/sidebar';
 import { Part, Stock } from '@renderer/types';
-import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
 import { ChevronDown, ChevronRight, Search, X } from 'lucide-react';
 
 interface StockSectionProps {
@@ -138,7 +138,7 @@ export function StockSection({
                           e.dataTransfer.setData('application/carvd-stock', stock.id);
                           e.dataTransfer.effectAllowed = 'copy';
                         }}
-                        title={`Drag onto canvas to create part\n${formatMeasurementWithUnit(stock.length, units)} × ${formatMeasurementWithUnit(stock.width, units)} × ${formatMeasurementWithUnit(stock.thickness, units)}${!isEditingAssembly ? `\n${partCount} part${partCount !== 1 ? 's' : ''} assigned` : ''}`}
+                        title={`Drag onto canvas to create part\n${formatStockMeasurement(stock.length, stock, units)} × ${formatStockMeasurement(stock.width, stock, units)} × ${formatStockMeasurement(stock.thickness, stock, units)}${!isEditingAssembly ? `\n${partCount} part${partCount !== 1 ? 's' : ''} assigned` : ''}`}
                       >
                         <span className="w-3 h-3 rounded-sm shrink-0" style={{ backgroundColor: stock.color }} />
                         <span className="flex-1 text-xs truncate">{stock.name}</span>
@@ -148,7 +148,7 @@ export function StockSection({
                           </span>
                         )}
                         <span className="text-[10px] text-text-muted">
-                          {formatMeasurementWithUnit(stock.thickness, units)}
+                          {formatStockMeasurement(stock.thickness, stock, units)}
                         </span>
                         <div className="flex gap-0.5 opacity-0 group-hover/stock:opacity-100 transition-opacity duration-100">
                           <Button

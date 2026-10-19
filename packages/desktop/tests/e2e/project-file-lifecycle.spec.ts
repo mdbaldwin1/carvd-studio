@@ -79,6 +79,51 @@ test.describe('project file lifecycle', () => {
       .toEqual(expect.arrayContaining([secondPath, firstPath]));
   });
 
+  test('savepoint Undo protects unsaved changes on native close and Redo returns clean', async () => {
+    const { window, userDataDir } = running;
+    const filePath = path.join(userDataDir, 'undo-savepoint.carvd');
+    await addPartFromSidebar(window);
+    await queueSavePath(window, filePath);
+    await pressShortcut(window, 's');
+    await expect.poll(() => fs.existsSync(filePath)).toBe(true);
+    await expect.poll(() => window.evaluate(() => window.useProjectStore.getState().isDirty)).toBe(false);
+
+    await renameProjectFromHeader(window, 'Saved renamed project');
+    await pressShortcut(window, 's');
+    // The existing file can be truncated while the asynchronous save rewrites
+    // it. Retry the complete read/parse/assertion until the new save is visible.
+    await expect(async () => {
+      expect(readCarvdFile(filePath).project.name).toBe('Saved renamed project');
+    }).toPass({ timeout: 30000 });
+    await expect.poll(() => window.evaluate(() => window.useProjectStore.getState().isDirty)).toBe(false);
+    await expect(window.locator('.dirty-indicator')).toHaveCount(0);
+    const savedFile = fs.readFileSync(filePath, 'utf8');
+
+    await pressShortcut(window, 'z');
+    await expect.poll(() => window.evaluate(() => window.useProjectStore.getState().isDirty)).toBe(true);
+    await expect(window.locator('.dirty-indicator')).toBeVisible();
+    await expect.poll(async () => (await getProjectSnapshot(window)).projectName).toBe('undo-savepoint');
+    await running.electronApp.evaluate(({ BrowserWindow }) => {
+      const editor = BrowserWindow.getAllWindows().find(
+        (candidate) => !candidate.webContents.getURL().includes('splash')
+      );
+      if (!editor) throw new Error('Missing editor window');
+      editor.close();
+    });
+    const dialog = window.getByRole('alertdialog', { name: 'Unsaved Changes' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    expect(window.isClosed()).toBe(false);
+    expect(fs.readFileSync(filePath, 'utf8')).toBe(savedFile);
+
+    await pressShortcut(window, 'z', { shift: true });
+    await expect.poll(async () => (await getProjectSnapshot(window)).projectName).toBe('Saved renamed project');
+    await expect.poll(() => window.evaluate(() => window.useProjectStore.getState().isDirty)).toBe(false);
+    await expect(window.locator('.dirty-indicator')).toHaveCount(0);
+    expect(fs.readFileSync(filePath, 'utf8')).toBe(savedFile);
+  });
+
   test('unsaved home dialog supports cancel, discard, and save branches', async () => {
     const { window, userDataDir } = running;
     const savedPath = path.join(userDataDir, 'unsaved-home-save.carvd');

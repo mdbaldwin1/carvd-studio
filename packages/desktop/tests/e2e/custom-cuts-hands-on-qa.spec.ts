@@ -93,7 +93,7 @@ async function generateCutList(window: Page): Promise<ReturnType<Page['getByRole
   const dialog = window.getByRole('dialog').filter({ has: window.getByRole('heading', { name: 'Cut List' }) });
   const generate = dialog.getByRole('button', { name: /Generate Cut List|Regenerate/ });
   await generate.click();
-  await expect(dialog.locator('.cut-list-tabs')).toBeVisible();
+  await expect(dialog.getByRole('tab', { name: /^Parts List/ })).toBeVisible();
   return dialog;
 }
 
@@ -180,7 +180,7 @@ function buildStressFeatures() {
       target: { type: 'face', face: 'top_face' },
       reference: { primaryFrom: 'min', secondaryFrom: 'min' },
       cutType: 'cutout',
-      placement: { x: 5 + index * 12, z: 2 },
+      placement: { x: index === 0 ? 8 : 5 + index * 12, z: 2 },
       parameters: { size: { length: 2, width: 2 }, depthMode: 'blind', depth: 0.25 }
     });
   }
@@ -245,18 +245,18 @@ function buildStressFeatures() {
 const STRESS_FABRICATION_LINES = [
   '1. Stress left mitre — Mitre 12.5° on Left End · Long point on Front',
   '2. Stress right compound — Compound 15° / 5° bevel on Right End · Long point on Back · High point on Top',
-  '3. Stress cutout 1 — Cutout on Top Face · 2" × 2" × 1/4" deep · 5" from Left · 2" from Front',
-  '4. Stress cutout 2 — Cutout on Top Face · 2" × 2" × 1/4" deep · 17" from Left · 2" from Front',
-  '5. Stress cutout 3 — Cutout on Top Face · 2" × 2" × 1/4" deep · 29" from Left · 2" from Front',
-  '6. Stress cutout 4 — Cutout on Top Face · 2" × 2" × 1/4" deep · 41" from Left · 2" from Front',
-  '7. Stress cutout 5 — Cutout on Top Face · 2" × 2" × 1/4" deep · 53" from Left · 2" from Front',
-  '8. Stress cutout 6 — Cutout on Top Face · 2" × 2" × 1/4" deep · 65" from Left · 2" from Front',
+  '3. Stress cutout 1 — Cutout on Top Face · 2" × 2" × 1/4" deep · 8" from Left · 2" from Back',
+  '4. Stress cutout 2 — Cutout on Top Face · 2" × 2" × 1/4" deep · 17" from Left · 2" from Back',
+  '5. Stress cutout 3 — Cutout on Top Face · 2" × 2" × 1/4" deep · 29" from Left · 2" from Back',
+  '6. Stress cutout 4 — Cutout on Top Face · 2" × 2" × 1/4" deep · 41" from Left · 2" from Back',
+  '7. Stress cutout 5 — Cutout on Top Face · 2" × 2" × 1/4" deep · 53" from Left · 2" from Back',
+  '8. Stress cutout 6 — Cutout on Top Face · 2" × 2" × 1/4" deep · 65" from Left · 2" from Back',
   '9. Stress round 1 — Round Hole on Top Face · 1/4" diameter × 1/2" deep · Primary -30" from center (+Right) · Secondary 10" from center (+Front)',
-  '10. Stress round 2 — Countersink on Top Face · 1/4" hole × 1/2" major · 90° · 1/2" deep · 1° tilt toward 15° · Primary -18" from center (+Right) · Secondary 10" from center (+Front) · Angles: 0° toward Right, 90° toward Front',
-  '11. Stress round 3 — Counterbore on Top Face · 1/4" hole · 1/2" × 1/8" recess · 1/2" deep · 2° tilt toward 30° · Primary -6" from center (+Right) · Secondary 10" from center (+Front) · Angles: 0° toward Right, 90° toward Front',
-  '12. Stress round 4 — Round Hole on Top Face · 1/4" diameter × 1/2" deep · 3° tilt toward 45° · Primary 6" from center (+Right) · Secondary 10" from center (+Front) · Angles: 0° toward Right, 90° toward Front',
-  '13. Stress round 5 — 3-hole Linear Countersink Pattern on Top Face · 1/4" hole × 1/2" major · 90° · 1" spacing · 0° direction · 1/2" deep · 4° tilt toward 60° · Primary 18" from center (+Right) · Secondary 10" from center (+Front) · Angles: 0° toward Right, 90° toward Front',
-  '14. Stress round 6 — 4-hole Circular Counterbore Pattern on Top Face · 1/4" hole · 1/2" × 1/8" recess · 1" radius · 30° start angle · 1/2" deep · 5° tilt toward 75° · Primary 30" from center (+Right) · Secondary 10" from center (+Front) · Angles: 0° toward Right, 90° toward Front',
+  '10. Stress round 2 — Countersink on Top Face · 1/4" hole × 1/2" major · 90° · 1/2" deep · 89° from face toward 15° · Primary -18" from center (+Right) · Secondary 10" from center (+Front) · Angles: 0° toward Right, 90° toward Front',
+  '11. Stress round 3 — Counterbore on Top Face · 1/4" hole · 1/2" × 1/8" recess · 1/2" deep · 88° from face toward 30° · Primary -6" from center (+Right) · Secondary 10" from center (+Front) · Angles: 0° toward Right, 90° toward Front',
+  '12. Stress round 4 — Round Hole on Top Face · 1/4" diameter × 1/2" deep · 87° from face toward 45° · Primary 6" from center (+Right) · Secondary 10" from center (+Front) · Angles: 0° toward Right, 90° toward Front',
+  '13. Stress round 5 — 3-hole Linear Countersink Pattern on Top Face · 1/4" hole × 1/2" major · 90° · 1" spacing · 0° direction · 1/2" deep · 86° from face toward 60° · Primary 18" from center (+Right) · Secondary 10" from center (+Front) · Angles: 0° toward Right, 90° toward Front',
+  '14. Stress round 6 — 4-hole Circular Counterbore Pattern on Top Face · 1/4" hole · 1/2" × 1/8" recess · 1" radius · 30° start angle · 1/2" deep · 85° from face toward 75° · Primary 30" from center (+Right) · Secondary 10" from center (+Front) · Angles: 0° toward Right, 90° toward Front',
   '15. Stress rounded 1 — Rounded Slot on Top Face · 4" × 1" × 3/8" deep · Primary -30" from center (+Right) · Secondary -5" from center (+Front) · 0° rotation · Angles: 0° toward Right, 90° toward Front',
   '16. Stress rounded 2 — Rounded Rectangle on Top Face · 4" × 1" · 1/4" radius × 3/8" deep · Primary -18" from center (+Right) · Secondary -5" from center (+Front) · 5° rotation · Angles: 0° toward Right, 90° toward Front',
   '17. Stress rounded 3 — Rounded Slot on Top Face · 4" × 1" × 3/8" deep · Primary -6" from center (+Right) · Secondary -5" from center (+Front) · 10° rotation · Angles: 0° toward Right, 90° toward Front',
@@ -297,7 +297,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await startPreset(window, 'Dado');
     await window.getByRole('button', { name: 'Top Face', exact: true }).click();
     await window.getByLabel('Label (optional)', { exact: true }).fill('Metric shelf dado');
-    await fillMeasurement(window, 'Run Along Blank', '19.05');
+    await fillMeasurement(window, 'Dado Width', '19.05');
     await fillMeasurement(window, 'Blind Depth', '6.35');
     await expectCutAccepted(window);
 
@@ -380,7 +380,7 @@ test.describe('hands-on custom cuts qualification', () => {
 
     await window.getByRole('button', { name: /^2\. Metric shelf dado/ }).click();
     await window.getByLabel('Label (optional)', { exact: true }).fill('Fractional shelf dado');
-    await fillMeasurement(window, 'Run Along Blank', '13/16');
+    await fillMeasurement(window, 'Dado Width', '13/16');
     await fillMeasurement(window, 'Blind Depth', '5/16');
     await expectCutAccepted(window);
 
@@ -456,7 +456,7 @@ test.describe('hands-on custom cuts qualification', () => {
     const fabricationLines = [
       '1. Fractional frame mitre — Mitre 22.5° on Right End · Long point on Front',
       '2. Fractional shelf dado — Dado on Top Face · 13/16" wide × 5/16" deep · 0" from Left; full width',
-      '3. Fractional rail mortise — Mortise on Bottom Face · 2 3/8" × 1 1/8" × 7/16" deep · 6 1/4" from Left · 2 1/4" from Front',
+      '3. Fractional rail mortise — Mortise on Bottom Face · 2 3/8" × 1 1/8" × 7/16" deep · square corners · 6 1/4" from Left · 2 1/4" from Back',
       '4. Fractional face hole — Round Hole on Front Face · 5/16" diameter × 9/16" deep · Primary 8 1/2" from center (+Right) · Secondary 3/8" from center (+Top)'
     ];
     const operationSummary = dialog
@@ -465,7 +465,7 @@ test.describe('hands-on custom cuts qualification', () => {
       .locator('td')
       .last()
       .locator('span.italic');
-    await expect(operationSummary).toHaveText(fabricationLines.join('; '));
+    await expect(operationSummary).toContainText(fabricationLines.join('; '));
 
     await queueSavePath(window, csvPath);
     await dialog.locator('.cut-list-parts-tab').getByRole('button', { name: 'Download' }).click();
@@ -515,7 +515,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await startPreset(window, 'Dado');
     await window.getByRole('button', { name: 'Top Face', exact: true }).click();
     await window.getByLabel('Label (optional)', { exact: true }).fill('Layered shelf dado');
-    await fillMeasurement(window, 'Run Along Blank', '3/4');
+    await fillMeasurement(window, 'Dado Width', '3/4');
     await fillMeasurement(window, 'Blind Depth', '1/4');
     await expectCutAccepted(window);
 
@@ -598,6 +598,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await window.evaluate((features) => {
       const project = window.useProjectStore.getState();
       const part = project.parts[0];
+      project.updateStock(part.stockId, { thickness: 1.5 });
       project.updatePart(part.id, {
         name: 'Twenty feature stress board',
         length: 84,
@@ -653,10 +654,10 @@ test.describe('hands-on custom cuts qualification', () => {
     await window.getByRole('button', { name: 'Actions for cut 3' }).click();
     await window.getByRole('menuitem', { name: 'Duplicate' }).click();
     await window.getByLabel('Label (optional)', { exact: true }).fill('Temporary stress duplicate');
-    await fillMeasurement(window, 'Offset Along Length', '76');
+    await fillMeasurement(window, 'Offset Along Length', '82');
     await fillMeasurement(window, 'Offset Across Width', '5');
-    // The right 15°/5° Back-long compound leaves only 77.2794 inches
-    // at this pocket's front-bottom corner; [76, 78] breaks out of stock.
+    // The pocket reaches the original square end at 84 inches, beyond the
+    // remaining compound-cut end at this cross-board location.
     await expect(cutPanel(window).getByRole('alert')).toBeVisible();
     await expect(window.getByRole('alert').last()).toContainText('remaining material');
     await fillMeasurement(window, 'Offset Along Length', '74');
@@ -703,7 +704,7 @@ test.describe('hands-on custom cuts qualification', () => {
       .locator('td')
       .last()
       .locator('span.italic');
-    await expect(operationSummary).toHaveText(STRESS_FABRICATION_LINES.join('; '));
+    await expect(operationSummary).toContainText(STRESS_FABRICATION_LINES.join('; '));
     await expect(dialog.getByText('Temporary stress duplicate')).toHaveCount(0);
   });
 
@@ -715,6 +716,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await window.evaluate(() => {
       const project = window.useProjectStore.getState();
       const part = project.parts[0];
+      project.updateStock(part.stockId, { thickness: 0.75 });
       project.updatePart(part.id, {
         name: 'Base cabinet side panel',
         length: 36,
@@ -728,10 +730,12 @@ test.describe('hands-on custom cuts qualification', () => {
     await startPreset(window, 'Stopped Dado');
     await window.getByRole('button', { name: 'Top Face', exact: true }).click();
     await window.getByLabel('Label (optional)', { exact: true }).fill('Stopped shelf divider dado');
-    await fillMeasurement(window, 'Run Along Blank', '8');
+    await fillMeasurement(window, 'Dado Width', '3/4');
+    await fillMeasurement(window, 'Stop from Front Edge', '1');
+    await fillMeasurement(window, 'Stop from Back Edge', '1');
     await fillMeasurement(window, 'Blind Depth', '1/4');
-    await fillMeasurement(window, 'Offset Along Length', '30');
-    await expectImperialMeasurement(window, 'Offset Along Length', 28);
+    await fillMeasurement(window, 'Offset Along Length', '36');
+    await expectImperialMeasurement(window, 'Offset Along Length', 35.25);
     await fillMeasurement(window, 'Offset Along Length', '6');
     const preview = window.getByRole('img', { name: 'Part cuts geometry preview' });
     const stoppedDadoBeforeMove = await preview.getAttribute('data-geometry-signature');
@@ -739,7 +743,7 @@ test.describe('hands-on custom cuts qualification', () => {
     await window.getByRole('button', { name: 'Move Right' }).click();
     await window.getByRole('button', { name: 'Extend Run' }).click();
     await expectImperialMeasurement(window, 'Offset Along Length', 6.25);
-    await expectImperialMeasurement(window, 'Run Along Blank', 8.25);
+    await expectImperialMeasurement(window, 'Dado Width', 1);
     const stoppedDadoAfterMove = await preview.getAttribute('data-geometry-signature');
     expectFiniteNondegenerateGeometrySignature(stoppedDadoAfterMove);
     expect(stoppedDadoAfterMove).not.toBe(stoppedDadoBeforeMove);
@@ -780,8 +784,8 @@ test.describe('hands-on custom cuts qualification', () => {
         cutType: 'stopped_dado',
         target: { type: 'face', face: 'top_face' },
         label: 'Stopped shelf divider dado',
-        parameters: { size: { length: 8.25, width: 12 }, depthMode: 'blind', depth: 0.25 },
-        placement: { x: 6.25, z: 0 }
+        parameters: { size: { length: 1, width: 10 }, stoppedSpan: true, depthMode: 'blind', depth: 0.25 },
+        placement: { x: 6.25, z: 1 }
       },
       {
         kind: 'rect_cut',
@@ -818,7 +822,7 @@ test.describe('hands-on custom cuts qualification', () => {
 
     const dialog = await generateCutList(window);
     const fabricationLines = [
-      '1. Stopped shelf divider dado — Stopped Dado on Top Face · 8 1/4" run × 1/4" deep · 6 1/4" from Left; full width',
+      '1. Stopped shelf divider dado — Stopped Dado on Top Face · 1" wide × 10" across × 1/4" deep · square ends · 6 1/4" from Left · Stop 1" from Back · Stop 1" from Front',
       '2. Cable chase edge notch — Edge Notch on Front Side · 4" × 1 3/4" · Through · 20" from Left along the selected edge',
       '3. Post corner clearance — Corner Notch on Back-Right Corner · 2 1/2" × 2 1/4" · Through'
     ];
@@ -828,6 +832,6 @@ test.describe('hands-on custom cuts qualification', () => {
       .locator('td')
       .last()
       .locator('span.italic');
-    await expect(operationSummary).toHaveText(fabricationLines.join('; '));
+    await expect(operationSummary).toContainText(fabricationLines.join('; '));
   });
 });

@@ -98,7 +98,7 @@ export function usePartCutsEditing() {
     analytics.capture('part_cuts_saved', { operation_count_bucket: bucketCount(draftFeatures.length) });
     finishEditing();
     selectPart(sourcePartId);
-    showToast(`Saved cuts for "${currentPart.name}"`, 'success');
+    showToast(`Applied cuts to "${currentPart.name}". Save the project to write them to disk.`, 'success');
     return true;
   }, [finishEditing, selectPart, showToast, sourcePartId, updatePart]);
 

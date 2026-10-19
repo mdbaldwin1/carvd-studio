@@ -214,6 +214,14 @@ describe('formatMeasurementWithUnit', () => {
 });
 
 describe('parseInput', () => {
+  it('respects explicit units when hardware and lumber use different systems', () => {
+    expect(parseInput('20mm', 'imperial')).toBeCloseTo(20 / 25.4, 12);
+    expect(parseInput('2 cm', 'imperial')).toBeCloseTo(20 / 25.4, 12);
+    expect(parseInput('3/4 in', 'metric')).toBe(0.75);
+    expect(parseInput('1 1/2"', 'metric')).toBe(1.5);
+    expect(parseInput('20 bananas', 'imperial')).toBeNull();
+    expect(parseInput('1/0', 'imperial')).toBeNull();
+  });
   describe('imperial parsing', () => {
     it('parses fractions and returns inches', () => {
       expect(parseInput('1/2', 'imperial')).toBe(0.5);

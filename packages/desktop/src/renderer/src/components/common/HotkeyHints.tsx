@@ -43,7 +43,7 @@ export function HotkeyHints({ show }: { show: boolean }) {
           ...(draftFeatureCount > 0 ? [{ key: 'Click', action: 'Select Cut' }] : []),
           { key: `${modKey}+Z`, action: 'Undo Cut' },
           { key: `${modKey}+Shift+Z`, action: 'Redo Cut' },
-          { key: `${modKey}+S`, action: 'Save Cuts' },
+          { key: `${modKey}+S`, action: 'Apply Cuts' },
           { key: 'F', action: 'Frame Part' },
           { key: 'Esc', action: 'Back to Project' }
         ];

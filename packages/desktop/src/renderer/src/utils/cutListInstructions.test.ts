@@ -4,6 +4,40 @@ import { getInstructionFabricationLines, groupCutInstructions } from './cutListI
 import type { CutInstruction } from '../types';
 
 describe('cutListInstructions', () => {
+  it.each(['imperial', 'metric'] as const)(
+    'includes a mitred half-lap thickness band in manufacturing lines (%s)',
+    (units) => {
+      const instruction: CutInstruction = {
+        partId: 'mitred-lap',
+        partName: 'Mitred half lap',
+        cutLength: 12,
+        cutWidth: 3,
+        thickness: 0.75,
+        stockId: 'oak',
+        stockName: 'Oak',
+        grainSensitive: false,
+        canRotate: true,
+        isGlueUp: false,
+        features: [
+          {
+            id: 'banded-mitre',
+            lengthMode: 'long_point',
+            kind: 'end_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face: 'right_end' },
+            reference: { primaryFrom: 'max' },
+            cutType: 'mitre',
+            parameters: { horizontalAngle: 45, horizontalFlip: true, band: { from: 0.375, to: 0.75 } }
+          }
+        ]
+      };
+      expect(getInstructionFabricationLines(instruction, units)).toEqual([
+        `1. Mitre 45° on Right End · Long point on Back · Cut band ${units === 'imperial' ? '3/8" to 3/4"' : '9.525mm to 19.05mm'} from Bottom`
+      ]);
+    }
+  );
+
   it('preserves a right-end compound cut rendered long point in fabrication output', () => {
     const part = createTestPart({
       features: [
@@ -90,7 +124,7 @@ describe('cutListInstructions', () => {
     };
 
     expect(getInstructionFabricationLines(instruction, 'imperial')[0]).toBe(
-      '1. 4-hole Linear Countersink Pattern on Top Face · 1/4" hole × 1/2" major · 82° · 2" spacing · 0° direction · 1/2" deep · 15° tilt toward 90° · Primary 2" from Left · Secondary 1" from Back · Angles: 0° toward Right, 90° toward Front'
+      '1. 4-hole Linear Countersink Pattern on Top Face · 1/4" hole × 1/2" major · 82° · 2" spacing · 0° direction · 1/2" deep · 75° from face toward 90° · Primary 2" from Left · Secondary 1" from Back · Angles: 0° toward Right, 90° toward Front'
     );
   });
 
@@ -137,7 +171,7 @@ describe('cutListInstructions', () => {
         'imperial'
       )
     ).toEqual([
-      '1. 4-hole Circular Counterbore Pattern on Bottom Face · 3/8" hole · 7/8" × 1/4" recess · 1 1/4" radius · 30° start angle · Through · 10° tilt toward 40° · Primary 6" from center (+Right) · Secondary 4" from center (+Back) · Angles: 0° toward Right, 90° toward Back'
+      '1. 4-hole Circular Counterbore Pattern on Bottom Face · 3/8" hole · 7/8" × 1/4" recess · 1 1/4" radius · 30° start angle · Through · 80° from face toward 40° · Primary 6" from center (+Right) · Secondary 4" from center (+Back) · Angles: 0° toward Right, 90° toward Back'
     ]);
   });
 
@@ -340,7 +374,7 @@ describe('cutListInstructions', () => {
 
     expect(lines).toEqual([
       '1. Left mitre — Mitre 45° on Left End · Long point on Front',
-      '2. Top cutout — Cutout on Top Face · 2" × 1" · Through · 2" from Left · 1" from Front'
+      '2. Top cutout — Cutout on Top Face · 2" × 1" · Through · 2" from Left · 1" from Back'
     ]);
   });
 

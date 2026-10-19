@@ -32,7 +32,7 @@ function renderHandle(overrides: Partial<Parameters<typeof ResizeHandle>[0]> = {
 }
 
 /** The oversized, near-invisible mesh that actually catches the pointer. */
-const hitTarget = (container: HTMLElement) => container.querySelectorAll('mesh')[0];
+const hitTarget = (container: HTMLElement) => container.querySelector('mesh[userdata]')!;
 
 beforeEach(() => {
   document.body.style.cursor = '';
@@ -45,9 +45,20 @@ describe('ResizeHandle', () => {
     expect(container.querySelector('group')?.getAttribute('position')).toBe('5,0.5,2');
   });
 
-  it('sits at the middle of an axis it does not pull on', () => {
-    const { container } = renderHandle({ handlePos: { x: 1, y: 0, z: 0, type: 'edge-y' } });
-    expect(container.querySelector('group')?.getAttribute('position')).toBe('5,0,0');
+  it('offsets a pin length grip outside the cap while preserving its physical-end handle', () => {
+    const handlePos: HandlePosition = { x: 1, y: 0, z: 0, type: 'edge-y' };
+    const { container, props } = renderHandle({
+      handlePos,
+      liveDims: { ...liveDims, length: 0.75, width: 0.25, thickness: 0.25 }
+    });
+    const position = container.querySelector('group')!.getAttribute('position')!.split(',').map(Number);
+    const hitRadius = (Number(hitTarget(container).getAttribute('scale')) * 0.45) / 2;
+    expect(position[0]).toBe(0.375);
+    expect(position[1] - hitRadius).toBeGreaterThan(0.125);
+    expect(position[2]).toBe(0);
+    expect(container.querySelector('cylindergeometry')).toBeTruthy();
+    fireEvent.pointerDown(hitTarget(container), { button: 0, pointerId: 1 });
+    expect(props.onResizeStart).toHaveBeenCalledWith(handlePos, expect.anything());
   });
 
   it('starts a resize when pressed, saying which handle was taken', () => {

@@ -1,3 +1,4 @@
+import { DocsLink } from '../common/library/DocsLink';
 import {
   Dialog,
   DialogClose,
@@ -34,6 +35,7 @@ export function AddCutDialog() {
             <DialogDescription>
               Pick the cut type first. The next step walks through the target and measurements.
             </DialogDescription>
+            <DocsLink section="part-cuts">Cut types and measurement guide</DocsLink>
           </div>
           <DialogClose onClose={handleCloseInspector} />
         </DialogHeader>

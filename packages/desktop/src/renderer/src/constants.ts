@@ -15,3 +15,6 @@ export const STOCK_COLORS = [
 // Grid settings
 export const GRID_SIZE = 1 / 16; // 1/16 inch snap increments
 export const GRID_DIVISIONS = 12; // 12 inches per foot marker
+
+// Shared positive authoring floor, in canonical inches (above geometry epsilon).
+export const MIN_DIMENSION_INCHES = 0.001;

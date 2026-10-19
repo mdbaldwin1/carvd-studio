@@ -292,3 +292,39 @@ describe('EditStockModal', () => {
     });
   });
 });
+
+describe('project stock insert fields', () => {
+  it('preserves purchased insert identity and pack data on edit', () => {
+    const onUpdateStock = vi.fn();
+    const stock: Stock = {
+      id: 'insert',
+      name: 'Loose tenon',
+      form: 'insert',
+      insertKind: 'loose_tenon',
+      packSize: 25,
+      length: 2,
+      width: 0.5,
+      thickness: 0.25,
+      grainDirection: 'length',
+      pricingUnit: 'per_item',
+      pricePerUnit: 10,
+      color: '#cc9966'
+    };
+    render(<EditStockModal isOpen stock={stock} onClose={vi.fn()} onUpdateStock={onUpdateStock} />);
+    expect(screen.getByLabelText('Stock Type')).toHaveValue('insert');
+    fireEvent.change(screen.getByRole('textbox', { name: 'Name' }), { target: { value: 'My loose tenon' } });
+    fireEvent.click(screen.getByText('Save Changes'));
+    expect(onUpdateStock).toHaveBeenCalledWith(
+      'insert',
+      expect.objectContaining({
+        name: 'My loose tenon',
+        form: 'insert',
+        insertKind: 'loose_tenon',
+        packSize: 25,
+        length: 2,
+        width: 0.5,
+        thickness: 0.25
+      })
+    );
+  });
+});

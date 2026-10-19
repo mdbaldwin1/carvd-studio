@@ -67,6 +67,19 @@ describe('joint fit', () => {
     expect(issues[0].matePartId).toBe('shelf');
   });
 
+  it.each([0.005, 0.02])('reports real interference of %s inches without treating it as clearance', (extra) => {
+    const side = dadoedSide(0.71875);
+    expect(getJointFitIssues([side, shelfIn(side, 0.71875 + extra)])).toEqual([
+      expect.objectContaining({ problem: 'tight', amount: expect.closeTo(extra, 6) })
+    ]);
+  });
+
+  it('ignores numeric noise and permits intentionally small clearance without prescribing a fit', () => {
+    const side = dadoedSide(0.71875);
+    expect(getJointFitIssues([side, shelfIn(side, 0.71875001)])).toEqual([]);
+    expect(getJointFitIssues([side, shelfIn(side, 0.69875)])).toEqual([]);
+  });
+
   it('catches a shelf too thick to go in at all', () => {
     const side = dadoedSide(0.625);
     const issues = getJointFitIssues([side, shelfIn(side, 0.75)]);

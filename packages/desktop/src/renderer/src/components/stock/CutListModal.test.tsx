@@ -595,6 +595,8 @@ describe('CutListModal', () => {
       render(<CutListModal {...defaultProps} />);
 
       expect(screen.getByText('Regenerate')).toBeInTheDocument();
+      expect(screen.queryByRole('tab', { name: /Parts List/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Download$/ })).not.toBeInTheDocument();
     });
   });
 
@@ -1306,6 +1308,29 @@ describe('CutListModal', () => {
   });
 
   describe('stale cut list regeneration', () => {
+    it('refreshes outdated instructions once on opening and again after closing', () => {
+      useProjectStore.setState({ cutList: { ...mockCutList, isStale: true } });
+      const { rerender } = render(<CutListModal {...defaultProps} />);
+      expect(generateOptimizedCutList).toHaveBeenCalledTimes(1);
+      rerender(<CutListModal {...defaultProps} />);
+      expect(generateOptimizedCutList).toHaveBeenCalledTimes(1);
+      rerender(<CutListModal {...defaultProps} isOpen={false} />);
+      rerender(<CutListModal {...defaultProps} />);
+      expect(generateOptimizedCutList).toHaveBeenCalledTimes(2);
+    });
+
+    it('shows blocking errors instead of outdated instructions and prevents export', () => {
+      useProjectStore.setState({
+        parts: [{ ...mockPart, stockId: null }],
+        cutList: { ...mockCutList, isStale: true }
+      });
+      render(<CutListModal {...defaultProps} />);
+      expect(generateOptimizedCutList).not.toHaveBeenCalled();
+      expect(screen.getByText('Issues Found')).toBeInTheDocument();
+      expect(screen.queryByRole('tab', { name: /Parts List/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Download Project Report' })).toBeDisabled();
+    });
+
     it('regenerates cut list when Regenerate button is clicked', () => {
       useProjectStore.setState({
         cutList: { ...mockCutList, isStale: true }

@@ -225,9 +225,23 @@ export function useMenuCommands(options: UseMenuCommandsOptions = {}) {
           break;
         }
 
-        case 'select-all':
+        case 'select-all': {
+          const focused = document.activeElement;
+          if (focused instanceof HTMLInputElement || focused instanceof HTMLTextAreaElement) {
+            focused.select();
+            break;
+          }
+          if (focused instanceof HTMLElement && focused.isContentEditable) {
+            const range = document.createRange();
+            range.selectNodeContents(focused);
+            const selection = window.getSelection();
+            selection?.removeAllRanges();
+            selection?.addRange(range);
+            break;
+          }
           useSelectionStore.getState().selectParts(useProjectStore.getState().parts.map((part) => part.id));
           break;
+        }
 
         // View commands
         case 'reset-camera':

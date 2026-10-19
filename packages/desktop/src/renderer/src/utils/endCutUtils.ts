@@ -226,7 +226,21 @@ export function getDerivedLengthMeasurements(input: {
 }): DerivedLengthMeasurements {
   const profiles = getPartEndCutProfiles(input);
   const longPoint = Math.max(0, input.length);
-  const shortPoint = Math.max(0, longPoint - profiles.left.maxInset - profiles.right.maxInset);
+  const maximumInset = (side: 'left' | 'right') => {
+    const feature = getEnabledEndCuts(input.features).findLast((cut) => cut.target.face === `${side}_end`);
+    const band = feature?.parameters.band;
+    if (!band) return profiles[side].maxInset;
+    // Material outside a lip remains full length. Sample only the two heights
+    // the cutting plane actually reaches, rather than the whole blank.
+    return Math.max(
+      ...[band.from, band.to].flatMap((height) =>
+        [-input.width / 2, input.width / 2].map((z) =>
+          getEndCutInsetAt(side, profiles, input, { y: height - input.thickness / 2, z })
+        )
+      )
+    );
+  };
+  const shortPoint = Math.max(0, longPoint - maximumInset('left') - maximumInset('right'));
   return {
     blank: input.length,
     longPoint,

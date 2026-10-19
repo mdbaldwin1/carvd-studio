@@ -29,7 +29,10 @@ class TestIntersectionObserver {
 }
 
 /** Tell the card whether it is on screen. */
-function setOnScreen(isIntersecting: boolean): void {
+async function setOnScreen(isIntersecting: boolean): Promise<void> {
+  // The heading can commit before the passive effect installs its observer.
+  // Do not deliver visibility or advance the impression clock before it exists.
+  await waitFor(() => expect(observers.some((observer) => !observer.disconnected)).toBe(true));
   act(() => {
     for (const observer of observers) {
       if (!observer.disconnected) {
@@ -40,9 +43,9 @@ function setOnScreen(isIntersecting: boolean): void {
 }
 
 /** Let the impression timer run out. */
-function waitOutImpression(): void {
-  act(() => {
-    vi.advanceTimersByTime(2000);
+async function waitOutImpression(): Promise<void> {
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(2000);
   });
 }
 
@@ -104,8 +107,8 @@ describe('NextSkillCard', () => {
     render(<NextSkillCard />);
     await screen.findByText('Guides');
 
-    setOnScreen(true);
-    waitOutImpression();
+    await setOnScreen(true);
+    await waitOutImpression();
     await waitFor(() => expect(useCapabilityDiscoveryStore.getState().usage.lastSuggestedAt).toBeTruthy());
   });
 
@@ -116,8 +119,8 @@ describe('NextSkillCard', () => {
     render(<NextSkillCard />);
     await screen.findByText('Guides');
 
-    setOnScreen(false);
-    waitOutImpression();
+    await setOnScreen(false);
+    await waitOutImpression();
     expect(useCapabilityDiscoveryStore.getState().usage.lastSuggestedAt).toBeUndefined();
   });
 
@@ -126,12 +129,12 @@ describe('NextSkillCard', () => {
     render(<NextSkillCard />);
     await screen.findByText('Guides');
 
-    setOnScreen(true);
+    await setOnScreen(true);
     act(() => {
       vi.advanceTimersByTime(400);
     });
-    setOnScreen(false);
-    waitOutImpression();
+    await setOnScreen(false);
+    await waitOutImpression();
     expect(useCapabilityDiscoveryStore.getState().usage.lastSuggestedAt).toBeUndefined();
   });
 
@@ -141,8 +144,8 @@ describe('NextSkillCard', () => {
     render(<NextSkillCard />);
     await screen.findByText('Guides');
 
-    setOnScreen(true);
-    waitOutImpression();
+    await setOnScreen(true);
+    await waitOutImpression();
     expect(useCapabilityDiscoveryStore.getState().usage.lastSuggestedAt).toBeUndefined();
     visibility.mockRestore();
   });

@@ -1,3 +1,4 @@
+import { MIN_DIMENSION_INCHES } from '../../constants';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
 import { Select } from '@renderer/components/ui/select';
@@ -56,7 +57,18 @@ export function StockFormFields({ formData, onChange }: StockFormFieldsProps) {
   const chooseInsertKind = (kind: InsertKind) => {
     const first = getInsertCatalog(kind)[0];
     if (!first) {
-      onChange({ ...formData, form: 'insert', insertKind: kind });
+      onChange({
+        ...formData,
+        form: 'insert',
+        insertKind: kind,
+        length: 2,
+        width: 0.75,
+        thickness: 0.25,
+        packSize: 1,
+        pricingUnit: 'per_item',
+        pricePerUnit: 0,
+        grainDirection: 'length'
+      });
       return;
     }
     onChange({ ...formData, ...stripCatalogId(first), name: formData.name || first.name });
@@ -83,8 +95,13 @@ export function StockFormFields({ formData, onChange }: StockFormFieldsProps) {
   return (
     <>
       <div className="flex flex-col mb-4 gap-2.5">
-        <Label>Name</Label>
-        <Input type="text" value={formData.name} onChange={(e) => onChange({ ...formData, name: e.target.value })} />
+        <Label htmlFor="stock-name">Name</Label>
+        <Input
+          id="stock-name"
+          type="text"
+          value={formData.name}
+          onChange={(e) => onChange({ ...formData, name: e.target.value })}
+        />
       </div>
 
       <div className="flex flex-col mb-4 gap-2.5">
@@ -106,14 +123,14 @@ export function StockFormFields({ formData, onChange }: StockFormFieldsProps) {
               value={insertKind}
               onChange={(e) => chooseInsertKind(e.target.value as InsertKind)}
             >
-              {INSERT_KINDS.filter((kind) => getInsertCatalog(kind).length > 0).map((kind) => (
+              {INSERT_KINDS.map((kind) => (
                 <option key={kind} value={kind}>
                   {INSERT_KIND_LABELS[kind]}
                 </option>
               ))}
             </Select>
           </div>
-          <div className="flex flex-col mb-4 gap-2.5 flex-1">
+          <div className={insertKind === 'loose_tenon' ? 'hidden' : 'flex flex-col mb-4 gap-2.5 flex-1'}>
             <Label htmlFor="insert-size">Size</Label>
             <Select id="insert-size" value={catalogId ?? ''} onChange={(e) => chooseCatalogEntry(e.target.value)}>
               {catalogId === undefined && <option value="">Custom size</option>}
@@ -127,7 +144,34 @@ export function StockFormFields({ formData, onChange }: StockFormFieldsProps) {
         </div>
       )}
 
-      {isInsert ? (
+      {isInsert && insertKind === 'loose_tenon' ? (
+        <div className="flex flex-col mb-4 gap-2.5">
+          <Label>Loose tenon dimensions (L × W × T)</Label>
+          <div className="flex items-center gap-1">
+            <FractionInput
+              ariaLabel="Tenon length"
+              value={formData.length}
+              onChange={(length) => onChange({ ...formData, length })}
+              min={MIN_DIMENSION_INCHES}
+            />
+            <span>×</span>
+            <FractionInput
+              ariaLabel="Tenon width"
+              value={formData.width}
+              onChange={(width) => onChange({ ...formData, width })}
+              min={MIN_DIMENSION_INCHES}
+            />
+            <span>×</span>
+            <FractionInput
+              ariaLabel="Tenon thickness"
+              value={formData.thickness}
+              onChange={(thickness) => onChange({ ...formData, thickness })}
+              min={MIN_DIMENSION_INCHES}
+            />
+          </div>
+          <p className="text-xs text-text-muted">Use the actual dimensions of your prepared tenon stock.</p>
+        </div>
+      ) : isInsert ? (
         <div className="flex flex-col mb-4 gap-2.5">
           <Label>Size</Label>
           {/* A #20 biscuit is a #20 biscuit. Pick a different one to change it. */}
@@ -140,7 +184,12 @@ export function StockFormFields({ formData, onChange }: StockFormFieldsProps) {
         <div className="flex gap-4">
           <div className="flex flex-col mb-4 gap-2.5 flex-1">
             <Label>Diameter</Label>
-            <FractionInput ariaLabel="Diameter" value={formData.width} onChange={setDiameter} min={0.0625} />
+            <FractionInput
+              ariaLabel="Diameter"
+              value={formData.width}
+              onChange={setDiameter}
+              min={MIN_DIMENSION_INCHES}
+            />
           </div>
           <div className="flex flex-col mb-4 gap-2.5 flex-1">
             <Label>Length</Label>
@@ -148,7 +197,7 @@ export function StockFormFields({ formData, onChange }: StockFormFieldsProps) {
               ariaLabel="Length"
               value={formData.length}
               onChange={(length) => onChange({ ...formData, length })}
-              min={1}
+              min={MIN_DIMENSION_INCHES}
             />
           </div>
         </div>
@@ -156,22 +205,31 @@ export function StockFormFields({ formData, onChange }: StockFormFieldsProps) {
         <div className="flex flex-col mb-4 gap-2.5">
           <Label>Dimensions (L × W × T)</Label>
           <div className="flex items-center gap-1">
-            <FractionInput value={formData.length} onChange={(length) => onChange({ ...formData, length })} min={1} />
+            <FractionInput
+              value={formData.length}
+              onChange={(length) => onChange({ ...formData, length })}
+              min={MIN_DIMENSION_INCHES}
+            />
             <span>×</span>
-            <FractionInput value={formData.width} onChange={(width) => onChange({ ...formData, width })} min={1} />
+            <FractionInput
+              value={formData.width}
+              onChange={(width) => onChange({ ...formData, width })}
+              min={MIN_DIMENSION_INCHES}
+            />
             <span>×</span>
             <FractionInput
               value={formData.thickness}
               onChange={(thickness) => onChange({ ...formData, thickness })}
-              min={0.25}
+              min={MIN_DIMENSION_INCHES}
             />
           </div>
         </div>
       )}
 
       <div className={isRod || isInsert ? 'hidden' : 'flex flex-col mb-4 gap-2.5'}>
-        <Label>Grain Direction</Label>
+        <Label htmlFor="stock-grain">Grain Direction</Label>
         <Select
+          id="stock-grain"
           value={formData.grainDirection}
           onChange={(e) =>
             onChange({
@@ -188,8 +246,9 @@ export function StockFormFields({ formData, onChange }: StockFormFieldsProps) {
 
       <div className="flex gap-4">
         <div className="flex flex-col mb-4 gap-2.5 flex-1">
-          <Label>Pricing Unit</Label>
+          <Label htmlFor="stock-pricing">Pricing Unit</Label>
           <Select
+            id="stock-pricing"
             value={formData.pricingUnit}
             onChange={(e) =>
               onChange({
@@ -198,7 +257,15 @@ export function StockFormFields({ formData, onChange }: StockFormFieldsProps) {
               })
             }
           >
-            <option value="per_item">{isInsert ? 'Per Box' : isRod ? 'Per Rod' : 'Per Sheet/Board'}</option>
+            <option value="per_item">
+              {isInsert
+                ? insertKind === 'loose_tenon'
+                  ? 'Per Tenon'
+                  : 'Per Box'
+                : isRod
+                  ? 'Per Rod'
+                  : 'Per Sheet/Board'}
+            </option>
             <option value="board_foot">Per Board Foot</option>
           </Select>
         </div>

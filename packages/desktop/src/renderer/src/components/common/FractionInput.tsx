@@ -1,12 +1,13 @@
 import { useState, useEffect, useRef, ChangeEvent, KeyboardEvent } from 'react';
 import { useProjectStore } from '../../store/projectStore';
-import { formatFabricationMeasurement, parseInput } from '../../utils/fractions';
+import { formatReadableMeasurement, parseInput } from '../../utils/fractions';
 import { Input } from '@renderer/components/ui/input';
 
 interface FractionInputProps {
   value: number;
   onChange: (value: number) => void;
   min?: number;
+  max?: number;
   className?: string;
   id?: string;
   ariaLabel?: string;
@@ -14,14 +15,23 @@ interface FractionInputProps {
 }
 
 const formatInputMeasurement = (value: number, units: 'imperial' | 'metric') =>
-  formatFabricationMeasurement(value, units).replace(/(?:mm|")$/, '');
+  formatReadableMeasurement(value, units).replace(/(?:mm|")$/, '');
 
 /**
  * Input component that displays decimal values as fractions (imperial)
  * or as millimeters (metric), based on project settings.
  * All values are stored internally as inches.
  */
-export function FractionInput({ value, onChange, min = 0, className, id, ariaLabel, disabled }: FractionInputProps) {
+export function FractionInput({
+  value,
+  onChange,
+  min = 0,
+  max = Infinity,
+  className,
+  id,
+  ariaLabel,
+  disabled
+}: FractionInputProps) {
   const units = useProjectStore((s) => s.units);
 
   // Display value formatted according to units when not editing
@@ -36,6 +46,7 @@ export function FractionInput({ value, onChange, min = 0, className, id, ariaLab
   const onChangeRef = useRef<((value: number) => void) | null>(null);
   const unitsRef = useRef(units);
   const minRef = useRef(min);
+  const maxRef = useRef(max);
 
   // Keep refs in sync with state/props
   useEffect(() => {
@@ -48,7 +59,8 @@ export function FractionInput({ value, onChange, min = 0, className, id, ariaLab
 
   useEffect(() => {
     minRef.current = min;
-  }, [min]);
+    maxRef.current = max;
+  }, [min, max]);
 
   // Update display when external value or units changes (and not currently editing)
   useEffect(() => {
@@ -62,7 +74,7 @@ export function FractionInput({ value, onChange, min = 0, className, id, ariaLab
     return () => {
       if (isEditingRef.current && isDirtyRef.current && onChangeRef.current) {
         const parsed = parseInput(displayValueRef.current, unitsRef.current);
-        if (parsed !== null && parsed >= minRef.current) {
+        if (parsed !== null && parsed >= minRef.current && parsed <= maxRef.current) {
           onChangeRef.current(parsed);
         }
       }
@@ -73,7 +85,10 @@ export function FractionInput({ value, onChange, min = 0, className, id, ariaLab
     setIsEditing(true);
     isEditingRef.current = true;
     isDirtyRef.current = false;
+    // Keep the text stable on focus so native selection/replacement cannot race
+    // a controlled-input rewrite. Untouched blur retains the canonical value.
     initialTextRef.current = displayValue;
+    displayValueRef.current = displayValue;
     unitsRef.current = units;
     // Capture the onChange callback so we call the right handler on blur/unmount
     onChangeRef.current = onChange;
@@ -93,7 +108,7 @@ export function FractionInput({ value, onChange, min = 0, className, id, ariaLab
     isDirtyRef.current = false;
 
     const parsed = parseInput(displayValue, unitsRef.current);
-    if (parsed !== null && parsed >= min) {
+    if (parsed !== null && parsed >= min && parsed <= max) {
       // Use the captured onChange callback (from when focus started)
       // This ensures we update the correct entity even if selection changed
       const capturedOnChange = onChangeRef.current || onChange;

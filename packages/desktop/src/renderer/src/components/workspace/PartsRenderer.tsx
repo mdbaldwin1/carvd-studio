@@ -29,7 +29,6 @@ export function PartsRenderer() {
   const dragIntentPartId = useSelectionStore((s) => s.dragIntent?.partId ?? null);
   const draggingPartId = useSelectionStore((s) => s.draggingPartId);
   const displayMode = useCameraStore((s) => s.displayMode);
-  const showDowels = useCameraStore((s) => s.showDowels);
   const referencePartIds = useSnapStore((s) => s.referencePartIds);
   const selectedSidebarStockId = useUIStore((s) => s.selectedSidebarStockId);
   // ADR-008: read group descendants from the scene graph adapter.
@@ -135,7 +134,8 @@ export function PartsRenderer() {
     }
     return { instancedParts: instanced, individualParts: individual };
   }, [parts, individualPartIdSet, displayMode]);
-  const dowelVisualizations = useMemo(() => (showDowels ? getDowelVisualizations(parts) : []), [parts, showDowels]);
+  // Keep legacy joint overlays visible until converted to ordinary dowel parts.
+  const dowelVisualizations = useMemo(() => getDowelVisualizations(parts), [parts]);
 
   return (
     <>
@@ -150,7 +150,7 @@ export function PartsRenderer() {
           isStockHighlighted={!!selectedSidebarStockId && part.stockId === selectedSidebarStockId}
         />
       ))}
-      {showDowels && <DowelVisualizations visualizations={dowelVisualizations} />}
+      <DowelVisualizations visualizations={dowelVisualizations} />
     </>
   );
 }

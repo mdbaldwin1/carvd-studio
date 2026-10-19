@@ -95,7 +95,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Window close confirmation
   confirmClose: () => ipcRenderer.invoke('confirm-close'),
-  cancelClose: () => ipcRenderer.invoke('cancel-close'),
+  cancelClose: (reason?: 'save-failed') => ipcRenderer.invoke('cancel-close', reason),
   onBeforeClose: (callback: () => void) => {
     const handler = () => callback();
     ipcRenderer.on('before-close', handler);

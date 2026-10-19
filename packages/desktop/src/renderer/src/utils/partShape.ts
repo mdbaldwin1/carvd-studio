@@ -10,9 +10,16 @@ import { isRoundStock, isStockDimensionFixed } from '../../../shared/stock';
  */
 export type PartShape = 'rectangular' | 'round';
 
+export function getFactoryBlankShape(stock: Stock | undefined): Part['blankShape'] {
+  if (stock && isRoundStock(stock)) return 'round';
+  return stock?.form === 'insert' && (stock.insertKind === 'domino' || stock.insertKind === 'biscuit')
+    ? stock.insertKind
+    : undefined;
+}
+
 export function getStockShapeKind(stock: Stock | undefined): PartShape {
-  // A dowel pin is a short dowel, so it is round too. The flats of a biscuit
-  // or a domino are what make them what they are, so those stay rectangular.
+  // Round stock determines circular rendering. Other factory profiles use the
+  // explicit blankShape on the part so legacy rectangular blanks stay intact.
   return stock && isRoundStock(stock) ? 'round' : 'rectangular';
 }
 

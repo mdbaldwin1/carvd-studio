@@ -543,11 +543,11 @@ describe('getEditableHandleOverlay', () => {
     expect(overlay?.operationLabel).toBe('mortise');
   });
 
-  it('omits the width handle for stopped dados', () => {
+  it('offers a stopped-span handle for stopped dados', () => {
     const overlay = getEditableHandleOverlay(part, createRectDraft('stopped_dado'));
 
     expect(overlay?.lengthHandle).toBeDefined();
-    expect(overlay?.widthHandle).toBeNull();
+    expect(overlay?.widthHandle).toBeDefined();
   });
 
   it('builds a handle-free overlay for cuts with no free axis', () => {
@@ -687,13 +687,13 @@ describe('applyHandleDelta', () => {
     expect(clampedLow.placementZ).toBe(0);
   });
 
-  it('pins stopped dado moves to the front of the board', () => {
+  it('moves stopped dados across the board within their available span', () => {
     const draft = createRectDraft('stopped_dado', { placementX: 2 });
 
     const moved = sameMode(draft, applyHandleDelta(part, draft, 'move', 1, 5));
 
     expect(moved.placementX).toBeCloseTo(3);
-    expect(moved.placementZ).toBe(0);
+    expect(moved.placementZ).toBe(part.width - draft.sizeWidth);
   });
 
   it('resizes the run and clamps to the available length', () => {
@@ -706,7 +706,7 @@ describe('applyHandleDelta', () => {
     );
   });
 
-  it('resizes the width but ignores width drags for stopped dados', () => {
+  it('resizes pocket and stopped-dado spans', () => {
     const mortise = createRectDraft('mortise');
     expect(sameMode(mortise, applyHandleDelta(part, mortise, 'width', 0, 0.5)).sizeWidth).toBeCloseTo(
       mortise.sizeWidth + 0.5
@@ -714,13 +714,13 @@ describe('applyHandleDelta', () => {
 
     const stoppedDado = createRectDraft('stopped_dado');
     expect(sameMode(stoppedDado, applyHandleDelta(part, stoppedDado, 'width', 0, 0.5)).sizeWidth).toBe(
-      stoppedDado.sizeWidth
+      stoppedDado.sizeWidth + 0.5
     );
   });
 
   it.each([
     ['cutout', true],
-    ['stopped_dado', false],
+    ['stopped_dado', true],
     ['stopped_groove', true],
     ['mortise', true]
   ] as const)('keeps %s handle moves and resizes inside the blank', (cutType, hasWidthHandle) => {
@@ -975,7 +975,7 @@ describe('PartCutsPreviewCanvas (webgl runtime branch)', () => {
     expect(within(canvas).queryByText('24"')).not.toBeInTheDocument();
   });
 
-  it('omits the width handle mesh for stopped dados', () => {
+  it('offers the same sizing handles for pockets and stopped dados', () => {
     const withWidth = renderCanvas(createRectDraft('mortise', { placementX: 4, placementZ: 3 }));
     const meshCountWithWidth = withWidth.container.querySelectorAll('mesh').length;
     withWidth.unmount();
@@ -983,7 +983,7 @@ describe('PartCutsPreviewCanvas (webgl runtime branch)', () => {
     const withoutWidth = renderCanvas(createRectDraft('stopped_dado'));
     const meshCountWithoutWidth = withoutWidth.container.querySelectorAll('mesh').length;
 
-    expect(meshCountWithoutWidth).toBeLessThan(meshCountWithWidth);
+    expect(meshCountWithoutWidth).toBe(meshCountWithWidth);
   });
   it('offers to move the cut when a different target is hovered', () => {
     const draft = createRectDraft('mortise', { placementX: 4, placementZ: 3 });

@@ -1,6 +1,6 @@
-import { Edges } from '@react-three/drei';
+import { PartOutline } from './PartOutline';
 import { ThreeEvent, useThree } from '@react-three/fiber';
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useShallow } from 'zustand/shallow';
 import { useCameraStore } from '../../store/cameraStore';
@@ -11,7 +11,6 @@ import { useSnapStore } from '../../store/snapStore';
 import { Part as PartType } from '../../types';
 import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
 import {
-  getPartOutlineGeometry,
   getPartRenderGeometry,
   getRodRenderGeometry,
   hasRenderablePartFeatures
@@ -31,16 +30,13 @@ import { applyCommitInstructions } from '../../interaction/tools/toolSolver';
 import { DimensionLabel } from './DimensionLabel';
 import { GrainDirectionArrow } from './GrainDirectionArrow';
 import { getPartGroupContext } from './partClickHandler';
-import { GRAIN_ARROW_MAX_DISTANCE_SQ, HANDLE_POSITIONS, LiveDimensions } from './partTypes';
+import { GRAIN_ARROW_MAX_DISTANCE_SQ, HANDLE_POSITIONS, LENGTH_HANDLE_POSITIONS, LiveDimensions } from './partTypes';
 import { ResizeHandle } from './ResizeHandle';
 import { RotationHandle } from './RotationHandle';
 import { useGroupDrag } from './useGroupDrag';
 import { usePartDrag } from './usePartDrag';
 import { usePartResize } from './usePartResize';
 import { pauseOrbitControls, resetWorkspaceCursor, resumeOrbitControls, setWorkspaceCursor } from './workspaceUtils';
-
-// Decorative edges should never consume pointer hits.
-const NOOP_RAYCAST: THREE.Object3D['raycast'] = () => {};
 
 interface PartProps {
   part: PartType;
@@ -121,8 +117,30 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
     });
   }, [part.position.x, part.position.y, part.position.z, part.length, part.width, part.thickness]);
 
-  // Enforce ground constraint after rotation or dimension changes
+  // Preserve authored placements, including underside assemblies. Only a
+  // shape change to a previously grounded part needs this legacy correction.
+  const previousGroundShape = useRef(part);
   useEffect(() => {
+    const previous = previousGroundShape.current;
+    previousGroundShape.current = part;
+    const shapeChanged =
+      previous.id === part.id &&
+      (previous.length !== part.length ||
+        previous.width !== part.width ||
+        previous.thickness !== part.thickness ||
+        previous.rotation.x !== part.rotation.x ||
+        previous.rotation.y !== part.rotation.y ||
+        previous.rotation.z !== part.rotation.z);
+    if (!shapeChanged) return;
+    const previousHalfHeight = calculateWorldHalfHeightFromDegrees(
+      previous.rotation,
+      previous.length,
+      previous.thickness,
+      previous.width,
+      previous.features
+    );
+    if (previous.position.y < previousHalfHeight - 1e-6) return;
+
     const worldHalfHeight = calculateWorldHalfHeightFromDegrees(
       part.rotation,
       part.length,
@@ -199,6 +217,8 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
   // === EVENT HANDLERS ===
   const handleClick = (e: ThreeEvent<MouseEvent>) => {
     e.stopPropagation();
+    // Releasing a drag over a part behind the moved part is not a selection click.
+    if (e.delta > 3) return;
 
     if (isOutsideEditingContext) {
       return;
@@ -322,14 +342,13 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
   // than stored, so it stays honest when the part is reassigned; selecting a
   // plain string keeps this from re-rendering when unrelated stock changes.
   const partShape = useProjectStore((s) => getPartShape(part, s.stocks));
+  const purchasedInsert = useProjectStore(
+    (s) => s.stocks.find((stock) => stock.id === part.stockId)?.form === 'insert'
+  );
   const isRodPart = partShape === 'round' && !isFeaturePart;
   const renderGeometry = useMemo(
     () => (isRodPart ? getRodRenderGeometry(part.length, part.width) : getPartRenderGeometry(part)),
     [isRodPart, part]
-  );
-  const outlineGeometry = useMemo(
-    () => (isFeaturePart ? getPartOutlineGeometry(part) : isRodPart ? renderGeometry : undefined),
-    [isFeaturePart, isRodPart, renderGeometry, part]
   );
 
   const interactionPreview = resolvePartInteractionPreview(part, activeSession);
@@ -349,6 +368,8 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
     : liveDims;
   const dims: [number, number, number] = [renderDims.length, renderDims.thickness, renderDims.width];
   const { x: renderX, y: renderY, z: renderZ } = renderDims;
+
+  const dimensionScale = Math.min(1, Math.max(renderDims.length, renderDims.width, renderDims.thickness) / 12);
 
   const partDimensionPlacements = useMemo(() => {
     const cameraLocal = new THREE.Vector3(
@@ -445,12 +466,17 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
   // Rotation handles stay visible the whole time a single part is selected — they're
   // the primary affordance for rotating, including the 90° click and drag-rotate.
   const showSinglePartRotationHandles = isOnlySelected;
-  // Resize handles only appear on hover / during an active resize gesture. Always-on
-  // resize handles clutter the part with small dots that read as opaque rectangles
-  // sitting on top of the part body, especially during drag.
+  // Board resize handles appear on hover. Round pins have only two outboard
+  // length grips: keep them visible while selected so leaving the body to
+  // reach a grip does not make it disappear.
+  const hasLengthOnlyHandles = partShape === 'round' || part.blankShape === 'round';
   const showSinglePartResizeHandles =
+    !purchasedInsert &&
     isOnlySelected &&
-    (isHovered || isResizing || (activeSession?.primaryPartId === part.id && activeSession.kind === 'resize'));
+    (hasLengthOnlyHandles ||
+      isHovered ||
+      isResizing ||
+      (activeSession?.primaryPartId === part.id && activeSession.kind === 'resize'));
 
   return (
     <group position={[renderX, renderY, renderZ]}>
@@ -486,11 +512,9 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
             isStockHighlighted ||
             displayMode === 'wireframe' ||
             displayMode === 'translucent') && (
-            <Edges
-              geometry={outlineGeometry}
+            <PartOutline
+              geometry={renderGeometry}
               scale={1.002}
-              threshold={15}
-              raycast={NOOP_RAYCAST}
               color={
                 isSelected
                   ? '#ffffff'
@@ -516,9 +540,9 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
             <GrainDirectionArrow liveDims={renderDims} grainDirection={part.grainDirection} />
           )}
 
-        {/* Resize handles - only show when single part selected and hovered/resizing */}
+        {/* Board grips on hover; round length grips remain accessible while selected. */}
         {showSinglePartResizeHandles &&
-          HANDLE_POSITIONS.map((handlePos, idx) => (
+          (hasLengthOnlyHandles ? LENGTH_HANDLE_POSITIONS : HANDLE_POSITIONS).map((handlePos, idx) => (
             <ResizeHandle
               key={idx}
               partId={part.id}
@@ -607,7 +631,8 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
               offset={partDimensionPlacements.length.offset + (partDimensionLayout.get('length')?.lane ?? 0) * 0.7}
               color="#e74c3c"
               units={units}
-              fontSize={0.44}
+              fontSize={0.44 * dimensionScale}
+              tickLength={0.3 * dimensionScale}
             />
             <DimensionLabel
               hidden={!partDimensionLayout.get('width')?.visible}
@@ -618,7 +643,8 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
               offset={partDimensionPlacements.width.offset + (partDimensionLayout.get('width')?.lane ?? 0) * 0.7}
               color="#3498db"
               units={units}
-              fontSize={0.44}
+              fontSize={0.44 * dimensionScale}
+              tickLength={0.3 * dimensionScale}
             />
             <DimensionLabel
               hidden={!partDimensionLayout.get('thickness')?.visible}
@@ -631,7 +657,8 @@ export const Part = memo(function Part({ part, isStockHighlighted = false }: Par
               }
               color="#2ecc71"
               units={units}
-              fontSize={0.4}
+              fontSize={0.4 * dimensionScale}
+              tickLength={0.3 * dimensionScale}
             />
           </>
         )}

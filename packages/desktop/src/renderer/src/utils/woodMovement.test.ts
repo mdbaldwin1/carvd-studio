@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createTestPart } from '../../../../tests/helpers/factories';
+import { createTestPart, createTestStock } from '../../../../tests/helpers/factories';
 import type { RectCutFeature } from '../types';
 import { estimateSeasonalMovement, getAcrossGrainWidth, movesSeasonally, needsMovementAllowance } from './woodMovement';
 import { findGrainCutMismatches, getCutRun } from './grainDirectionCuts';
@@ -7,11 +7,13 @@ import { findGrainCutMismatches, getCutRun } from './grainDirectionCuts';
 const panel = (width: number, grainDirection: 'length' | 'width' = 'length') =>
   createTestPart({ id: 'panel', length: 24, width, thickness: 0.75, grainSensitive: true, grainDirection });
 
+const solid = createTestStock({ form: 'board' });
+
 describe('seasonal movement', () => {
   it('moves a solid panel across the grain and not along it', () => {
     // A 12" panel swings about an eighth of an inch over the year.
-    expect(estimateSeasonalMovement(panel(12))).toBeCloseTo(0.125);
-    expect(estimateSeasonalMovement(panel(24))).toBeCloseTo(0.25);
+    expect(estimateSeasonalMovement(panel(12), solid)).toBeCloseTo(0.125);
+    expect(estimateSeasonalMovement(panel(24), solid)).toBeCloseTo(0.25);
   });
 
   it('measures the width that actually runs across the grain', () => {
@@ -19,25 +21,32 @@ describe('seasonal movement', () => {
     expect(getAcrossGrainWidth(panel(12))).toBe(12);
     // Cross-cut from a wide board: now it is the length that moves.
     expect(getAcrossGrainWidth(panel(12, 'width'))).toBe(24);
-    expect(estimateSeasonalMovement(panel(12, 'width'))).toBeCloseTo(0.25);
+    expect(estimateSeasonalMovement(panel(12, 'width'), solid)).toBeCloseTo(0.25);
   });
 
-  it('leaves sheet goods alone, because plywood stays put', () => {
-    const ply = createTestPart({ id: 'ply', length: 24, width: 24, grainSensitive: false });
-    expect(movesSeasonally(ply)).toBe(false);
-    expect(estimateSeasonalMovement(ply)).toBe(0);
-    expect(needsMovementAllowance(ply)).toBe(false);
+  it('does not infer material movement from sheet face grain', () => {
+    const ply = createTestPart({ id: 'ply', length: 24, width: 24, grainSensitive: true });
+    expect(movesSeasonally(ply, createTestStock({ form: 'sheet' }))).toBe(false);
+    expect(estimateSeasonalMovement(ply, createTestStock({ form: 'sheet' }))).toBe(0);
+    expect(needsMovementAllowance(ply, createTestStock({ form: 'sheet' }))).toBe(false);
   });
 
   it('says nothing about a rail narrow enough for the joint to swallow it', () => {
     // A 3" rail moves about a thirty-second, which disappears into any joint.
-    expect(needsMovementAllowance(panel(3))).toBe(false);
-    expect(needsMovementAllowance(panel(12))).toBe(true);
+    expect(needsMovementAllowance(panel(3), solid)).toBe(false);
+    expect(needsMovementAllowance(panel(12), solid)).toBe(true);
+  });
+
+  it('retains solid-stock movement with free nesting and does not guess unknown material', () => {
+    const part = { ...panel(12), grainSensitive: false };
+    expect(estimateSeasonalMovement(part, solid)).toBeCloseTo(0.125);
+    expect(estimateSeasonalMovement(part)).toBe(0);
+    expect(estimateSeasonalMovement(part, createTestStock())).toBe(0);
   });
 
   it('scales with the width rather than being a fixed fudge', () => {
-    const narrow = estimateSeasonalMovement(panel(8));
-    const wide = estimateSeasonalMovement(panel(16));
+    const narrow = estimateSeasonalMovement(panel(8), solid);
+    const wide = estimateSeasonalMovement(panel(16), solid);
     expect(wide).toBeCloseTo(narrow * 2);
   });
 });

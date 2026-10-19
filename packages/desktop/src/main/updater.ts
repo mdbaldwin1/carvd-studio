@@ -143,13 +143,24 @@ export async function checkForUpdatesManual(): Promise<void> {
     log.info('[Updater] Manual update check');
     const result = await autoUpdater.checkForUpdates();
 
-    // If no update is available, show a message
-    if (!result || !result.updateInfo || result.updateInfo.version === app.getVersion()) {
+    if (!result) {
+      dialog.showMessageBox({
+        type: 'info',
+        title: 'Check for Updates',
+        message: 'Update checking is unavailable for this build.',
+        buttons: ['OK']
+      });
+      return;
+    }
+
+    // The feed may contain an older or ineligible release. Let the updater
+    // decide availability rather than comparing version strings ourselves.
+    if (!result.isUpdateAvailable) {
       dialog.showMessageBox({
         type: 'info',
         title: 'Check for Updates',
         message: "You're up to date!",
-        detail: `Carvd Studio ${app.getVersion()} is the latest version.`,
+        detail: `No newer update is available for Carvd Studio ${app.getVersion()}.`,
         buttons: ['OK']
       });
     }

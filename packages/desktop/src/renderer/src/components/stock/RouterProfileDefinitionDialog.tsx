@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentProps, type SetStateAction } from 'react';
 import { Button } from '@renderer/components/ui/button';
 import { Checkbox } from '@renderer/components/ui/checkbox';
 import {
@@ -38,6 +38,32 @@ export function createBlankRouterProfile(): RouterProfileDefinition {
 const number = (value: string) => (Number.isFinite(Number(value)) ? Number(value) : 0);
 /** Keep exact canonical values in state while presenting shop-friendly decimal precision. */
 export const formatProfileEditorNumber = (value: number) => Number(value.toFixed(4)).toString();
+
+function ProfileNumberInput({ value, onChange, ...props }: ComponentProps<typeof Input>) {
+  const [text, setText] = useState(String(value ?? ''));
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!focused.current) setText(String(value ?? ''));
+  }, [value]);
+  return (
+    <Input
+      {...props}
+      value={text}
+      onFocus={() => {
+        focused.current = true;
+      }}
+      onChange={(event) => {
+        setText(event.target.value);
+        // Preserve intermediate decimal and negative input instead of replacing it with zero.
+        if (event.target.value.trim() && Number.isFinite(Number(event.target.value))) onChange?.(event);
+      }}
+      onBlur={() => {
+        focused.current = false;
+        setText(String(value ?? ''));
+      }}
+    />
+  );
+}
 
 export function RouterProfileDefinitionDialog({
   open,
@@ -216,8 +242,7 @@ export function RouterProfileDefinitionDialog({
           <div>
             <DialogTitle>{initialProfile ? 'Edit Router Profile' : 'Create Router Profile'}</DialogTitle>
             <p className="mt-1 text-sm text-text-muted">
-              Define a precise connected boundary from semantic lines, arcs, and cubic Bézier curves—no freehand drawing
-              required.
+              Shape the finished edge with lines and curves. Drag the points in the preview or enter exact measurements.
             </p>
           </div>
           <div className="flex gap-2">
@@ -295,10 +320,29 @@ export function RouterProfileDefinitionDialog({
             )}
             <fieldset className="rounded-md border border-border p-3">
               <legend className="px-1 text-sm font-semibold">Start Point</legend>
+              <p className="mb-2 text-xs text-text-muted">
+                Measure inward from the stock corner along its two faces, in inches. Drag the profile in the preview to
+                shape the edge.
+              </p>
+              <svg
+                viewBox="0 0 220 78"
+                role="img"
+                aria-label="Profile width and depth measured inward from the stock corner"
+                className="mb-2 h-20 w-full"
+              >
+                <path d="M25 15 H190 V65 H25 Z" fill="currentColor" opacity=".12" />
+                <path d="M25 65 V15 H190 M25 15 L90 55" fill="none" stroke="currentColor" strokeWidth="2" />
+                <text x="82" y="11" fill="currentColor" fontSize="11">
+                  In from edge →
+                </text>
+                <text x="32" y="75" fill="currentColor" fontSize="11">
+                  ↓ Depth from face
+                </text>
+              </svg>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label htmlFor="profile-start-u">U</Label>
-                  <Input
+                  <Label htmlFor="profile-start-u">In from edge</Label>
+                  <ProfileNumberInput
                     id="profile-start-u"
                     type="number"
                     step="any"
@@ -315,8 +359,8 @@ export function RouterProfileDefinitionDialog({
                   />
                 </div>
                 <div>
-                  <Label htmlFor="profile-start-v">V</Label>
-                  <Input
+                  <Label htmlFor="profile-start-v">Depth from face</Label>
+                  <ProfileNumberInput
                     id="profile-start-v"
                     type="number"
                     step="any"
@@ -341,8 +385,8 @@ export function RouterProfileDefinitionDialog({
                   <tr>
                     <th scope="col">#</th>
                     <th scope="col">Kind</th>
-                    <th scope="col">End U</th>
-                    <th scope="col">End V</th>
+                    <th scope="col">End inset</th>
+                    <th scope="col">End depth</th>
                     <th scope="col">Curve</th>
                     <th scope="col">Actions</th>
                   </tr>
@@ -364,8 +408,8 @@ export function RouterProfileDefinitionDialog({
                         </Select>
                       </td>
                       <td>
-                        <Input
-                          aria-label={`Segment ${index + 1} endpoint U`}
+                        <ProfileNumberInput
+                          aria-label={`Segment ${index + 1} endpoint inset`}
                           type="number"
                           step="any"
                           value={segment.to.u}
@@ -373,8 +417,8 @@ export function RouterProfileDefinitionDialog({
                         />
                       </td>
                       <td>
-                        <Input
-                          aria-label={`Segment ${index + 1} endpoint V`}
+                        <ProfileNumberInput
+                          aria-label={`Segment ${index + 1} endpoint depth`}
                           type="number"
                           step="any"
                           value={segment.to.v}
@@ -384,8 +428,8 @@ export function RouterProfileDefinitionDialog({
                       <td>
                         {segment.kind === 'cubicBezier' ? (
                           <div className="grid min-w-52 grid-cols-2 gap-1">
-                            <Input
-                              aria-label={`Segment ${index + 1} control 1 U`}
+                            <ProfileNumberInput
+                              aria-label={`Segment ${index + 1} control 1 inset`}
                               type="number"
                               step="any"
                               value={formatProfileEditorNumber(segment.control1.u)}
@@ -393,8 +437,8 @@ export function RouterProfileDefinitionDialog({
                                 updateSegment(index, { control1: { ...segment.control1, u: number(e.target.value) } })
                               }
                             />
-                            <Input
-                              aria-label={`Segment ${index + 1} control 1 V`}
+                            <ProfileNumberInput
+                              aria-label={`Segment ${index + 1} control 1 depth`}
                               type="number"
                               step="any"
                               value={formatProfileEditorNumber(segment.control1.v)}
@@ -402,8 +446,8 @@ export function RouterProfileDefinitionDialog({
                                 updateSegment(index, { control1: { ...segment.control1, v: number(e.target.value) } })
                               }
                             />
-                            <Input
-                              aria-label={`Segment ${index + 1} control 2 U`}
+                            <ProfileNumberInput
+                              aria-label={`Segment ${index + 1} control 2 inset`}
                               type="number"
                               step="any"
                               value={formatProfileEditorNumber(segment.control2.u)}
@@ -411,8 +455,8 @@ export function RouterProfileDefinitionDialog({
                                 updateSegment(index, { control2: { ...segment.control2, u: number(e.target.value) } })
                               }
                             />
-                            <Input
-                              aria-label={`Segment ${index + 1} control 2 V`}
+                            <ProfileNumberInput
+                              aria-label={`Segment ${index + 1} control 2 depth`}
                               type="number"
                               step="any"
                               value={formatProfileEditorNumber(segment.control2.v)}
@@ -421,7 +465,7 @@ export function RouterProfileDefinitionDialog({
                               }
                             />
                             <span className="col-span-2 text-[10px] text-text-muted">
-                              Control 1 U/V · Control 2 U/V
+                              Control 1 inset/depth · Control 2 inset/depth
                             </span>
                             <Button
                               className="col-span-2"
@@ -447,7 +491,7 @@ export function RouterProfileDefinitionDialog({
                           </div>
                         ) : segment.kind === 'arc' ? (
                           <>
-                            <Input
+                            <ProfileNumberInput
                               aria-label={`Segment ${index + 1} radius`}
                               type="number"
                               min="0"
@@ -465,16 +509,16 @@ export function RouterProfileDefinitionDialog({
                           </>
                         ) : segment.kind === 'ellipseArc' ? (
                           <>
-                            <Input
-                              aria-label={`Segment ${index + 1} radius U`}
+                            <ProfileNumberInput
+                              aria-label={`Segment ${index + 1} horizontal radius`}
                               type="number"
                               min="0"
                               step="any"
                               value={segment.radiusU}
                               onChange={(e) => updateSegment(index, { radiusU: number(e.target.value) })}
                             />
-                            <Input
-                              aria-label={`Segment ${index + 1} radius V`}
+                            <ProfileNumberInput
+                              aria-label={`Segment ${index + 1} depth radius`}
                               type="number"
                               min="0"
                               step="any"

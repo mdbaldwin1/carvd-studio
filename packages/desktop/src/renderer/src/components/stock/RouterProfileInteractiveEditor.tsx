@@ -30,20 +30,20 @@ export function snapProfilePoint(
   const tolerance = grid ? Math.min(grid / 4, 0.01) : 0.01;
   if (Math.abs(point.u) <= tolerance) {
     point.u = 0;
-    target = 'U stock axis';
+    target = 'inset stock axis';
   }
   if (Math.abs(point.v) <= tolerance) {
     point.v = 0;
-    target = 'V stock axis';
+    target = 'depth stock axis';
   }
   for (const p of candidates) {
     if (Math.abs(point.u - p.u) <= tolerance) {
       point.u = p.u;
-      target = 'U handle alignment';
+      target = 'Inset handle alignment';
     }
     if (Math.abs(point.v - p.v) <= tolerance) {
       point.v = p.v;
-      target = 'V handle alignment';
+      target = 'Depth handle alignment';
     }
   }
   if (alt && origin) {
@@ -165,7 +165,7 @@ export function RouterProfileInteractiveEditor({
     const du = snapped.point.u - d.handle.point.u,
       dv = snapped.point.v - d.handle.point.v;
     setStatus(
-      `U ${snapped.point.u.toFixed(4)}, V ${snapped.point.v.toFixed(4)} · Δ ${du.toFixed(4)}, ${dv.toFixed(4)} · distance ${Math.hypot(du, dv).toFixed(4)} · angle ${((Math.atan2(dv, du) * 180) / Math.PI).toFixed(1)}° · ${snapped.target}${mode && mode !== 'off' ? ` · ${mode} tangent lock` : ''}`
+      `Inset ${snapped.point.u.toFixed(4)} in, depth ${snapped.point.v.toFixed(4)} in · Δ ${du.toFixed(4)}, ${dv.toFixed(4)} · distance ${Math.hypot(du, dv).toFixed(4)} · angle ${((Math.atan2(dv, du) * 180) / Math.PI).toFixed(1)}° · ${snapped.target}${mode && mode !== 'off' ? ` · ${mode} tangent lock` : ''}`
     );
   };
   const finish = (e: React.PointerEvent, commit: boolean) => {
@@ -192,7 +192,7 @@ export function RouterProfileInteractiveEditor({
     if (e.key === 'ArrowDown') p.v -= step;
     if (e.key === 'ArrowUp') p.v += step;
     onChange(replace(profile, handle, p));
-    setStatus(`${handle.kind} moved to U ${p.u.toFixed(4)}, V ${p.v.toFixed(4)}.`);
+    setStatus(`${handle.kind} moved to inset ${p.u.toFixed(4)} in, depth ${p.v.toFixed(4)} in.`);
   };
   const evaluated = evaluateRouterProfileBoundary(shown),
     path = evaluated.map((p, i) => `${i ? 'L' : 'M'}${xy({ u: p.x, v: p.y }).x} ${xy({ u: p.x, v: p.y }).y}`).join(' '),
@@ -293,7 +293,7 @@ export function RouterProfileInteractiveEditor({
               fill={h.kind.startsWith('control') ? 'var(--color-warning)' : 'var(--color-accent)'}
               tabIndex={0}
               role="button"
-              aria-label={`${label}, U ${h.point.u}, V ${h.point.v}`}
+              aria-label={`${label}, inset ${h.point.u}, depth ${h.point.v}`}
               onKeyDown={(e) => key(h, e)}
               onPointerDown={(e) => {
                 e.preventDefault();

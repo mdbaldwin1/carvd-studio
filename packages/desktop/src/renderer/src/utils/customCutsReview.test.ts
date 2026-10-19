@@ -266,7 +266,7 @@ describe('whole-branch custom cut regression findings', () => {
     };
     const lines = getInstructionFabricationLines(instruction, 'imperial');
     expect.soft(lines[0]).toContain('2" from Left');
-    expect.soft(lines[0]).toContain('1" from Front');
+    expect.soft(lines[0]).toContain('1" from Back');
     expect.soft(lines[1]).toContain('Primary 2" from center');
     expect.soft(lines[1]).toContain('45° rotation');
     expect(lines[2]).toContain('2 rows × 3 columns');

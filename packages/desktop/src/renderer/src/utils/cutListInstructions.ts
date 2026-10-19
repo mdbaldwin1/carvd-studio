@@ -1,6 +1,6 @@
 import { CutInstruction, DowelJointMetadata, PartFeature } from '../types';
 import { getReferenceMode } from './endCutUtils';
-import { formatFabricationMeasurement as formatMeasurementWithUnit } from './fractions';
+import { formatFabricationMeasurement as formatMeasurementWithUnit, formatReadableMeasurement } from './fractions';
 import { getFeaturePlacementSummary, getFeatureSummary } from './partFeatureSummary';
 import { analyzeEdgeProfileToolFeasibility } from './edgeProfileToolFeasibility';
 
@@ -92,6 +92,27 @@ export function getInstructionEnabledFeatures(instruction: CutInstruction): Part
   return (instruction.features ?? []).filter((feature) => feature.enabled);
 }
 
+/** End-face routing keeps its square-blank reference after an angled end cut. */
+export function getRoutedEndReferenceWarning(feature: PartFeature, features: PartFeature[]): string | null {
+  if (feature.kind !== 'routed_path' || feature.target.type !== 'face') return null;
+  const face = feature.target.face;
+  if (face !== 'left_end' && face !== 'right_end') return null;
+  const index = features.indexOf(feature);
+  const trimmed = features
+    .slice(0, index)
+    .some(
+      (earlier) =>
+        earlier.enabled &&
+        earlier.kind === 'end_cut' &&
+        earlier.target.type === 'face' &&
+        earlier.target.face === face &&
+        (earlier.parameters.horizontalAngle !== 0 || (earlier.parameters.verticalAngle ?? 0) !== 0)
+    );
+  return trimmed
+    ? 'Model dimensions use the original square end, not the angled cut face. Route depth is not a machine plunge setting. Establish the actual slot depth, entry direction, and tooling before machining.'
+    : null;
+}
+
 export function getInstructionFabricationLines(instruction: CutInstruction, units: 'imperial' | 'metric'): string[] {
   const enabledFeatures = getInstructionEnabledFeatures(instruction);
   const descriptions: string[] = [];
@@ -107,15 +128,19 @@ export function getInstructionFabricationLines(instruction: CutInstruction, unit
         `Dowel joint: ${count} × ${formatMeasurementWithUnit(dowel.dowelDiameter, units)} dowels, ${formatMeasurementWithUnit(dowel.dowelLength, units)} long; drill ${formatMeasurementWithUnit(dowel.embedmentDepth, units)} into this part.`
       );
     }
-    const summary = [getFeatureSummary(feature, units), getFeaturePlacementSummary(feature, units)]
+    const summary = [
+      getRoutedEndReferenceWarning(feature, enabledFeatures),
+      getFeatureSummary(feature, units),
+      getFeaturePlacementSummary(feature, units, instruction.finishedWidth ?? instruction.cutWidth)
+    ]
       .filter(Boolean)
       .join(' · ');
     const label = feature.label?.trim();
     descriptions.push(label ? `${label} — ${summary}` : summary);
     if (feature.kind === 'edge_profile') {
       const findings = analyzeEdgeProfileToolFeasibility(feature, {
-        length: instruction.cutLength,
-        width: instruction.cutWidth,
+        length: instruction.finishedLength ?? instruction.cutLength,
+        width: instruction.finishedWidth ?? instruction.cutWidth,
         thickness: instruction.thickness
       });
       for (const finding of findings) {
@@ -132,10 +157,19 @@ export function getInstructionFabricationLines(instruction: CutInstruction, unit
   // something to allow for, not an operation to perform.
   if (instruction.movementAllowance) {
     lines.push(
-      `Solid wood: allow about ${formatMeasurementWithUnit(instruction.movementAllowance, units)} of seasonal movement across the grain. Housed panels must stay free to move.`
+      `Board stock assumed solid wood: allow about ${formatReadableMeasurement(instruction.movementAllowance, units)} of seasonal movement across the grain. Housed panels must stay free to move.`
     );
   }
 
+  if (
+    instruction.finishedLength !== undefined &&
+    instruction.finishedWidth !== undefined &&
+    (instruction.finishedLength !== instruction.cutLength || instruction.finishedWidth !== instruction.cutWidth)
+  ) {
+    lines.unshift(
+      `Blank: ${formatMeasurementWithUnit(instruction.cutLength, units)} × ${formatMeasurementWithUnit(instruction.cutWidth, units)}. Finished modeled envelope: ${formatMeasurementWithUnit(instruction.finishedLength, units)} × ${formatMeasurementWithUnit(instruction.finishedWidth, units)} × ${formatMeasurementWithUnit(instruction.thickness, units)}. Allowance is unassigned to edges. Establish the modeled envelope and reference edges before locating these cuts; do not measure their offsets from an oversized blank edge. Authored cuts describe the modeled envelope, not extra material.`
+    );
+  }
   const note = instruction.notes?.trim();
   if (note) lines.push(note);
   return lines;
@@ -162,7 +196,7 @@ export function groupCutInstructions(instructions: CutInstruction[]): GroupedCut
     // inflate the unique-blank count. Distinct notes still separate ordinary
     // parts, which is what this key was added for.
     const noteKey = inst.isGlueUp ? '' : (inst.notes?.trim() ?? '');
-    const key = `${inst.stage ?? 'blank'}-${inst.cutLength}-${inst.cutWidth}-${inst.thickness}-${inst.stockId}-${inst.grainSensitive}-${inst.isGlueUp}-${featureKey}-${noteKey}`;
+    const key = `${inst.stage ?? 'blank'}-${inst.finishedLength ?? ''}-${inst.finishedWidth ?? ''}-${inst.cutLength}-${inst.cutWidth}-${inst.thickness}-${inst.stockId}-${inst.grainSensitive}-${inst.isGlueUp}-${featureKey}-${noteKey}`;
 
     const existing = groups.get(key);
     if (existing) {

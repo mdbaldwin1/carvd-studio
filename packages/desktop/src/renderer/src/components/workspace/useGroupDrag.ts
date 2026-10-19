@@ -17,6 +17,7 @@ import { snapToGrid } from './partTypes';
 import {
   bindWindowPointerSession,
   createPointerRafQueue,
+  getPlaneSnapAxes,
   pauseOrbitControls,
   resumeOrbitControls
 } from './workspaceUtils';
@@ -169,7 +170,7 @@ export function useGroupDrag(
         planeBasisVRef.current.copy(_normal).cross(planeBasisURef.current).normalize();
       }
 
-      planeAxesRef.current = { x: true, y: true, z: true };
+      planeAxesRef.current = getPlaneSnapAxes(_normal);
     },
     [camera]
   );
@@ -493,7 +494,9 @@ export function useGroupDrag(
         }
       });
 
-      const handleUp = () => {
+      const handleUp = (event?: unknown) => {
+        if (event instanceof PointerEvent && event.type === 'pointerup' && dragStarted) pointerRafQueue.schedule(event);
+        pointerRafQueue.flush();
         if (!dragStarted || !lastDragPosRef.current) {
           // Click without drag — clean up
           cleanup();
@@ -580,7 +583,8 @@ export function useGroupDrag(
 
       const unbindPointerSession = bindWindowPointerSession(window, {
         onMove: handleMove,
-        onEnd: handleUp
+        onEnd: handleUp,
+        endOptions: { capture: true }
       });
       const cleanup = () => {
         unbindPointerSession();

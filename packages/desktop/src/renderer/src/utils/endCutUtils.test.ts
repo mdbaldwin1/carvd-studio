@@ -279,6 +279,30 @@ describe('endCutUtils', () => {
   });
 
   describe('getDerivedLengthMeasurements', () => {
+    it.each([
+      { from: 0, to: 0.25, flip: false },
+      { from: 0.5, to: 0.75, flip: true }
+    ])('measures a bevel only within its lip: %j', ({ from, to, flip }) => {
+      const measurements = getDerivedLengthMeasurements({
+        length: 12,
+        width: 3,
+        thickness: 0.75,
+        features: [
+          createEndCut({
+            cutType: 'bevel',
+            parameters: {
+              horizontalAngle: 0,
+              verticalAngle: 45,
+              verticalFlip: flip,
+              band: { from, to }
+            }
+          })
+        ]
+      });
+      expect(measurements.shortPoint).toBeCloseTo(11.75);
+      expect(measurements.longPoint).toBe(12);
+    });
+
     it('derives blank, long point, short point, and centerline values', () => {
       const measurements = getDerivedLengthMeasurements({
         length: 24,

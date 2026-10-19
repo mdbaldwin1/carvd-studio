@@ -148,7 +148,7 @@ export function solvePartMoveSnapPreview(params: {
                 // multi-selection so preview and commit cannot disagree.
                 mateResult =
                   movingPartIds.length === 1
-                    ? getSnapContext().advancedDetectors.mate()
+                    ? initialContext.advancedDetectors.mate()
                     : {
                         adjustedPosition: nextPosition,
                         snappedX: false,
@@ -178,10 +178,8 @@ export function solvePartMoveSnapPreview(params: {
   // A socket mate is a holistic fit: a face-constrained drag may only expose
   // the insertion axis to ordinary snap arbitration, but the mate detector
   // still needs to center the cross-section on the socket's inactive axes.
-  // Fill axes that were inactive, plus active axes whose only rejection was
-  // the generic "do not snap back to the drag origin" guard. Returning a
-  // cross-section axis to its origin is required when that origin is the exact
-  // socket center. Any competing winner still keeps its normal priority.
+  // Apply all of the mate's constrained axes together, including unchanged
+  // cross-section axes. Normal stage priority still protects explicit guides.
   if (mateResult?.mateHostPartId) {
     const mateSnappedAxes: Record<Axis, boolean> = {
       x: mateResult.snappedX,
@@ -189,9 +187,8 @@ export function solvePartMoveSnapPreview(params: {
       z: mateResult.snappedZ
     };
     for (const axis of ['x', 'y', 'z'] as const) {
-      if (!mateSnappedAxes[axis] || winners[axis]) continue;
+      if (!mateSnappedAxes[axis]) continue;
       const nextValue = mateResult.adjustedPosition[axis];
-      if (axes[axis] && !snapWouldRestoreDragOrigin(axis, nextValue)) continue;
       if (axis === 'y' && nextValue < worldHalfHeight) continue;
       if (
         tryApplyAxisSnap(
@@ -279,7 +276,7 @@ export function solveGroupMoveSnapPreview(params: {
     createGroupProxySnapContext({
       initialBounds,
       anchorPosition,
-      delta: workingDelta,
+      delta: { ...workingDelta },
       referenceParts,
       movingPartIds,
       movingParts,
@@ -338,7 +335,7 @@ export function solveGroupMoveSnapPreview(params: {
       enableFeatureAnchors: settings.enableFeatureAnchors ?? true,
       detectors: {
         mate: () => {
-          groupMateResult = getSnapContext().advancedDetectors.mate();
+          groupMateResult = initialContext.advancedDetectors.mate();
           return groupMateResult;
         },
         surface: () => getSnapContext().advancedDetectors.surface(),

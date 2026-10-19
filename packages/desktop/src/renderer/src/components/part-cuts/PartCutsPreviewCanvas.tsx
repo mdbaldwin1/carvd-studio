@@ -1,4 +1,5 @@
-import { Edges, Html, Line, OrbitControls } from '@react-three/drei';
+import { PartOutline } from '../workspace/PartOutline';
+import { Html, Line, OrbitControls } from '@react-three/drei';
 import { Canvas, ThreeEvent, useFrame, useThree } from '@react-three/fiber';
 import {
   getCutFaceBox,
@@ -31,10 +32,10 @@ import {
   getValidPickableTargets,
   partFeatureTargetEquals
 } from '@renderer/utils/partCutPicking';
-import { getPartOutlineGeometry, getPartRenderGeometry } from '@renderer/utils/partFeatureGeometry';
+import { getPartRenderGeometry } from '@renderer/utils/partFeatureGeometry';
 import { getRectCutDepth, getResolvedRectCutFeature } from '@renderer/utils/rectCutUtils';
 import { getFaceFrame, validateCircularCut, validateRoundedCut } from '@renderer/utils/roundCutUtils';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useCameraStore } from '@renderer/store/cameraStore';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
@@ -307,7 +308,7 @@ function SelectedEdgeHighlight({ part, edge }: { part: Part; edge: string }) {
 
 function RoutedPathHandles({
   part,
-  draft,
+  draft: sourceDraft,
   groupRef,
   controlsRef,
   dragQuantum,
@@ -322,9 +323,13 @@ function RoutedPathHandles({
   units: 'imperial' | 'metric';
   onDraftChange: (draft: FeatureDraft) => void;
 }) {
+  const [dragDraft, setDragDraft] = useState<RoutedPathDraft | null>(null);
+  const pendingDraft = useRef<RoutedPathDraft | null>(null);
+  const draft = dragDraft ?? sourceDraft;
   const frame = getFaceFrame(part, draft.faceTarget);
   const activeRef = useRef<ActiveRoutePointDrag | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [selectedPointIndex, setSelectedPointIndex] = useState<number | null>(null);
   const points = draft.points.map((point) => facePoint(frame, point.primary, point.secondary));
   const linePoints = draft.closed && points.length > 2 ? [...points, points[0]] : points;
   const normal = new THREE.Vector3(-frame.inwardNormal.x, -frame.inwardNormal.y, -frame.inwardNormal.z);
@@ -362,11 +367,13 @@ function RoutedPathHandles({
   // compact zig-zag from becoming a pile of unreadable badges.
   const labelSpacing = Math.min(frame.primarySize, frame.secondarySize) * 0.18;
   const visibleSegmentIndexes = new Set<number>();
-  const activeIndex = activeRef.current?.index;
+  const activeIndex = activeRef.current?.index ?? selectedPointIndex;
   const prioritizedSegments =
-    dragging && activeIndex !== undefined
+    activeIndex !== undefined && activeIndex !== null
       ? routeSegments.filter((segment) => segment.index === activeIndex || segment.endIndex === activeIndex)
-      : [...routeSegments].sort((a, b) => b.length - a.length);
+      : routeSegments.length === 1
+        ? routeSegments
+        : [];
   const acceptedMidpoints: Array<{ primary: number; secondary: number }> = [];
   for (const segment of prioritizedSegments) {
     if (
@@ -380,18 +387,20 @@ function RoutedPathHandles({
     }
   }
 
-  const finish = () => {
+  const finish = useCallback(() => {
+    const pending = pendingDraft.current;
+    pendingDraft.current = null;
+    if (pending) onDraftChange(pending);
+    setDragDraft(null);
     activeRef.current = null;
     setDragging(false);
     if (controlsRef.current) controlsRef.current.enabled = true;
-  };
+  }, [controlsRef, onDraftChange]);
 
   useEffect(() => {
     if (!dragging) return;
-    const handleUp = () => {
-      activeRef.current = null;
-      setDragging(false);
-      if (controlsRef.current) controlsRef.current.enabled = true;
+    const handleUp = (event: PointerEvent) => {
+      if (activeRef.current?.pointerId === event.pointerId) finish();
     };
     window.addEventListener('pointerup', handleUp);
     window.addEventListener('pointercancel', handleUp);
@@ -399,15 +408,23 @@ function RoutedPathHandles({
       window.removeEventListener('pointerup', handleUp);
       window.removeEventListener('pointercancel', handleUp);
     };
-  }, [controlsRef, dragging]);
+  }, [dragging, finish]);
 
   const movePoint = (event: ThreeEvent<PointerEvent>) => {
     const active = activeRef.current;
     const group = groupRef.current;
     if (!active || !group) return;
     event.stopPropagation();
-    const local = group.worldToLocal(event.point.clone());
-    const relative = local.sub(new THREE.Vector3(frame.origin.x, frame.origin.y, frame.origin.z));
+    // Project the captured pointer ray onto the face, not onto the moving
+    // handle sphere. Capture keeps fast drags and off-board releases reliable.
+    const localRay = event.ray.clone().applyMatrix4(group.matrixWorld.clone().invert());
+    const origin = new THREE.Vector3(frame.origin.x, frame.origin.y, frame.origin.z);
+    const local = localRay.intersectPlane(
+      new THREE.Plane().setFromNormalAndCoplanarPoint(normal, origin),
+      new THREE.Vector3()
+    );
+    if (!local) return;
+    const relative = local.sub(origin);
     const snapped = snapRoutedPathPoint(
       {
         primary: relative.dot(new THREE.Vector3(frame.primaryAxis.x, frame.primaryAxis.y, frame.primaryAxis.z)),
@@ -418,7 +435,7 @@ function RoutedPathHandles({
       frame,
       dragQuantum
     );
-    onDraftChange({
+    const nextDraft: RoutedPathDraft = {
       ...draft,
       points: draft.points.map((point, index) =>
         index === active.index
@@ -429,7 +446,9 @@ function RoutedPathHandles({
             }
           : point
       )
-    });
+    };
+    pendingDraft.current = nextDraft;
+    setDragDraft(nextDraft);
   };
 
   return (
@@ -514,8 +533,17 @@ function RoutedPathHandles({
             onPointerDown={(event) => {
               event.stopPropagation();
               activeRef.current = { index, pointerId: event.pointerId };
+              setSelectedPointIndex(index);
+              (event.target as Element).setPointerCapture(event.pointerId);
               setDragging(true);
               if (controlsRef.current) controlsRef.current.enabled = false;
+            }}
+            onPointerMove={movePoint}
+            onPointerUp={(event) => {
+              if (activeRef.current?.pointerId !== event.pointerId) return;
+              event.stopPropagation();
+              (event.target as Element).releasePointerCapture(event.pointerId);
+              finish();
             }}
           >
             <sphereGeometry args={[Math.max(0.12, Math.min(frame.primarySize, frame.secondarySize) * 0.035), 20, 20]} />
@@ -580,7 +608,7 @@ const RECT_HANDLE_AXES: Partial<Record<RectCutDraft['cutType'], { moveX: boolean
   cutout: { moveX: true, moveZ: true },
   mortise: { moveX: true, moveZ: true },
   stopped_groove: { moveX: true, moveZ: true },
-  stopped_dado: { moveX: true, moveZ: false },
+  stopped_dado: { moveX: true, moveZ: true },
   dado: { moveX: true, moveZ: false },
   groove: { moveX: false, moveZ: true }
 };
@@ -713,7 +741,7 @@ function PreviewHandleControls({
             Enlarge Hole
           </Button>
         ) : null}
-        {(draft.mode === 'rounded_cut' || (draft.mode === 'rect_cut' && draft.cutType !== 'stopped_dado')) && (
+        {(draft.mode === 'rounded_cut' || (draft.mode === 'rect_cut' && rectAxes?.moveZ)) && (
           <Button
             type="button"
             size="xs"
@@ -1689,7 +1717,6 @@ function PartCutsPreviewScene({
   dragQuantum: number;
 }) {
   const geometry = useMemo(() => getPartRenderGeometry(previewPart), [previewPart]);
-  const outlineGeometry = useMemo(() => getPartOutlineGeometry(previewPart), [previewPart]);
   const pickTargets = useMemo(() => getValidPickableTargets(previewPart, draft), [draft, previewPart]);
   const maxDimension = Math.max(previewPart.length, previewPart.width, previewPart.thickness, 1);
   const handleOverlay = useMemo(
@@ -1841,16 +1868,9 @@ function PartCutsPreviewScene({
           three-quarter view otherwise leaves a bottom-face cut, and every
           handle on it, hidden beneath the board with no way to reach them. */}
       <group ref={groupRef} rotation={routedFaceRotation}>
-        <mesh geometry={geometry}>
+        <mesh geometry={geometry} dispose={null}>
           <meshStandardMaterial color="#d6c3a1" metalness={0.05} roughness={0.82} />
-          <Edges
-            geometry={outlineGeometry}
-            threshold={15}
-            color="#433225"
-            raycast={() => {}}
-            renderOrder={4}
-            scale={1.002}
-          />
+          <PartOutline geometry={geometry} color="#433225" renderOrder={4} scale={1.002} />
         </mesh>
 
         <BlankDimensions part={previewPart} units={units} />

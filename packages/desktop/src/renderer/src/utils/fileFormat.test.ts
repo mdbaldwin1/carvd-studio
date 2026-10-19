@@ -16,6 +16,7 @@ import {
   CARVD_FILE_VERSION,
   CARVD_FILE_VERSION_BASE,
   CARVD_FILE_VERSION_FEATURES,
+  CARVD_FILE_VERSION_STOCK_FORMS,
   GroupMember,
   RectCutFeature
 } from '../types';
@@ -65,6 +66,23 @@ describe('fileFormat', () => {
   // ============================================================
 
   describe('serializeProject', () => {
+    it('round-trips explicit factory geometry at version 4 without changing legacy blanks', () => {
+      const stock = createTestStock({ id: 'insert', form: 'insert', insertKind: 'domino' });
+      const shaped = createTestPart({ id: 'shaped', stockId: stock.id, blankShape: 'domino' });
+      const legacy = createTestPart({ id: 'legacy', stockId: stock.id });
+      const file = createValidCarvdFile({ parts: [shaped, legacy], stocks: [stock] });
+      expect(file.version).toBe(4);
+      const round = parseCarvdFile(stringifyCarvdFile(file));
+      expect(round.valid).toBe(true);
+      expect(round.data?.parts[0].blankShape).toBe('domino');
+      expect(round.data?.parts[1].blankShape).toBeUndefined();
+    });
+
+    it('rejects a factory shape incorrectly stamped as an older reader version', () => {
+      const file = createValidCarvdFile({ parts: [createTestPart({ blankShape: 'round' })] });
+      expect(parseCarvdFile(stringifyCarvdFile({ ...file, version: 3 })).valid).toBe(false);
+    });
+
     it('creates valid CarvdFile structure', () => {
       const file = createValidCarvdFile();
 
@@ -1535,13 +1553,13 @@ describe('stock form migration and file versioning', () => {
     expect(resolveFileVersion([], false)).toBe(CARVD_FILE_VERSION_BASE);
     expect(resolveFileVersion([], true)).toBe(CARVD_FILE_VERSION_FEATURES);
     // Rod stock is material an older build cannot model, so the file moves up.
-    expect(resolveFileVersion([rodStock], false)).toBe(CARVD_FILE_VERSION);
-    expect(resolveFileVersion([rodStock], true)).toBe(CARVD_FILE_VERSION);
+    expect(resolveFileVersion([rodStock], false)).toBe(CARVD_FILE_VERSION_STOCK_FORMS);
+    expect(resolveFileVersion([rodStock], true)).toBe(CARVD_FILE_VERSION_STOCK_FORMS);
   });
 
   it('round-trips a project holding rod stock at version 3', () => {
     const file = createValidCarvdFile({ stocks: [rodStock] });
-    expect(file.version).toBe(CARVD_FILE_VERSION);
+    expect(file.version).toBe(CARVD_FILE_VERSION_STOCK_FORMS);
     const round = parseCarvdFile(stringifyCarvdFile(file));
     expect(round.valid).toBe(true);
     expect(round.data?.stocks[0].form).toBe('rod');

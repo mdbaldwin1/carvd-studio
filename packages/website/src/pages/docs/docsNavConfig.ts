@@ -41,7 +41,7 @@ export const docPages: DocPage[] = [
     title: "Stock Materials",
     section: "Core Features",
     searchText:
-      "material library plywood lumber sheet goods board dimensions grain pricing constraints import export stock management",
+      "material library plywood lumber sheet goods board dimensions grain pricing constraints import export stock management dowel rod insert biscuit domino loose tenon",
   },
   {
     slug: "groups",
@@ -77,14 +77,28 @@ export const docPages: DocPage[] = [
     title: "Snapping & Alignment",
     section: "Advanced Features",
     searchText:
-      "snap grid edge center corner align nudge measurements precision coordinates placement",
+      "snap grid edge center corner align nudge measurements precision coordinates placement rotated compound joint alignment alt option shift drag ground live grid",
   },
   {
     slug: "joinery",
     title: "Custom Cuts & Joinery",
     section: "Advanced Features",
     searchText:
-      "dado rabbet mortise tenon allowances extra length extra width cut dimensions woodworking joinery",
+      "dado rabbet mortise tenon allowances matching cuts layout bring pieces together assembly placement insert socket dowel biscuit domino loose tenon spline clearance glue shoulder joint fit",
+  },
+  {
+    slug: "part-cuts",
+    title: "Part Cuts",
+    section: "Advanced Features",
+    searchText:
+      "end cut mitre bevel compound dado groove stopped rabbet mortise tenon notch hole pattern grid rows columns shelf pin countersink counterbore rounded slot routed path router profile cutter reference edge depth through save apply cuts circle jig pivot drill angle face socket wall tail splay mirror duplicate reorder enable disable svg import physical router tool feasibility profile versions library snapshot compatibility",
+  },
+  {
+    slug: "joint-recipes",
+    title: "Joint Recipes",
+    section: "Advanced Features",
+    searchText:
+      "butt edge glue glue-up bridle box dovetail half blind sliding twin haunched mortise and tenon fox wedge wedged pegged tenon pin spline biscuit domino shiplap tongue and groove half lap egg crate scarf mitre miter birdsmouth hinge pocket hole counterbore countersink cross dowel barrel nut keyed cleat shelf pin rule t-slot beaded scallop tambour housing dado groove stopped dado stopped groove rabbet rabbeted dado dovetailed lap mitred half lap cutter sampler router bits edge profiles",
   },
   // Reference
   {
@@ -92,7 +106,7 @@ export const docPages: DocPage[] = [
     title: "Keyboard Shortcuts",
     section: "Reference",
     searchText:
-      "hotkeys keyboard commands undo redo copy paste duplicate group ungroup movement navigation tools rotate rotation custom angles precise rotate angle snap shift drag ring",
+      "hotkeys keyboard commands undo redo copy paste duplicate group ungroup movement navigation tools rotate rotation custom angles precise rotate angle snap shift drag ring part cuts escape delete apply alt option",
   },
   {
     slug: "settings",

@@ -27,7 +27,7 @@ describe('RouterProfileInteractiveEditor', () => {
     expect(snapProfilePoint({ u: 0.061, v: 0.063 }, 0.0625, [])).toMatchObject({ point: { u: 0.0625, v: 0.0625 } });
     expect(snapProfilePoint({ u: 0.004, v: 0.2 }, 0, [])).toMatchObject({
       point: { u: 0, v: 0.2 },
-      target: 'U stock axis'
+      target: 'inset stock axis'
     });
     expect(snapProfilePoint({ u: 0.201, v: 0.31 }, 0, [{ u: 0.2, v: 0.4 }])).toMatchObject({ point: { u: 0.2 } });
     expect(snapProfilePoint({ u: 0.061, v: 0.063 }, 0.0625, [], true).point).toEqual({ u: 0.061, v: 0.063 });
@@ -145,6 +145,6 @@ describe('RouterProfileInteractiveEditor', () => {
     fireEvent.pointerMove(svg, { pointerId: 1, ...target });
     fireEvent.pointerCancel(svg, { pointerId: 1 });
     expect(onChange).not.toHaveBeenCalled();
-    expect(handle(/Profile start point/)).toHaveAttribute('aria-label', 'Profile start point, U 0, V 0.25');
+    expect(handle(/Profile start point/)).toHaveAttribute('aria-label', 'Profile start point, inset 0, depth 0.25');
   });
 });

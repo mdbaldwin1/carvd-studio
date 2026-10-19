@@ -63,11 +63,149 @@ const inspector = () => screen.getByRole('complementary', { name: 'Cut propertie
 const inspectorAlert = () => within(inspector()).queryByRole('alert');
 
 describe('CutProperties measurement and placement fields', () => {
+  it('recesses a thin hinge leaf to its actual thickness', () => {
+    const props = renderWorkspace();
+    startCut('Mortise');
+    setMeasurement('Blind Depth', '0.09');
+    expect(props.onDraftFeaturesChange).toHaveBeenLastCalledWith(
+      [expect.objectContaining({ parameters: expect.objectContaining({ depth: 0.09 }) })],
+      expect.any(Object)
+    );
+    expect(inspectorAlert()).toBeNull();
+  });
+  it.each(['Round Hole', 'Rounded Slot'])('places a %s on either side of the face center', (preset) => {
+    const props = renderWorkspace();
+    startCut(preset);
+    setMeasurement('Offset Along Face', '-3');
+    setMeasurement('Offset Across Face', '-1');
+    expect(props.onDraftFeaturesChange).toHaveBeenLastCalledWith(
+      [expect.objectContaining({ placement: expect.objectContaining({ primary: -3, secondary: -1 }) })],
+      expect.any(Object)
+    );
+    expect(inspectorAlert()).toBeNull();
+  });
+  it('routes from negative face coordinates with a short lead-in beyond the board edge', () => {
+    const props = renderWorkspace();
+    startCut('Routed Path');
+    setMeasurement('Point 1 along face', '-3');
+    setMeasurement('Point 1 across face', '-6.1');
+    expect(props.onDraftFeaturesChange).toHaveBeenLastCalledWith(
+      [
+        expect.objectContaining({
+          path: expect.objectContaining({
+            points: expect.arrayContaining([expect.objectContaining({ primary: -3, secondary: -6.1 })])
+          })
+        })
+      ],
+      expect.any(Object)
+    );
+    expect(inspectorAlert()).toBeNull();
+  });
+
+  it('lays out a circle jig across a narrow end face and rejects a route wholly off stock', () => {
+    const props = renderWorkspace();
+    startCut('Routed Path');
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Left End' }));
+    fireEvent.click(screen.getByText('Circle jig'));
+    setMeasurement('Circle route radius', '5/8');
+    setMeasurement('Circle pivot along face', '-1.5');
+    fireEvent.click(screen.getByRole('button', { name: 'Apply circle' }));
+    expect(inspectorAlert()).toBeNull();
+    const feature = vi.mocked(props.onDraftFeaturesChange).mock.calls.at(-1)?.[0][0];
+    expect(feature?.kind).toBe('routed_path');
+    if (feature?.kind !== 'routed_path') throw new Error('Expected routed path');
+    expect(feature.path.closed).toBe(true);
+    expect(feature.path.points).toHaveLength(32);
+    expect(feature.path.points[0]).toMatchObject({ primary: -0.875, secondary: 0 });
+    setMeasurement('Circle pivot along face', '100');
+    fireEvent.click(screen.getByRole('button', { name: 'Apply circle' }));
+    expect(
+      screen.getByText('This route does not reach the stock. Move the path or its pivot onto the face.')
+    ).toBeInTheDocument();
+  });
+
+  it('accepts a negative dovetail socket angle and preserves it through other edits', () => {
+    const props = renderWorkspace();
+    startCut('Cutout');
+    fireEvent.click(screen.getByText('Dovetail shaping'));
+    const angle = screen.getByRole('spinbutton', { name: 'Socket Side Angle' });
+    fireEvent.change(angle, { target: { value: '-10' } });
+    fireEvent.blur(angle);
+    setMeasurement('Offset Along Length', '2');
+    expect(props.onDraftFeaturesChange).toHaveBeenLastCalledWith(
+      [expect.objectContaining({ parameters: expect.objectContaining({ sideWallAngle: -10 }) })],
+      expect.any(Object)
+    );
+  });
+
+  it('cuts a matching half lap from the underside without losing its position', () => {
+    const props = renderWorkspace();
+    startCut('Half Lap');
+    setMeasurement('Offset Along Length', '6');
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Bottom Face' }));
+    expect(props.onDraftFeaturesChange).toHaveBeenLastCalledWith(
+      [
+        expect.objectContaining({
+          cutType: 'half_lap',
+          target: { type: 'face', face: 'bottom_face' },
+          placement: expect.objectContaining({ x: 6 })
+        })
+      ],
+      expect.any(Object)
+    );
+    expect(inspectorAlert()).toBeNull();
+  });
+
+  it('marks a dado from the end and a groove from the edge with exact measurements', () => {
+    const props = renderWorkspace();
+    startCut('Dado');
+    setMeasurement('Dado Width', '23/32');
+    setMeasurement('Offset Along Length', '6');
+    expect(props.onDraftFeaturesChange).toHaveBeenLastCalledWith(
+      [
+        expect.objectContaining({
+          placement: expect.objectContaining({ x: 6, z: 0 }),
+          parameters: expect.objectContaining({ size: { length: 23 / 32, width: 12 } })
+        })
+      ],
+      expect.any(Object)
+    );
+    startCut('Groove');
+    setMeasurement('Groove Width', '1/4');
+    setMeasurement('Offset Across Width', '3/8');
+    expect(props.onDraftFeaturesChange).toHaveBeenLastCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ cutType: 'groove', placement: expect.objectContaining({ x: 0, z: 3 / 8 }) })
+      ]),
+      expect.any(Object)
+    );
+    expect(inspectorAlert()).toBeNull();
+  });
+
   it('retargets a tenon to the other end of the board', () => {
     renderWorkspace();
     startCut('Tenon');
     fireEvent.click(within(inspector()).getByRole('button', { name: 'Right End' }));
     expect(within(inspector()).getByRole('button', { name: 'Right End' })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it.each(['Groove', 'Stopped Groove'])('ploughs a %s into a long edge', (preset) => {
+    const props = renderWorkspace();
+    startCut(preset);
+    fireEvent.click(within(inspector()).getByRole('button', { name: 'Back Face' }));
+    setMeasurement('Height Across Thickness', '1/4');
+    setMeasurement('Offset Up From Bottom', '1/4');
+    expect(props.onDraftFeaturesChange).toHaveBeenLastCalledWith(
+      [
+        expect.objectContaining({
+          target: { type: 'face', face: 'back_face' },
+          placement: expect.objectContaining({ z: 1 / 4 }),
+          parameters: expect.objectContaining({ size: expect.objectContaining({ width: 1 / 4 }) })
+        })
+      ],
+      expect.any(Object)
+    );
+    expect(inspectorAlert()).toBeNull();
   });
 
   it('moves an edge profile onto a different edge', () => {

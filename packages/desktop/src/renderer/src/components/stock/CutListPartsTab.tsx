@@ -34,7 +34,18 @@ export function CutListPartsTab({
   const groupedInstructions = useMemo(() => groupCutInstructions(cutList.instructions), [cutList.instructions]);
   // The blank table answers "what do I buy and break down". This answers
   // "what do I set the machine to", which is a different day's work.
-  const setups = useMemo(() => getCutSetups(cutList.instructions, units), [cutList.instructions, units]);
+  const setups = useMemo(
+    () =>
+      getCutSetups(
+        [
+          ...cutList.instructions,
+          ...(cutList.postGlueUpInstructions ?? []),
+          ...(cutList.postPurchaseInstructions ?? [])
+        ],
+        units
+      ),
+    [cutList, units]
+  );
 
   const toggleGroup = (key: string) => {
     setExpandedGroups((prev) => {
@@ -240,18 +251,37 @@ export function CutListPartsTab({
             ))}
           </section>
         )}
+        {(cutList.postPurchaseInstructions?.length ?? 0) > 0 && (
+          <section aria-label="After purchase — component machining" className="p-4 border-t border-border">
+            <h3 className="font-semibold">After purchase — component machining</h3>
+            <p className="text-sm text-text-muted">
+              These components are counted in the shopping list, not cut from raw stock.
+            </p>
+            {cutList.postPurchaseInstructions!.map((instruction) => (
+              <div key={instruction.partId} className="mt-3">
+                <h4 className="font-medium">{instruction.partName}</h4>
+                <ul className="text-sm list-disc pl-5">
+                  {getInstructionFabricationLines(instruction, units).map((line, index) => (
+                    <li key={index}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </section>
+        )}
         {setups.length > 0 && (
           <section aria-label="Operations by setup" className="p-4 border-t border-border">
             <h3 className="font-semibold">Operations by setup</h3>
             <p className="text-sm text-text-muted">
               The same operations, regrouped by what the machine has to be set to. Run every piece through one setup
-              before changing it.
+              before changing it, within each stage. Complete glue-up or purchase before the corresponding operations.
+              This is not an operation-order plan.
             </p>
             <ul className="mt-3 space-y-3">
               {setups.map((setup) => (
                 <li key={setup.key}>
                   <div className="text-sm font-medium text-text">
-                    {setup.operation} · {setup.setting}
+                    {setup.stage} · {setup.operation} · {setup.setting}
                   </div>
                   <div className="text-[12px] text-text-muted">
                     {setup.passes} {setup.passes === 1 ? 'pass' : 'passes'} ·{' '}

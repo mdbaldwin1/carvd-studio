@@ -13,9 +13,11 @@ import {
 } from '../types';
 import { getEndCutInsetAt, getPartEndCutProfiles } from './endCutUtils';
 import {
+  expandRoutedPath,
   getPartContourSubBoxes,
   getPartLocalBoundingBox,
   getPartLocalConvexVertices,
+  getPartLocalHullEdges,
   getPartWorldAABB,
   hasRenderablePartFeatures
 } from './partFeatureGeometry';
@@ -481,6 +483,87 @@ export function getPartMaterialOBBs(
         (volume) =>
           volume.xMax - volume.xMin > 1e-6 && volume.yMax - volume.yMin > 1e-6 && volume.zMax - volume.zMin > 1e-6
       );
+
+  // End-grain dovetail passes leave a flared tongue and a square shoulder.
+  // Sample the increasing cutter radius conservatively, just as for splayed
+  // pockets, so the fit check sees the tongue rather than the original blank.
+  for (const feature of part.features ?? []) {
+    if (
+      !feature.enabled ||
+      feature.kind !== 'routed_path' ||
+      feature.bit.profile !== 'dovetail' ||
+      (feature.target.face !== 'left_end' && feature.target.face !== 'right_end')
+    )
+      continue;
+    const depth = feature.parameters.depth ?? part.length;
+    const slope = Math.tan(THREE.MathUtils.degToRad(feature.bit.includedAngle) / 2);
+    const shankRadius = feature.bit.shankDiameter / 2;
+    const cavityHeight = (feature.bit.diameter / 2 - shankRadius) / slope;
+    if (!(depth > 0) || !(cavityHeight > 0) || cavityHeight > depth + 1e-8) continue;
+    const points = expandRoutedPath(feature, part);
+    const left = feature.target.face === 'left_end';
+    const halfLength = part.length / 2;
+    const halfThickness = part.thickness / 2;
+    const halfWidth = part.width / 2;
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1],
+        b = points[i];
+      if (Math.abs(a.y - b.y) > 1e-8) continue;
+      for (let step = 0; step < 24; step++) {
+        const near = (depth * step) / 24,
+          far = (depth * (step + 1)) / 24;
+        const radius = shankRadius + Math.max(0, near - (depth - cavityHeight)) * slope;
+        const volume = {
+          xMin: left ? -halfLength + near : halfLength - far,
+          xMax: left ? -halfLength + far : halfLength - near,
+          yMin: Math.max(-halfThickness, a.y - radius),
+          yMax: Math.min(halfThickness, a.y + radius),
+          zMin: Math.max(-halfWidth, Math.min(a.z, b.z)),
+          zMax: Math.min(halfWidth, Math.max(a.z, b.z))
+        };
+        if (volume.yMax - volume.yMin > 1e-8 && volume.zMax - volume.zMin > 1e-8) cutVolumes.push(volume);
+      }
+    }
+  }
+
+  // Axis-aligned V passes remove sloping material from the broad faces.
+  // Keep conservative material cells rather than measuring the uncut blank
+  // against the socket mouth. Curved and diagonal runs still use the fallback.
+  for (const feature of part.features ?? []) {
+    if (
+      !feature.enabled ||
+      feature.kind !== 'routed_path' ||
+      (feature.bit.profile !== 'v_bit' && feature.bit.profile !== 'engraving') ||
+      (feature.target.face !== 'top_face' && feature.target.face !== 'bottom_face')
+    )
+      continue;
+    const points = expandRoutedPath(feature, part);
+    const slope = Math.tan(THREE.MathUtils.degToRad(feature.bit.includedAngle) / 2);
+    const depth = Math.min(Number(feature.parameters.depth ?? part.thickness), feature.bit.diameter / (2 * slope));
+    if (!(depth > 0) || !Number.isFinite(slope)) continue;
+    const bottom = feature.target.face === 'bottom_face';
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1],
+        b = points[i];
+      const alongZ = Math.abs(a.x - b.x) < 1e-8;
+      const alongX = Math.abs(a.z - b.z) < 1e-8;
+      if (!alongZ && !alongX) continue;
+      for (let step = 0; step < 24; step++) {
+        const near = (depth * step) / 24,
+          far = (depth * (step + 1)) / 24;
+        const radius = (depth - far) * slope;
+        if (radius <= 1e-8) continue;
+        cutVolumes.push({
+          xMin: Math.max(-part.length / 2, alongZ ? a.x - radius : Math.min(a.x, b.x)),
+          xMax: Math.min(part.length / 2, alongZ ? a.x + radius : Math.max(a.x, b.x)),
+          zMin: Math.max(-part.width / 2, alongX ? a.z - radius : Math.min(a.z, b.z)),
+          zMax: Math.min(part.width / 2, alongX ? a.z + radius : Math.max(a.z, b.z)),
+          yMin: bottom ? -part.thickness / 2 + near : part.thickness / 2 - far,
+          yMax: bottom ? -part.thickness / 2 + far : part.thickness / 2 - near
+        });
+      }
+    }
+  }
 
   // A cut taken in a long edge -- a groove for a panel, a mortise for a
   // domino, the slot a biscuit sits in -- removes material just as a pocket
@@ -2681,7 +2764,7 @@ export function detectFaceSnaps(
 
         bestDistance = absDistance;
         const clearance = Math.min(FACE_SNAP_CLEARANCE, absDistance * 0.5);
-        const correctedPlaneDistance = planeDistance - Math.sign(planeDistance || 1) * clearance;
+        const correctedPlaneDistance = planeDistance + clearance;
         best = {
           delta: {
             x: targetFace.normal.x * correctedPlaneDistance,
@@ -3105,6 +3188,16 @@ function getPartObbVertices(part: Part, position: { x: number; y: number; z: num
 }
 
 function getPartEdges(part: Part, position: { x: number; y: number; z: number }): PartEdge[] {
+  const enabled = (part.features ?? []).filter((feature) => feature.enabled);
+  if (enabled.some((feature) => feature.kind === 'end_cut') && enabled.some((feature) => feature.kind !== 'end_cut')) {
+    return getPartLocalHullEdges(part).flatMap(([localA, localB]) => {
+      const a = transformLocalVertexToWorld(localA, part.rotation, position);
+      const b = transformLocalVertexToWorld(localB, part.rotation, position);
+      const ab = subVec(b, a);
+      const length = lenVec(ab);
+      return length > 1e-6 ? [{ a, b, dir: normalizeVec(ab), length }] : [];
+    });
+  }
   // Feature-bearing flat-contour parts get true contour edges; parts with
   // vertical end-cut insets (bevels/compounds) keep the tightened-OBB edge
   // approximation because the deduped hull loses the bottom/top pairing.
@@ -3377,7 +3470,7 @@ export function detectSurfaceAnchorSnaps(
         if (absPlaneDistance > snapThreshold) continue;
 
         const clearance = Math.min(FACE_SNAP_CLEARANCE, absPlaneDistance * 0.5);
-        const correctedPlaneDistance = planeDistance - Math.sign(planeDistance || 1) * clearance;
+        const correctedPlaneDistance = planeDistance + clearance;
 
         const dragOnTargetPlane = addScaledVec(dragFace.center, targetFace.normal, correctedPlaneDistance);
         const planarOffset = subVec(dragOnTargetPlane, targetFace.center);
@@ -3518,7 +3611,7 @@ export function detectFractionalFaceSnaps(
         if (absPlaneDistance > snapThreshold) continue;
 
         const clearance = Math.min(FACE_SNAP_CLEARANCE, absPlaneDistance * 0.5);
-        const correctedPlaneDistance = planeDistance - Math.sign(planeDistance || 1) * clearance;
+        const correctedPlaneDistance = planeDistance + clearance;
         const dragOnTargetPlane = addScaledVec(dragFace.center, targetFace.normal, correctedPlaneDistance);
         const planarOffset = subVec(dragOnTargetPlane, targetFace.center);
         const u = dotVec(planarOffset, targetFace.tangent1);
@@ -3708,6 +3801,8 @@ function createFaceSnapLine(
 // dovetails, etc.) can produce sockets with the same interface.
 
 export interface FeatureSocket {
+  /** A socket laid out for this insert also transfers its center mark. */
+  centerInsert?: boolean;
   hostPartId: string;
   featureId: string;
   /** World-space center of the socket opening */
@@ -3738,9 +3833,9 @@ export interface FeatureSocket {
 // Tolerance for dimension matching (inches) — parts whose dimension is within
 // this tolerance of the socket opening are considered a "tight fit".
 const MATE_DIM_TOLERANCE = 0.03;
-// Cosine threshold for axis alignment — OBB axis must be roughly parallel to
-// socket normal / tangents to be considered for mating.
-const MATE_ALIGN_THRESHOLD = 0.85;
+// Translation-only mating cannot straighten a tilted insert. Require parallel
+// joint axes; otherwise the proposed seat can drive solid wood into the host.
+const MATE_ALIGN_THRESHOLD = 1 - 1e-6;
 
 /**
  * Compute feature sockets for a part's enabled rect_cut features.
@@ -3838,7 +3933,18 @@ export function getPartFeatureSockets(part: Part): FeatureSocket[] {
         // The stored axis points the way the bit travels; a socket's normal
         // points back out of the hole, against insertion.
         const openingNormal = mulVec(pose.axis, -1);
-        const [tangent1, tangent2] = perpendicularBasis(openingNormal);
+        // Keep the bore frame attached to its board. A world-axis basis makes
+        // the fit check measure rotated material boxes diagonally after a
+        // rigid assembly rotation, falsely enlarging perfectly matching pins.
+        const localNormal = {
+          x: dotVec(openingNormal, axX),
+          y: dotVec(openingNormal, axY),
+          z: dotVec(openingNormal, axZ)
+        };
+        const tangents = perpendicularBasis(localNormal).map((axis) =>
+          addVec(addVec(mulVec(axX, axis.x), mulVec(axY, axis.y)), mulVec(axZ, axis.z))
+        );
+        const [tangent1, tangent2] = tangents;
         sockets.push({
           hostPartId: part.id,
           featureId: feature.id,
@@ -4048,6 +4154,24 @@ type MateShape = {
   mateKind?: 'mortise-tenon' | 'half-lap' | 'interlock';
 };
 
+function socketForInsert(socket: FeatureSocket, receiver: Part, insertId: string): FeatureSocket {
+  const relationship = receiver.features?.find((feature) => feature.id === socket.featureId)?.metadata?.insertSocket as
+    | { insertPartId?: string; insertion?: number }
+    | undefined;
+  const insertion = relationship?.insertion;
+  if (
+    relationship?.insertPartId !== insertId ||
+    !Number.isFinite(insertion) ||
+    !insertion ||
+    insertion <= 0 ||
+    insertion > socket.depth
+  )
+    return socket;
+  // The floor includes glue space. Layout and dragging must seat the same
+  // insert at its authored depth, leaving that space empty.
+  return { ...socket, depth: insertion, through: false, centerInsert: true };
+}
+
 function mateShapeIsCompatibleWithSocket(mateShape: MateShape, socket: FeatureSocket): boolean {
   if (socket.mateKind === 'round_hole') {
     // Only a square-sectioned member seats in a bored hole. That admits a dowel
@@ -4158,33 +4282,248 @@ function getMateShapes(part: Part, position: Vec3): MateShape[] {
   const halfLength = part.length / 2;
 
   if (tenons.length > 0) {
-    return tenons.map((tenon) => {
+    return tenons.flatMap((tenon) => {
       const leftEnd = tenon.target.type === 'face' && tenon.target.face === 'left_end';
       const tenonLength = tenon.parameters.size.length;
-      const tongueWidth = tenon.parameters.size.width;
       const tongueThickness = tenon.parameters.depth ?? 0;
       const localCenterX = leftEnd ? -halfLength + tenonLength / 2 : halfLength - tenonLength / 2;
-      const localCenterZ = getRenderedLocalZRange(part.width, tenon.placement.z, tongueWidth).center;
       const insertionAxis = leftEnd ? axisX : mulVec(axisX, -1);
-
-      return {
-        sourceFeatureId: tenon.id,
-        obb: {
-          center: addVec(position, addVec(mulVec(axisX, localCenterX), mulVec(axisZ, localCenterZ))),
-          axes: [insertionAxis, axisY, axisZ],
-          halfExtents: [tenonLength / 2, tongueThickness / 2, tongueWidth / 2]
-        },
-        insertionDepth: tenonLength,
-        complementaryOpeningNormal: mulVec(insertionAxis, -1),
-        mateKind: 'mortise-tenon'
-      };
+      const range = getRenderedLocalZRange(part.width, tenon.placement.z, tenon.parameters.size.width);
+      let spans = [{ min: range.min, max: range.max }];
+      // A through cut can divide one authored tenon into multiple fingers.
+      // Match the remaining fingers, not the uncut envelope across the gap.
+      for (const cut of resolvedRectCuts) {
+        if (cut.cutType === 'tenon' || cut.parameters.depthMode !== 'through') continue;
+        const bounds = getRectCutPlanBounds(cut, part);
+        const endMin = leftEnd ? 0 : part.length - tenonLength;
+        if (bounds.minX > endMin + 1e-6 || bounds.maxX < endMin + tenonLength - 1e-6) continue;
+        const removed = getRenderedLocalZRange(part.width, bounds.minZ, cut.parameters.size.width);
+        spans = spans.flatMap((span) => {
+          if (removed.max <= span.min || removed.min >= span.max) return [span];
+          return [
+            { min: span.min, max: Math.min(span.max, removed.min) },
+            { min: Math.max(span.min, removed.max), max: span.max }
+          ].filter((remaining) => remaining.max - remaining.min > 1e-6);
+        });
+      }
+      // A kerfed through-tenon still mates as one envelope in a single
+      // mortise; the split sections additionally support twin mortises.
+      if (spans.length > 1) spans.push({ min: range.min, max: range.max });
+      return spans.map(
+        (span): MateShape => ({
+          sourceFeatureId: `${tenon.id}:${span.min}:${span.max}`,
+          obb: {
+            center: addVec(position, addVec(mulVec(axisX, localCenterX), mulVec(axisZ, (span.min + span.max) / 2))),
+            axes: [insertionAxis, axisY, axisZ],
+            halfExtents: [tenonLength / 2, tongueThickness / 2, (span.max - span.min) / 2]
+          },
+          insertionDepth: tenonLength,
+          complementaryOpeningNormal: mulVec(insertionAxis, -1),
+          mateKind: 'mortise-tenon'
+        })
+      );
     });
   }
 
   const shapes: MateShape[] = [{ obb: getPartOBB(part, position) }];
   shapes.push(...getEndFingerShapes({ ...part, position }, [axisX, axisY, axisZ], resolvedRectCuts));
+  // Opposing straight V-bit shoulder passes can leave a tapered end tongue.
+  // Its shoulder section enters a dovetail housing; the wider tip is below
+  // the mouth once seated. Use the shoulder dimensions for the opening fit.
+  const routed = (part.features ?? []).filter((feature) => feature.enabled && feature.kind === 'routed_path');
+  for (const upper of routed) {
+    if (
+      upper.kind !== 'routed_path' ||
+      upper.bit.profile !== 'dovetail' ||
+      (upper.target.face !== 'left_end' && upper.target.face !== 'right_end') ||
+      upper.reference.primaryFrom !== 'center' ||
+      upper.reference.secondaryFrom !== 'center' ||
+      upper.parameters.depthMode !== 'blind' ||
+      upper.path.points.length !== 2
+    )
+      continue;
+    const [a, b] = upper.path.points;
+    const upperBit = upper.bit;
+    if (
+      a.secondary <= 0 ||
+      Math.abs(a.secondary - b.secondary) > 1e-8 ||
+      Math.min(a.primary, b.primary) > -part.width / 2 ||
+      Math.max(a.primary, b.primary) < part.width / 2
+    )
+      continue;
+    const lower = routed.find(
+      (candidate) =>
+        candidate.kind === 'routed_path' &&
+        candidate.bit.profile === 'dovetail' &&
+        candidate.target.face === upper.target.face &&
+        candidate.parameters.depthMode === 'blind' &&
+        candidate.parameters.depth === upper.parameters.depth &&
+        candidate.bit.diameter === upper.bit.diameter &&
+        candidate.bit.shankDiameter === upperBit.shankDiameter &&
+        candidate.bit.includedAngle === upper.bit.includedAngle &&
+        candidate.reference.primaryFrom === 'center' &&
+        candidate.reference.secondaryFrom === 'center' &&
+        candidate.path.points.length === 2 &&
+        candidate.path.points.every(
+          (point, index) =>
+            Math.abs(point.primary - upper.path.points[index].primary) < 1e-8 &&
+            Math.abs(point.secondary + upper.path.points[index].secondary) < 1e-8
+        )
+    );
+    if (!lower) continue;
+    const length = upper.parameters.depth ?? 0;
+    const thickness = 2 * a.secondary - upper.bit.diameter;
+    if (length <= 0 || length >= halfLength || thickness <= 0) continue;
+    const end = upper.target.face === 'left_end' ? -1 : 1;
+    const insertionAxis = mulVec(axisX, -end);
+    shapes.push({
+      sourceFeatureId: upper.id,
+      obb: {
+        center: addVec(position, mulVec(axisX, end * (halfLength - length / 2))),
+        axes: [insertionAxis, axisY, axisZ],
+        halfExtents: [length / 2, thickness / 2, part.width / 2]
+      },
+      insertionDepth: length,
+      complementaryOpeningNormal: mulVec(insertionAxis, -1),
+      mateKind: 'interlock'
+    });
+  }
+  for (const top of routed) {
+    if (
+      top.kind !== 'routed_path' ||
+      top.target.type !== 'face' ||
+      top.target.face !== 'top_face' ||
+      top.bit.profile !== 'v_bit' ||
+      top.parameters.depthMode !== 'blind' ||
+      top.reference.primaryFrom !== 'center' ||
+      top.path.points.length !== 2
+    )
+      continue;
+    const [from, to] = top.path.points;
+    if (Math.abs(from.primary - to.primary) > 1e-6 || Math.abs(from.secondary - to.secondary) < part.width) continue;
+    const bottom = routed.find(
+      (feature) =>
+        feature.kind === 'routed_path' &&
+        feature.target.type === 'face' &&
+        feature.target.face === 'bottom_face' &&
+        feature.bit.profile === 'v_bit' &&
+        feature.bit.includedAngle === top.bit.includedAngle &&
+        feature.parameters.depthMode === 'blind' &&
+        feature.reference.primaryFrom === 'center' &&
+        JSON.stringify(feature.path.points) === JSON.stringify(top.path.points)
+    );
+    if (!bottom || bottom.kind !== 'routed_path') continue;
+    const end = from.primary < 0 ? -1 : 1;
+    const length = halfLength - Math.abs(from.primary);
+    const thickness = part.thickness - (top.parameters.depth ?? 0) - (bottom.parameters.depth ?? 0);
+    if (length <= 0 || length >= halfLength || thickness <= 0) continue;
+    const insertionAxis = mulVec(axisX, -end);
+    shapes.push({
+      sourceFeatureId: top.id,
+      obb: {
+        center: addVec(position, mulVec(axisX, end * (halfLength - length / 2))),
+        axes: [insertionAxis, axisY, axisZ],
+        halfExtents: [length / 2, thickness / 2, part.width / 2]
+      },
+      insertionDepth: length,
+      complementaryOpeningNormal: mulVec(insertionAxis, -1),
+      mateKind: 'interlock'
+    });
+  }
+  // Crossed divider notches leave a half-height strip. At the crossing,
+  // that strip is the mate for the other board's opposing through notch.
+  for (const cut of resolvedRectCuts) {
+    if (cut.cutType !== 'edge_notch' || cut.parameters.depthMode !== 'through') continue;
+    const bounds = getRectCutPlanBounds(cut, part);
+    const remaining =
+      bounds.minZ < 1e-6
+        ? { min: bounds.maxZ, max: part.width }
+        : bounds.maxZ > part.width - 1e-6
+          ? { min: 0, max: bounds.minZ }
+          : undefined;
+    if (!remaining || remaining.max - remaining.min <= 1e-6) continue;
+    shapes.push({
+      sourceFeatureId: cut.id,
+      obb: {
+        center: addVec(position, mulVec(axisZ, -part.width / 2 + (remaining.min + remaining.max) / 2)),
+        axes: [axisX, axisY, axisZ],
+        halfExtents: [halfLength, part.thickness / 2, (remaining.max - remaining.min) / 2]
+      }
+    });
+  }
+  const inferredTongueCuts = new Set<string>();
+  // Infer a tongue left by opposing cheeks, or a single end rabbet. These
+  // are ordinary cuts, but their remaining material is the inserted member.
   for (const cut of resolvedRectCuts) {
     if (cut.parameters.depthMode !== 'blind' || (!isTopTarget(cut) && !isBottomTarget(cut))) continue;
+    const bounds = getRectCutPlanBounds(cut, part);
+    const opposite = resolvedRectCuts.find((other) => {
+      if (other === cut || other.parameters.depthMode !== 'blind') return false;
+      if (!(isTopTarget(cut) ? isBottomTarget(other) : isTopTarget(other))) return false;
+      const otherBounds = getRectCutPlanBounds(other, part);
+      return (
+        Math.abs(bounds.minX - otherBounds.minX) < 1e-6 &&
+        Math.abs(bounds.maxX - otherBounds.maxX) < 1e-6 &&
+        Math.abs(bounds.minZ - otherBounds.minZ) < 1e-6 &&
+        Math.abs(bounds.maxZ - otherBounds.maxZ) < 1e-6
+      );
+    });
+    if (opposite && isBottomTarget(cut)) continue;
+    const topDepth = isTopTarget(cut)
+      ? getRectCutDepth(cut, part.thickness)
+      : opposite
+        ? getRectCutDepth(opposite, part.thickness)
+        : 0;
+    const bottomDepth = isBottomTarget(cut)
+      ? getRectCutDepth(cut, part.thickness)
+      : opposite
+        ? getRectCutDepth(opposite, part.thickness)
+        : 0;
+    const thickness = part.thickness - topDepth - bottomDepth;
+    if (thickness <= 1e-6) continue;
+    const centerY = (bottomDepth - topDepth) / 2;
+    const zRange = getRenderedLocalZRange(part.width, bounds.minZ, cut.parameters.size.width);
+    const centerX = -halfLength + (bounds.minX + bounds.maxX) / 2;
+    const center = addVec(
+      position,
+      addVec(addVec(mulVec(axisX, centerX), mulVec(axisY, centerY)), mulVec(axisZ, zRange.center))
+    );
+    const end = bounds.minX < 1e-6 ? -1 : bounds.maxX > part.length - 1e-6 ? 1 : 0;
+    const side = bounds.minZ < 1e-6 ? -1 : bounds.maxZ > part.width - 1e-6 ? 1 : 0;
+    if (end && cut.parameters.size.length < part.length / 2) {
+      const insertionAxis = mulVec(axisX, -end);
+      inferredTongueCuts.add(cut.id);
+      if (opposite) inferredTongueCuts.add(opposite.id);
+      shapes.push({
+        sourceFeatureId: cut.id,
+        obb: {
+          center,
+          axes: [insertionAxis, axisY, axisZ],
+          halfExtents: [cut.parameters.size.length / 2, thickness / 2, cut.parameters.size.width / 2]
+        },
+        insertionDepth: cut.parameters.size.length,
+        complementaryOpeningNormal: mulVec(insertionAxis, -1)
+      });
+    }
+    if (side && opposite && cut.parameters.size.width < part.width / 2) {
+      const insertionAxis = mulVec(axisZ, -side);
+      inferredTongueCuts.add(cut.id);
+      if (opposite) inferredTongueCuts.add(opposite.id);
+      shapes.push({
+        sourceFeatureId: cut.id,
+        obb: {
+          center,
+          axes: [insertionAxis, axisY, axisX],
+          halfExtents: [cut.parameters.size.width / 2, thickness / 2, cut.parameters.size.length / 2]
+        },
+        insertionDepth: cut.parameters.size.width,
+        complementaryOpeningNormal: mulVec(insertionAxis, -1)
+      });
+    }
+  }
+  for (const cut of resolvedRectCuts) {
+    if (cut.parameters.depthMode !== 'blind' || (!isTopTarget(cut) && !isBottomTarget(cut))) continue;
+    if (inferredTongueCuts.has(cut.id) && (cut.cutType === 'cutout' || cut.cutType === 'rabbet')) continue;
     const cutDepth = getRectCutDepth(cut, part.thickness);
     const remainingThickness = part.thickness - cutDepth;
     if (cutDepth <= 0 || remainingThickness <= 0) continue;
@@ -4274,6 +4613,7 @@ type FeatureMateCandidate = {
   distance: number;
   hostPartId: string;
   constrainedAxes: { x: boolean; y: boolean; z: boolean };
+  constrainedDirections?: Vec3[];
   mateKind: string;
   sourceKey: string;
   /** Out of the socket, against the way the piece went in. */
@@ -4313,7 +4653,7 @@ function collectFeatureMateCandidates(
     for (const moving of movingEndFaces) {
       for (const host of hostEndFaces) {
         if (moving.feature.cutType !== host.feature.cutType) continue;
-        if (dotVec(moving.face.normal, host.face.normal) > -0.995) continue;
+        if (dotVec(moving.face.normal, host.face.normal) > -MATE_ALIGN_THRESHOLD) continue;
         const movingDimensions = [moving.face.half1, moving.face.half2].sort((left, right) => left - right);
         const hostDimensions = [host.face.half1, host.face.half2].sort((left, right) => left - right);
         if (
@@ -4348,13 +4688,17 @@ function collectFeatureMateCandidates(
         ) {
           continue;
         }
-        if (mateShape.insertionDepth !== undefined && mateShape.insertionDepth - socket.depth >= MATE_DIM_TOLERANCE) {
+        if (
+          mateShape.insertionDepth !== undefined &&
+          !socket.through &&
+          mateShape.insertionDepth - socket.depth >= MATE_DIM_TOLERANCE
+        ) {
           continue;
         }
         const seatingSocket =
-          mateShape.insertionDepth !== undefined && socket.depth > mateShape.insertionDepth
-            ? { ...socket, depth: mateShape.insertionDepth }
-            : socket;
+          mateShape.insertionDepth !== undefined && (socket.through || socket.depth > mateShape.insertionDepth)
+            ? { ...socket, depth: mateShape.insertionDepth, through: false }
+            : socketForInsert(socket, hostPart, draggingPart.id);
         const match = findBestMateMatch(mateShape.obb, seatingSocket, snapThreshold);
         if (!match) continue;
         candidates.push({
@@ -4387,13 +4731,17 @@ function collectFeatureMateCandidates(
           ) {
             continue;
           }
-          if (hostShape.insertionDepth !== undefined && hostShape.insertionDepth - socket.depth >= MATE_DIM_TOLERANCE) {
+          if (
+            hostShape.insertionDepth !== undefined &&
+            !socket.through &&
+            hostShape.insertionDepth - socket.depth >= MATE_DIM_TOLERANCE
+          ) {
             continue;
           }
           const seatingSocket =
-            hostShape.insertionDepth !== undefined && socket.depth > hostShape.insertionDepth
-              ? { ...socket, depth: hostShape.insertionDepth }
-              : socket;
+            hostShape.insertionDepth !== undefined && (socket.through || socket.depth > hostShape.insertionDepth)
+              ? { ...socket, depth: hostShape.insertionDepth, through: false }
+              : socketForInsert(socket, draggingPart, hostPart.id);
           const match = findBestMateMatch(hostShape.obb, seatingSocket, snapThreshold);
           if (!match) continue;
           candidates.push({
@@ -4405,6 +4753,7 @@ function collectFeatureMateCandidates(
             distance: match.distance,
             hostPartId: hostPart.id,
             constrainedAxes: match.constrainedAxes,
+            constrainedDirections: match.constrainedDirections,
             mateKind: hostShape.mateKind ?? socket.mateKind,
             sourceKey: `${draggingPart.id}:${socket.featureId}`
           });
@@ -4453,17 +4802,76 @@ function resolvePartMateCandidateConsensus(
 ): MateSnapResult | undefined {
   if (candidates.length === 0) return undefined;
   const allSources = new Set(candidates.map((candidate) => candidate.sourceKey));
-  if (allSources.size === 1) return candidateToMateSnapResult(currentPosition, candidates[0]);
 
+  // A through bore constrains a plane, not whichever world axes its
+  // tangents happen to touch. Solve the actual directional constraints so
+  // rotating the assembly cannot turn a free insertion axis into a conflict.
+  const solve = (members: FeatureMateCandidate[]): Vec3 | undefined => {
+    const basis: { direction: Vec3; value: number }[] = [];
+    for (const candidate of members) {
+      const directions =
+        candidate.constrainedDirections ??
+        [
+          { x: 1, y: 0, z: 0 },
+          { x: 0, y: 1, z: 0 },
+          { x: 0, y: 0, z: 1 }
+        ].filter((_, index) => candidate.constrainedAxes[(['x', 'y', 'z'] as const)[index]]);
+      for (const direction of directions) {
+        let residual = { ...direction };
+        let value = dotVec(direction, candidate.delta);
+        for (const entry of basis) {
+          const projection = dotVec(residual, entry.direction);
+          residual = subVec(residual, mulVec(entry.direction, projection));
+          value -= projection * entry.value;
+        }
+        const length = lenVec(residual);
+        if (length < 1e-6) {
+          if (Math.abs(value) > GROUP_MATE_CONSENSUS_TOLERANCE) return undefined;
+        } else basis.push({ direction: mulVec(residual, 1 / length), value: value / length });
+      }
+    }
+    return basis.reduce((delta, entry) => addVec(delta, mulVec(entry.direction, entry.value)), { x: 0, y: 0, z: 0 });
+  };
+  const byDistance = [...candidates].sort((left, right) => left.distance - right.distance);
   const clusters = candidates.map((seed) => {
-    const members = candidates.filter(
-      (candidate) => lenVec(subVec(candidate.delta, seed.delta)) <= GROUP_MATE_CONSENSUS_TOLERANCE
-    );
+    const members = [seed];
+    for (const candidate of byDistance) {
+      if (candidate !== seed && solve([...members, candidate])) members.push(candidate);
+    }
     return { members, sources: new Set(members.map((candidate) => candidate.sourceKey)) };
   });
-  clusters.sort((left, right) => right.sources.size - left.sources.size || right.members.length - left.members.length);
+  clusters.sort(
+    (left, right) =>
+      right.sources.size - left.sources.size ||
+      bestMateMember(left.members).distance - bestMateMember(right.members).distance ||
+      right.members.length - left.members.length
+  );
   const winning = clusters[0];
   if (winning.sources.size < allSources.size) {
+    // A pin need not bottom in a blind clearance bore when another connector
+    // locates the assembly (for example a bolt meeting a cross dowel). Keep
+    // coaxial alignment mandatory, but relax this optional insertion depth.
+    let relaxedDepth = false;
+    const relaxed = candidates.map((candidate) => {
+      const normal = candidate.insertionNormal;
+      if (candidate.mateKind !== 'round_hole' || candidate.through || !normal) return candidate;
+      // A floating tip may stop short; a tip beyond the floor must never be forgiven.
+      if (dotVec(candidate.delta, normal) > GROUP_MATE_CONSENSUS_TOLERANCE) return candidate;
+      const axis = (['x', 'y', 'z'] as const).find((key) => Math.abs(normal[key]) > 1 - 1e-6);
+      relaxedDepth = true;
+      const delta = subVec(candidate.delta, mulVec(normal, dotVec(candidate.delta, normal)));
+      return {
+        ...candidate,
+        delta,
+        distance: lenVec(delta),
+        through: true,
+        constrainedDirections: candidate.constrainedDirections?.filter(
+          (direction) => Math.abs(dotVec(direction, normal)) < 1 - 1e-6
+        ),
+        constrainedAxes: axis ? { ...candidate.constrainedAxes, [axis]: false } : candidate.constrainedAxes
+      };
+    });
+    if (relaxedDepth) return resolvePartMateCandidateConsensus(currentPosition, relaxed);
     let maxDisagreement = 0;
     for (let leftIndex = 0; leftIndex < candidates.length; leftIndex += 1) {
       for (let rightIndex = leftIndex + 1; rightIndex < candidates.length; rightIndex += 1) {
@@ -4487,8 +4895,17 @@ function resolvePartMateCandidateConsensus(
   // Seat on the closest agreeing joint's exact delta. Averaging the cluster
   // lands between its members and seats none of them, which leaves every joint
   // fractionally proud and reads as a collision instead of an assembly.
-  const consensus = bestMateMember(winning.members).delta;
+  const consensus = solve(winning.members)!;
   const results = winning.members.map((candidate) => candidateToMateSnapResult(currentPosition, candidate));
+  const normal = winning.members[0].insertionNormal;
+  const commonInsertionNormal =
+    normal &&
+    winning.members.every(
+      (candidate) => candidate.insertionNormal && dotVec(normal, candidate.insertionNormal) > MATE_ALIGN_THRESHOLD
+    )
+      ? normal
+      : undefined;
+
   return {
     adjustedPosition: addVec(currentPosition, consensus),
     snappedX: results.some((result) => result.snappedX),
@@ -4496,7 +4913,9 @@ function resolvePartMateCandidateConsensus(
     snappedZ: results.some((result) => result.snappedZ),
     snapLines: results.flatMap((result) => result.snapLines),
     mateHostPartId: results[0].mateHostPartId,
-    mateKind: results[0].mateKind
+    mateKind: results[0].mateKind,
+    mateInsertionNormal: commonInsertionNormal,
+    mateThrough: commonInsertionNormal ? winning.members.every((candidate) => candidate.through) : undefined
   };
 }
 
@@ -4546,7 +4965,8 @@ export function detectFeatureMateSnaps(
     pulledOut
       ? candidates.filter(
           (candidate) =>
-            lenVec(subVec(addVec(currentPosition, candidate.delta), draggingPart.position)) > MATE_RELEASE_DISTANCE
+            lenVec(subVec(addVec(currentPosition, candidate.delta), draggingPart.position)) >
+            GROUP_MATE_CONSENSUS_TOLERANCE
         )
       : candidates
   );
@@ -4654,7 +5074,15 @@ export function detectGroupFeatureMateSnaps(
     snappedZ: winning.members.some(({ result }) => result.snappedZ),
     snapLines: winning.members.flatMap(({ result }) => result.snapLines),
     mateHostPartId: winning.members[0].result.mateHostPartId,
-    mateKind: winning.members[0].result.mateKind
+    mateKind: winning.members[0].result.mateKind,
+    mateInsertionNormal: winning.members.every(
+      ({ candidate }) =>
+        candidate.insertionNormal &&
+        winning.members[0].candidate.insertionNormal &&
+        dotVec(candidate.insertionNormal, winning.members[0].candidate.insertionNormal) > MATE_ALIGN_THRESHOLD
+    )
+      ? winning.members[0].candidate.insertionNormal
+      : undefined
   };
 }
 
@@ -4667,7 +5095,13 @@ function findBestMateMatch(
   socket: FeatureSocket,
   snapThreshold: number
 ):
-  | { delta: Vec3; distance: number; constrainedAxes: { x: boolean; y: boolean; z: boolean }; insertionNormal: Vec3 }
+  | {
+      delta: Vec3;
+      distance: number;
+      constrainedAxes: { x: boolean; y: boolean; z: boolean };
+      constrainedDirections: Vec3[];
+      insertionNormal: Vec3;
+    }
   | undefined {
   const [axisX, axisY, axisZ] = draggingOBB.axes;
   const [hx, hy, hz] = draggingOBB.halfExtents;
@@ -4705,6 +5139,7 @@ function findBestMateMatch(
         delta: Vec3;
         distance: number;
         constrainedAxes: { x: boolean; y: boolean; z: boolean };
+        constrainedDirections: Vec3[];
         insertionNormal: Vec3;
       }
     | undefined;
@@ -4717,6 +5152,10 @@ function findBestMateMatch(
     // Determine which cross-section axis maps to which socket tangent
     const cs0AlignT1 = Math.abs(dotVec(cand.cross[0].axis, socket.tangent1));
     const cs0AlignT2 = Math.abs(dotVec(cand.cross[0].axis, socket.tangent2));
+
+    // Rectangular inserts also need their cross-section aligned. A circular
+    // bore is indifferent to rotation around its insertion axis.
+    if (socket.mateKind !== 'round_hole' && Math.max(cs0AlignT1, cs0AlignT2) < MATE_ALIGN_THRESHOLD) continue;
 
     let socketHE1: number;
     let socketHE2: number;
@@ -4747,8 +5186,8 @@ function findBestMateMatch(
     if (!fits1 || !fits2) continue;
 
     // At least one dimension must be a snug/tight fit
-    const tight1 = Math.abs(2 * csHalf1 - 2 * socketHE1) < MATE_DIM_TOLERANCE;
-    const tight2 = Math.abs(2 * csHalf2 - 2 * socketHE2) < MATE_DIM_TOLERANCE;
+    const tight1 = socket.centerInsert || Math.abs(2 * csHalf1 - 2 * socketHE1) < MATE_DIM_TOLERANCE;
+    const tight2 = socket.centerInsert || Math.abs(2 * csHalf2 - 2 * socketHE2) < MATE_DIM_TOLERANCE;
     if (!tight1 && !tight2) continue;
 
     const partAlongT1 = dotVec(draggingOBB.center, snapT1);
@@ -4794,7 +5233,9 @@ function findBestMateMatch(
       if (distFromSurface > snapThreshold) continue;
     }
 
-    const insertionDelta = floorAlongN - enterFaceAlongN;
+    // Through holes constrain the cross-section, not insertion depth. An
+    // authored tenon supplies its shoulder depth via seatingSocket above.
+    const insertionDelta = socket.through ? 0 : floorAlongN - enterFaceAlongN;
     let delta = mulVec(n, insertionDelta);
 
     // --- Cross-section centering for tight-fit dimensions ---
@@ -4810,11 +5251,16 @@ function findBestMateMatch(
     const distance = lenVec(delta);
     if (distance < bestDist) {
       bestDist = distance;
-      const constrainedDirections = [n, ...(tight1 ? [snapT1] : []), ...(tight2 ? [snapT2] : [])];
+      const constrainedDirections = [
+        ...(socket.through ? [] : [n]),
+        ...(tight1 ? [snapT1] : []),
+        ...(tight2 ? [snapT2] : [])
+      ];
       bestResult = {
         delta,
         distance,
         insertionNormal: n,
+        constrainedDirections,
         constrainedAxes: {
           x: constrainedDirections.some((direction) => Math.abs(direction.x) > 1e-5),
           y: constrainedDirections.some((direction) => Math.abs(direction.y) > 1e-5),

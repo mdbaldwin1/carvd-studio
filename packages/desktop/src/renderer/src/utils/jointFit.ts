@@ -30,8 +30,11 @@ type Vec3 = { x: number; y: number; z: number };
  * be assembled, with nothing said.
  */
 
-/** The band the mate engine already calls a tight fit. */
+/** Spatial sampling margin, not a permissible interference allowance. */
 const GOOD_FIT = 0.03;
+const INTERFERENCE_EPSILON = 1e-6;
+/** Loose fits are advisory; intended clearance depends on the joint. */
+const LOOSE_ADVISORY_THRESHOLD = 0.03;
 /** A piece has to be properly in the socket, not merely near its mouth. */
 const MIN_ENGAGEMENT = 1 / 32;
 /**
@@ -226,26 +229,54 @@ export function getJointFitIssues(parts: Part[], units: 'imperial' | 'metric' = 
         const dz = candidate.obb.center.z - socket.openingCenter.z;
         if (dx * dx + dy * dy + dz * dz > reach * reach) continue;
         if (!occupies(candidate.obb, socket)) continue;
+        // A transverse barrel in an intersecting bore is not the bolt that
+        // enters this hole. Rod-like candidates must follow its bore axis.
+        if (socket.mateKind === 'round_hole') {
+          const dimensions = candidate.obb.halfExtents;
+          const longest = dimensions.indexOf(Math.max(...dimensions));
+          const others = dimensions.filter((_, index) => index !== longest);
+          if (
+            Math.abs(others[0] - others[1]) < 0.001 &&
+            dimensions[longest] > others[0] * 1.5 &&
+            Math.abs(dot(candidate.obb.axes[longest], socket.openingNormal)) < 0.99
+          )
+            continue;
+        }
         // Judge the piece by the part of it that is in the socket. On an
         // uncut board that is the whole board; on one that carries a tongue
         // or a tenon it is only that.
         candidate.material ??= getPartMaterialOBBs(mate);
         const seated = candidate.material.filter((cell) => occupies(cell, socket));
         if (seated.length === 0) continue;
-        const axes = fitAxes(socket);
+        const sourceCut = host.features?.find((feature) => feature.id === socket.featureId);
+        const plateJoiner =
+          sourceCut?.kind === 'rounded_cut' && sourceCut.parameters.plateJoiner && mate.blankShape === 'biscuit';
+        // A biscuit floats lengthwise in the blade slot to let the boards register.
+        // Its kerf fit still matters; intended lateral adjustment is not a loose joint.
+        const axes = fitAxes(socket).filter(({ axis }) => !plateJoiner || Math.abs(dot(axis, socket.tangent2)) > 0.99);
         const atMouth = cellsInOpening(cellsAtOpening(seated, socket), socket, axes);
 
         let worst: { problem: JointFitProblem; amount: number } | null = null;
         for (const { axis, opening } of axes) {
           // Where a cut has split the piece into several cells across this
           // axis, the joint is as wide as all of them together.
-          const reach = atMouth.map((cell) => ({
-            lo: dot(cell.center, axis) - extentAlong(cell, axis) / 2,
-            hi: dot(cell.center, axis) + extentAlong(cell, axis) / 2
-          }));
+          // An uncut round blank is a cylinder, not the square box used for
+          // broad-phase sampling. Rolling a dowel must not enlarge its fit.
+          const plainRound = mate.blankShape === 'round' && !mate.features?.some((feature) => feature.enabled);
+          const reach = plainRound
+            ? (() => {
+                const axial = Math.min(1, Math.abs(dot(candidate.obb.axes[0], axis)));
+                const half = (mate.length * axial + mate.width * Math.sqrt(1 - axial * axial)) / 2;
+                const center = dot(candidate.obb.center, axis);
+                return [{ lo: center - half, hi: center + half }];
+              })()
+            : atMouth.map((cell) => ({
+                lo: dot(cell.center, axis) - extentAlong(cell, axis) / 2,
+                hi: dot(cell.center, axis) + extentAlong(cell, axis) / 2
+              }));
           const delta = Math.max(...reach.map((r) => r.hi)) - Math.min(...reach.map((r) => r.lo)) - opening;
           const amount = Math.abs(delta);
-          if (amount <= GOOD_FIT || amount > MAX_MISFIT) continue;
+          if (amount <= (delta > 0 ? INTERFERENCE_EPSILON : LOOSE_ADVISORY_THRESHOLD) || amount > MAX_MISFIT) continue;
           if (worst && worst.amount >= amount) continue;
           worst = { problem: delta > 0 ? 'tight' : 'loose', amount };
         }

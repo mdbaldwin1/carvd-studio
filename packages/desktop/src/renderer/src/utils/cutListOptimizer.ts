@@ -1,3 +1,4 @@
+import { CUT_LIST_FORMAT_VERSION } from './cutListVersion';
 // Cut List Optimizer - Guillotine Bin Packing Algorithm
 // Optimizes part placement on stock boards for woodworking cut lists
 
@@ -14,6 +15,7 @@ import {
   StockSummary,
   PartValidationIssue
 } from '../types';
+import { formatReadableMeasurement } from './fractions';
 import { logger } from './logger';
 import { clonePartFeatures } from './partFeatures';
 import { getPacksNeeded, isCountedStockForm, isRectangularStockForm, resolveStockForm } from '../../../shared/stock';
@@ -68,12 +70,13 @@ export function generateOptimizedCutList(
 
   const instructions: CutInstruction[] = [];
   const postGlueUpInstructions: CutInstruction[] = [];
+  const postPurchaseInstructions: CutInstruction[] = [];
   const stockBoards: StockBoard[] = [];
   const allSkippedParts: string[] = [];
 
   // Inserts are bought at a fixed size and used as they come, so they are
-  // counted here and never reach the packer or the cut instructions. Nobody
-  // cuts a #20 biscuit to size.
+  // counted here and never reach the packer. Explicitly authored machining
+  // is retained separately, after purchase.
   const insertCounts = new Map<string, number>();
 
   for (const [stockId, stockParts] of partsByStock) {
@@ -81,6 +84,30 @@ export function generateOptimizedCutList(
 
     if (isCountedStockForm(resolveStockForm(stock))) {
       insertCounts.set(stockId, stockParts.length);
+      for (const part of stockParts) {
+        const features = getEnabledPartFeatures(part);
+        if (features.length > 0)
+          postPurchaseInstructions.push({
+            stage: 'post_purchase',
+            partId: part.id,
+            partName: part.name,
+            cutLength: part.length,
+            cutWidth: part.width,
+            thickness: part.thickness,
+            stockId: stock.id,
+            stockName: stock.name,
+            grainSensitive: part.grainSensitive,
+            canRotate: false,
+            isGlueUp: false,
+            features,
+            notes: [
+              'After purchase: machine the purchased component; do not cut an additional stock blank.',
+              part.notes
+            ]
+              .filter(Boolean)
+              .join('\n')
+          });
+      }
       continue;
     }
 
@@ -90,7 +117,7 @@ export function generateOptimizedCutList(
       const partInstructions = createInstructions(part, stock);
       instructions.push(...partInstructions);
       const features = getEnabledPartFeatures(part);
-      if (part.glueUpPanel && features.length > 0) {
+      if (part.glueUpPanel) {
         postGlueUpInstructions.push({
           stage: 'post_glue_up',
           partId: part.id,
@@ -128,13 +155,16 @@ export function generateOptimizedCutList(
   return {
     id: uuidv4(),
     generatedAt: new Date().toISOString(),
+    formatVersion: CUT_LIST_FORMAT_VERSION,
     projectModifiedAt,
     isStale: false,
     instructions,
     postGlueUpInstructions,
+    postPurchaseInstructions,
+    validationIssues: bypassedIssues,
     stockBoards,
     statistics,
-    bypassedIssues,
+    bypassedIssues: bypassedIssues.filter((issue) => issue.canBypass),
     skippedParts: allSkippedParts,
     kerfWidth,
     overageFactor
@@ -168,6 +198,11 @@ function createInstructions(part: Part, stock: Stock): CutInstruction[] {
   const cutLength = part.length + (part.extraLength || 0);
   const cutWidth = part.width + (part.extraWidth || 0);
   const isGlueUp = part.glueUpPanel || false;
+  const preparation =
+    resolveStockForm(stock) === 'board' && part.thickness < stock.thickness - 0.000001
+      ? `Stock preparation: start with ${formatReadableMeasurement(stock.thickness, 'imperial')} lumber and prepare stock to ${formatReadableMeasurement(part.thickness, 'imperial')} finished thickness before cutting these blanks and their joinery. Keep thin or small parts on a larger blank during preparation. The layout allocates one full-thickness stock footprint per blank; additional pieces recovered by resawing are not counted.`
+      : undefined;
+  const notes = [preparation, part.notes].filter(Boolean).join('\n') || undefined;
 
   if (!isGlueUp) {
     // Regular part: single instruction
@@ -177,6 +212,8 @@ function createInstructions(part: Part, stock: Stock): CutInstruction[] {
         partName: part.name,
         cutLength,
         cutWidth,
+        finishedLength: part.length,
+        finishedWidth: part.width,
         thickness: part.thickness,
         stockId: stock.id,
         stockName: stock.name,
@@ -184,8 +221,8 @@ function createInstructions(part: Part, stock: Stock): CutInstruction[] {
         canRotate: !part.grainSensitive,
         isGlueUp: false,
         features: getEnabledPartFeatures(part),
-        notes: part.notes,
-        movementAllowance: needsMovementAllowance(part) ? estimateSeasonalMovement(part) : undefined
+        notes,
+        movementAllowance: needsMovementAllowance(part, stock) ? estimateSeasonalMovement(part, stock) : undefined
       }
     ];
   }
@@ -214,7 +251,7 @@ function createInstructions(part: Part, stock: Stock): CutInstruction[] {
       features: [],
       notes:
         i === 0
-          ? `Glue-up panel: ${numStrips} strips × ${stripWidth.toFixed(2)}" = ${cutWidth}" final width${part.notes ? '. ' + part.notes : ''}`
+          ? `Glue-up panel: ${numStrips} strips × ${stripWidth.toFixed(2)}" = ${cutWidth}" final width${notes ? '. ' + notes : ''}`
           : undefined
     });
   }
@@ -233,6 +270,11 @@ function preparePartsForPlacement(parts: Part[], stock: Stock): PartToPlace[] {
     const cutLength = part.length + (part.extraLength || 0);
     const cutWidth = part.width + (part.extraWidth || 0);
     const isGlueUp = part.glueUpPanel || false;
+    const preparation =
+      resolveStockForm(stock) === 'board' && part.thickness < stock.thickness - 0.000001
+        ? `Stock preparation: start with ${formatReadableMeasurement(stock.thickness, 'imperial')} lumber and prepare stock to ${formatReadableMeasurement(part.thickness, 'imperial')} finished thickness before cutting these blanks and their joinery. Keep thin or small parts on a larger blank during preparation. The layout allocates one full-thickness stock footprint per blank; additional pieces recovered by resawing are not counted.`
+        : undefined;
+    const notes = [preparation, part.notes].filter(Boolean).join('\n') || undefined;
 
     if (!isGlueUp) {
       // Regular part: single placement
@@ -243,7 +285,7 @@ function preparePartsForPlacement(parts: Part[], stock: Stock): PartToPlace[] {
         height: cutWidth, // and "height" for width
         canRotate: !part.grainSensitive,
         color: part.color,
-        notes: part.notes,
+        notes,
         isGlueUp: false
       });
     } else {
@@ -264,7 +306,7 @@ function preparePartsForPlacement(parts: Part[], stock: Stock): PartToPlace[] {
           height: stripWidth, // Strip width = optimal width for this glue-up
           canRotate: false, // Glue-up strips should not rotate (need consistent grain)
           color: part.color,
-          notes: part.notes,
+          notes,
           isGlueUp: true,
           boardsNeeded: numStrips
         });

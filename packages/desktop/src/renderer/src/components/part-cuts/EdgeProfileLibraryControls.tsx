@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DocsLink } from '../common/library/DocsLink';
 import { useRouterProfileLibrary } from '@renderer/hooks/useRouterProfileLibrary';
 import { useRouterToolLibrary } from '@renderer/hooks/useRouterToolLibrary';
 import { Button } from '@renderer/components/ui/button';
@@ -102,6 +103,7 @@ export function EdgeProfileLibraryControls({
 
   return (
     <>
+      <DocsLink section="router-profiles">Profile and physical tool guide</DocsLink>
       {draft.profile === 'custom' && draft.routerProfileSnapshot && (
         <div className="property-group rounded-md border border-border p-3">
           {profileStatus === 'current' && <p className="text-xs text-success">Library profile is current.</p>}

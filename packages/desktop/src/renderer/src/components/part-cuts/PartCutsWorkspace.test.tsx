@@ -129,6 +129,7 @@ describe('PartCutsWorkspace', () => {
 
     chooseRouterBit('V-Groove');
     fireEvent.change(screen.getByLabelText('Included Angle'), { target: { value: '60' } });
+    fireEvent.blur(screen.getByLabelText('Included Angle'));
     setMeasurementField('Cutter Diameter', '1/2');
     fireEvent.click(screen.getByRole('button', { name: 'Add Point' }));
     expect(screen.getByLabelText('Point 1 corner radius')).toBeDisabled();
@@ -293,10 +294,11 @@ describe('PartCutsWorkspace', () => {
     fireEvent.click(within(issue).getByRole('button', { name: 'Fix cut 1' }));
     expect(screen.getByLabelText('Label (optional)')).toHaveValue('Oversize pocket');
   });
-  it('UX clarifies the limited-run full-width dado and points to enclosed pockets', () => {
+  it('exposes physical edge stops for a stopped dado', () => {
     renderWorkspace();
     startCut('Stopped Dado');
-    expect(screen.getByText(/For a channel stopped before a side edge, use Mortise/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('Stop from Back Edge')).toBeInTheDocument();
+    expect(screen.getByLabelText('Stop from Front Edge')).toBeInTheDocument();
   });
   it('Q10 refuses to write the cut when the candidate completes cumulative blank removal', () => {
     const a = createMortiseFeature({
@@ -430,8 +432,8 @@ describe('PartCutsWorkspace', () => {
     fireEvent.click(screen.getByText('Round Hole'));
     expect(screen.getByText(/Set the face, diameter, depth, angle, placement/)).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Depth'), { target: { value: 'blind' } });
-    fireEvent.change(screen.getByLabelText('Tilt From Square (degrees)'), { target: { value: '15' } });
-    fireEvent.change(screen.getByLabelText('Tilt Toward (degrees)'), { target: { value: '90' } });
+    fireEvent.change(screen.getByLabelText('Drill angle from face (degrees)'), { target: { value: '75' } });
+    fireEvent.change(screen.getByLabelText('Drill direction across face (degrees)'), { target: { value: '90' } });
     fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'linear' } });
     fireEvent.change(screen.getByLabelText('Hole Count'), { target: { value: '3' } });
 
@@ -469,9 +471,9 @@ describe('PartCutsWorkspace', () => {
     {
       title: 'a 90 degree drill tilt',
       configure: () => {
-        fireEvent.change(screen.getByLabelText('Tilt From Square (degrees)'), { target: { value: '90' } });
+        fireEvent.change(screen.getByLabelText('Drill angle from face (degrees)'), { target: { value: '0' } });
       },
-      message: /tilt must be at least 0° and less than 90°/i
+      message: /angle from face must be greater than 0° and at most 90°/i
     },
     {
       title: 'a countersink whose major profile exits the blank',
@@ -504,7 +506,7 @@ describe('PartCutsWorkspace', () => {
     fireEvent.change(screen.getByLabelText('Repeating Pattern'), { target: { value: 'linear' } });
     fireEvent.change(screen.getByLabelText('Hole Count'), { target: { value: '128' } });
     setMeasurementField('Spacing', '0.01');
-    fireEvent.change(screen.getByLabelText('Tilt From Square (degrees)'), { target: { value: '89' } });
+    fireEvent.change(screen.getByLabelText('Drill angle from face (degrees)'), { target: { value: '1' } });
 
     expect(within(screen.getByRole('complementary', { name: 'Cut properties' })).queryByRole('alert')).toBeNull();
   });
@@ -1280,6 +1282,25 @@ describe('PartCutsWorkspace', () => {
     expect(props.onPendingTargetChange).toHaveBeenLastCalledWith(null);
   });
 
+  it('does not recreate an open cut removed by a keyboard command or undo', () => {
+    const feature = createMortiseFeature();
+    const { rerender, props } = renderWorkspace({ draftFeatures: [feature], selectedFeatureId: feature.id });
+    fireEvent.click(screen.getByRole('button', { name: /Target: Top Face/ }));
+    (props.onDraftFeaturesChange as Mock).mockClear();
+    rerender(
+      <SidebarProvider>
+        <PartCutsEditorProvider {...props} draftFeatures={[]} selectedFeatureId={null}>
+          <CutsSection isCollapsed={false} onOpenChange={() => {}} />
+          <PartCutsWorkspace />
+          <CutProperties />
+        </PartCutsEditorProvider>
+      </SidebarProvider>
+    );
+    expect(props.onDraftFeaturesChange).not.toHaveBeenCalled();
+    expect(screen.getByText('No cuts yet. Click + to add.')).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: 'Cut properties' })).not.toBeInTheDocument();
+  });
+
   it('toggles a cut enabled state from the list', () => {
     const feature = createMortiseFeature();
     const { props } = renderWorkspace({ draftFeatures: [feature] });
@@ -1473,19 +1494,20 @@ describe('PartCutsWorkspace', () => {
     });
   });
 
-  it('builds a stopped dado with a limited run and fixed cross width', () => {
+  it('builds a stopped dado with independently measured edge stops', () => {
     const { props } = renderWorkspace();
 
     startCut('Stopped Dado');
-    expect(screen.getByText(/Stopped dados span the full board width/i)).toBeInTheDocument();
-    setMeasurementField('Run Along Blank', '5');
+    setMeasurementField('Dado Width', '3/4');
+    setMeasurementField('Stop from Back Edge', '1');
+    setMeasurementField('Stop from Front Edge', '2');
     setMeasurementField('Offset Along Length', '2');
 
     const features = lastFeatures(props.onDraftFeaturesChange);
     expect(features[0]).toMatchObject({
       cutType: 'stopped_dado',
-      parameters: expect.objectContaining({ size: { length: 5, width: 12 } }),
-      placement: { x: 2, z: 0 }
+      parameters: expect.objectContaining({ size: { length: 0.75, width: 9 }, stoppedSpan: true }),
+      placement: { x: 2, z: 1 }
     });
   });
 
@@ -1571,14 +1593,14 @@ describe('PartCutsWorkspace', () => {
     });
   });
 
-  it('omits the widen handle for stopped dados in the preview fallback', () => {
+  it('supports editing a stopped span with the preview handles', () => {
     renderWorkspace();
 
     startCut('Stopped Dado');
     const handlesSection = screen.getByText('Preview Handles').parentElement as HTMLElement;
 
     expect(within(handlesSection).getByRole('button', { name: 'Extend Run' })).toBeInTheDocument();
-    expect(within(handlesSection).queryByRole('button', { name: 'Widen' })).not.toBeInTheDocument();
+    expect(within(handlesSection).getByRole('button', { name: 'Widen' })).toBeInTheDocument();
   });
 
   it('tells end-cut editors to use the inspector instead of handles', () => {
@@ -1668,7 +1690,7 @@ describe('PartCutsWorkspace', () => {
       expect(screen.getByText('Height Across Thickness')).toBeInTheDocument();
       expect(screen.getByText('Depth Into Width')).toBeInTheDocument();
       expect(screen.getByText('Offset Up From Bottom')).toBeInTheDocument();
-      expect(screen.getByText(/recess into the board width/i)).toBeInTheDocument();
+      expect(screen.getByText(/Depth is measured into the board width/i)).toBeInTheDocument();
     });
   });
 

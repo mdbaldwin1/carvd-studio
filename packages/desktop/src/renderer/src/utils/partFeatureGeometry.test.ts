@@ -5,6 +5,7 @@ import type { PartFeature } from '../types';
 import {
   clearPartGeometryCache,
   getPartGeometryCacheSizeForTests,
+  getPartMaterialVolume,
   getPartLocalBoundingBox,
   worldContoursOverlap,
   getPartLocalConvexVertices,
@@ -554,6 +555,46 @@ describe('partFeatureGeometry', () => {
       expect(firstTopHit(part, 0, 0.6)).toBeCloseTo(1, 3);
     });
 
+    it('keeps a circle-jig center intact while cutting the surrounding flat-bottom channel', () => {
+      const part = routedPart('straight');
+      const feature = part.features![0];
+      if (feature.kind !== 'routed_path') throw new Error('Expected routed path');
+      feature.bit.diameter = 0.25;
+      feature.path = {
+        closed: true,
+        points: Array.from({ length: 32 }, (_, i) => ({
+          primary: Math.cos((i * Math.PI) / 16),
+          secondary: Math.sin((i * Math.PI) / 16)
+        }))
+      };
+      expect(firstTopHit(part, 0, 0)).toBeCloseTo(1, 3);
+      expect(firstTopHit(part, 1, 0)).toBeCloseTo(0.5, 3);
+      expect(firstTopHit(part, 0, 1)).toBeCloseTo(0.5, 3);
+      expect(firstTopHit(part, 1.2, 0)).toBeCloseTo(1, 3);
+    });
+
+    it('cuts a circular scallop into end grain without removing the central pin land', () => {
+      const part = routedPart('straight');
+      const feature = part.features![0];
+      if (feature.kind !== 'routed_path') throw new Error('Expected routed path');
+      feature.target.face = 'left_end';
+      feature.bit.diameter = 0.28;
+      feature.path = {
+        closed: true,
+        points: Array.from({ length: 32 }, (_, i) => ({
+          primary: 0.625 * Math.cos((i * Math.PI) / 16),
+          secondary: 0.625 * Math.sin((i * Math.PI) / 16)
+        }))
+      };
+      const mesh = new THREE.Mesh(getPartRenderGeometry(part), new THREE.MeshBasicMaterial({ side: THREE.DoubleSide }));
+      mesh.updateMatrixWorld(true);
+      const hit = (z: number) =>
+        new THREE.Raycaster(new THREE.Vector3(-5, 0, z), new THREE.Vector3(1, 0, 0)).intersectObject(mesh)[0]?.point.x;
+      expect(hit(0)).toBeCloseTo(-4, 3);
+      expect(hit(0.625)).toBeCloseTo(-3.5, 3);
+      expect(hit(0.9)).toBeCloseTo(-4, 3);
+    });
+
     it('sweeps a core-box bit with a curved cross-section', () => {
       const part = routedPart('core_box');
       expect(firstTopHit(part, 0, 0)).toBeCloseTo(0.5, 2);
@@ -565,6 +606,16 @@ describe('partFeatureGeometry', () => {
       expect(firstTopHit(part, 0, 0)).toBeCloseTo(0.5, 2);
       expect(firstTopHit(part, 0, 0.2)).toBeCloseTo(0.7, 2);
       expect(firstTopHit(part, 0, 0.55)).toBeCloseTo(1, 2);
+    });
+
+    it('preserves the flank angle of a shallow wide-angle V cut', () => {
+      const part = routedPart('v_bit');
+      const feature = part.features![0];
+      if (feature.kind !== 'routed_path') throw new Error('expected routed path');
+      feature.bit = { profile: 'v_bit', diameter: 0.75, includedAngle: 160 };
+      feature.parameters = { depthMode: 'blind', depth: 0.375 * Math.tan(Math.PI / 18) };
+      const expected = 1 - feature.parameters.depth! + 0.2 * Math.tan(Math.PI / 18);
+      expect(firstTopHit(part, 0, 0.2)).toBeCloseTo(expected, 4);
     });
 
     it('uses the selected face frame for a rounded front-face route', () => {
@@ -1363,6 +1414,46 @@ describe('partFeatureGeometry', () => {
     expect(geometry.boundingBox!.max.y).toBeCloseTo(0.375);
     expect(geometry.boundingBox!.min.y).toBeCloseTo(-0.375);
     expect(geometry.getAttribute('position').count).toBeGreaterThan(0);
+  });
+
+  it.each(['top_face', 'bottom_face'] as const)('rounds only closed stopped-dado ends on %s', (face) => {
+    for (const [back, front] of [
+      [0, 0],
+      [0, 1],
+      [1, 0],
+      [0.5, 1]
+    ]) {
+      const radius = 0.375;
+      const span = 8 - back - front;
+      const closedEnds = Number(back > 0) + Number(front > 0);
+      // Two quarter-circle corners per stopped end, matching the 8-step arcs.
+      const retainedCorners = closedEnds * radius ** 2 * (2 - 8 * Math.sin(Math.PI / 16));
+      const part = createTestPart({
+        length: 18,
+        width: 8,
+        thickness: 0.75,
+        features: [
+          {
+            id: 'stopped',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            target: { type: 'face', face },
+            reference: { primaryFrom: 'min' },
+            cutType: 'stopped_dado',
+            parameters: {
+              size: { length: 0.75, width: span },
+              stoppedSpan: true,
+              depthMode: 'blind',
+              depth: 0.25,
+              cornerRadius: radius
+            },
+            placement: { x: 8, z: back }
+          }
+        ]
+      });
+      expect(getPartMaterialVolume(part)).toBeCloseTo(108 - (0.75 * span - retainedCorners) * 0.25, 5);
+    }
   });
 
   it('renders stopped dado and stopped groove geometry through the face-cut path', () => {

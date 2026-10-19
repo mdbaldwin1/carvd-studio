@@ -30,15 +30,22 @@ for (const part of file.parts) {
 
 /** Half extents in world axes, for the quarter turns the bench uses. */
 function ext(p) {
-  const turn = (a) => (((a ?? 0) % 360) + 360) % 360;
-  const rx = turn(p.rotation?.x),
-    ry = turn(p.rotation?.y),
-    rz = turn(p.rotation?.z);
-  let e = { x: p.length / 2, y: p.thickness / 2, z: p.width / 2 };
-  if (rz === 90 || rz === 270) e = { x: e.y, y: e.x, z: e.z };
-  if (ry === 90 || ry === 270) e = { x: e.z, y: e.y, z: e.x };
-  if (rx === 90 || rx === 270) e = { x: e.x, y: e.z, z: e.y };
-  return e;
+  const [rx, ry, rz] = ['x', 'y', 'z'].map((k) => ((p.rotation?.[k] ?? 0) * Math.PI) / 180);
+  const out = { x: 0, y: 0, z: 0 };
+  for (const v of [
+    [p.length / 2, 0, 0],
+    [0, p.thickness / 2, 0],
+    [0, 0, p.width / 2]
+  ]) {
+    const x1 = v[0] * Math.cos(rz) - v[1] * Math.sin(rz),
+      y1 = v[0] * Math.sin(rz) + v[1] * Math.cos(rz);
+    const x2 = x1 * Math.cos(ry) + v[2] * Math.sin(ry),
+      z2 = -x1 * Math.sin(ry) + v[2] * Math.cos(ry);
+    out.x += Math.abs(x2);
+    out.y += Math.abs(y1 * Math.cos(rx) - z2 * Math.sin(rx));
+    out.z += Math.abs(y1 * Math.sin(rx) + z2 * Math.cos(rx));
+  }
+  return out;
 }
 
 /** Closest approach between two parts' boxes; zero means they touch. */

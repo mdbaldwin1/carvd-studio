@@ -9,7 +9,8 @@ export type AxisSnapWinners = Record<Axis, SnapStage | null>;
 export const SNAP_STAGE_PRIORITIES: Record<SnapStage, number> = {
   guide: 500,
   origin: 400,
-  mate: 350,
+  // An authored joint must remain seated even beside the global origin.
+  mate: 450,
   face: 300,
   surface: 250,
   fraction: 225,

@@ -290,7 +290,9 @@ test.describe('round 9 file transaction ownership and quit', () => {
         if (process.platform === 'darwin') expect(proc.exitCode).toBeNull();
         else await expect.poll(() => proc.exitCode).toBe(0);
       } else {
-        await expect.poll(() => proc.exitCode, { timeout: 5000 }).toBe(0);
+        // Match the harness's graceful-exit budget. macOS teardown can outlast
+        // five seconds while another isolated Electron worker is launching.
+        await expect.poll(() => proc.exitCode, { timeout: 30000 }).toBe(0);
         expect(JSON.parse(fs.readFileSync(first, 'utf8')).parts[0].features[0].label).toBe(
           choice === 'Save' ? 'Unsaved inspector' : 'Original'
         );

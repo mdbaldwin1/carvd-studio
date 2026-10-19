@@ -68,7 +68,7 @@ export interface ElectronAPI {
   reorderFavoriteProjects: (filePaths: string[]) => Promise<{ success: boolean }>;
   setWindowTitle: (title: string) => Promise<void>;
   confirmClose: () => Promise<void>;
-  cancelClose: () => Promise<void>;
+  cancelClose: (reason?: 'save-failed') => Promise<void>;
   onBeforeClose: (callback: () => void) => () => void;
   getAppVersion: () => Promise<string>;
   getPlatform: () => Promise<string>;

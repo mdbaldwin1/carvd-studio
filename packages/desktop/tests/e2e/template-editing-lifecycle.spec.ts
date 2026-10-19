@@ -84,10 +84,8 @@ test.describe('template editing lifecycle', () => {
 
     await window.getByTitle('Duplicate to My Templates').first().click();
     await expect.poll(() => getUserTemplateNames(window), { timeout: 10000 }).toContain('Simple Writing Desk (Copy)');
-    await window.waitForTimeout(500);
-    if ((await window.locator('.header-mode-chip', { hasText: 'Template' }).count()) > 0) {
-      await clickEditingCancel(window);
-    }
+    await expect(window.getByRole('button', { name: 'Exit', exact: true })).toBeVisible();
+    await clickEditingCancel(window);
 
     await openTemplatesScreen(running);
     await window.getByText('E2E Custom Template').first().hover();

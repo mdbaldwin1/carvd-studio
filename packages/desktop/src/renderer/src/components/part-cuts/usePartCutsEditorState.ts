@@ -1,3 +1,4 @@
+import { validateRoutedPath } from '@renderer/utils/routedPathValidation';
 import { isLengthwiseEdgeTarget } from '@renderer/utils/rectCutUtils';
 import { usePartCutsEditingStore } from '@renderer/store/partCutsEditingStore';
 import { useProjectStore } from '@renderer/store/projectStore';
@@ -38,7 +39,7 @@ import {
   TOP_BOTTOM_FACE_TARGETS,
   validateRectCutFeature
 } from '@renderer/utils/rectCutUtils';
-import { getFaceFrame, validateCircularCut, validateRoundedCut } from '@renderer/utils/roundCutUtils';
+import { validateCircularCut, validateRoundedCut } from '@renderer/utils/roundCutUtils';
 import {} from '@renderer/components/ui/dropdown-menu';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { Part } from '@renderer/types';
@@ -112,6 +113,7 @@ export function usePartCutsEditorState({
   const lastWrittenFeature = useRef<string | null>(null);
   /** Identity of the cut as the list last presented it, to spot an outside change. */
   const lastSeenFeature = useRef<string | null>(null);
+  const previousFeatures = useRef(draftFeatures);
   const [panelMode, setPanelMode] = useState<CutsPanelMode>('list');
   const workspaceRootRef = useRef<HTMLDivElement | null>(null);
 
@@ -157,13 +159,12 @@ export function usePartCutsEditorState({
     if (
       !draft ||
       draft.mode !== 'rect_cut' ||
-      !['cutout', 'dado', 'stopped_dado', 'groove', 'stopped_groove', 'mortise'].includes(draft.cutType)
+      !['cutout', 'dado', 'stopped_dado', 'groove', 'stopped_groove', 'mortise', 'half_lap'].includes(draft.cutType)
     ) {
       return FACE_TARGETS;
     }
-    // Pockets can also sink into the front/back side faces (leg mortises);
-    // channels stay on top/bottom where their run semantics are defined.
-    if (draft.cutType === 'mortise' || draft.cutType === 'cutout') {
+    // Pockets and grooves can also be cut into a board's long edges.
+    if (['mortise', 'cutout', 'groove', 'stopped_groove'].includes(draft.cutType)) {
       return [...TOP_BOTTOM_FACE_TARGETS, 'front_face', 'back_face'] as typeof TOP_BOTTOM_FACE_TARGETS;
     }
     return TOP_BOTTOM_FACE_TARGETS;
@@ -179,61 +180,8 @@ export function usePartCutsEditorState({
       : [...draftFeatures, feature];
     const candidate = { ...part, features };
     if (feature.kind === 'routed_path') {
-      const frame = getFaceFrame(part, feature.target.face);
-      const depth = feature.parameters.depthMode === 'blind' ? Number(feature.parameters.depth) : null;
-      const materialDepth =
-        feature.target.face === 'top_face' || feature.target.face === 'bottom_face'
-          ? part.thickness
-          : feature.target.face === 'left_end' || feature.target.face === 'right_end'
-            ? part.length
-            : part.width;
-      if (!(feature.bit.diameter > 0)) return 'Cutter diameter must be greater than zero.';
-      if (depth !== null && (!(depth > 0) || depth > materialDepth)) {
-        return `Route depth must be greater than zero and no deeper than the ${formatMeasurementWithUnit(materialDepth, units)} material thickness. Use Through for a through-route.`;
-      }
-      const requestedDepth = depth ?? materialDepth;
-      if (feature.bit.profile === 'core_box' || feature.bit.profile === 'ball_nose') {
-        const maxDepth = feature.bit.diameter / 2;
-        if (requestedDepth > maxDepth) {
-          return `This round-bottom bit can cut at most ${formatMeasurementWithUnit(maxDepth, units)} deep at its ${formatMeasurementWithUnit(feature.bit.diameter, units)} diameter.`;
-        }
-      }
-      if (feature.bit.profile === 'v_bit' || feature.bit.profile === 'engraving') {
-        const maxDepth = feature.bit.diameter / (2 * Math.tan((feature.bit.includedAngle * Math.PI) / 360));
-        if (requestedDepth > maxDepth) {
-          return `At ${feature.bit.includedAngle}°, this V-bit can cut at most ${formatMeasurementWithUnit(maxDepth, units)} deep at its ${formatMeasurementWithUnit(feature.bit.diameter, units)} maximum diameter.`;
-        }
-      }
-      if (feature.bit.profile === 'dovetail' || feature.bit.profile === 't_slot' || feature.bit.profile === 'keyhole') {
-        if (!(feature.bit.shankDiameter > 0) || feature.bit.shankDiameter >= feature.bit.diameter) {
-          return 'Shank diameter must be greater than zero and smaller than the cutter diameter.';
-        }
-        const cutterHeight =
-          feature.bit.profile === 'dovetail'
-            ? (feature.bit.diameter - feature.bit.shankDiameter) /
-              (2 * Math.tan((feature.bit.includedAngle * Math.PI) / 360))
-            : feature.bit.cutterHeight;
-        if (!(cutterHeight > 0) || cutterHeight > requestedDepth) {
-          return `Route depth must be at least the ${formatMeasurementWithUnit(cutterHeight, units)} cutter height.`;
-        }
-      }
-      const outsidePoint = feature.path.points.findIndex(
-        (point) =>
-          Math.abs(point.primary) > frame.primarySize / 2 + 1e-9 ||
-          Math.abs(point.secondary) > frame.secondarySize / 2 + 1e-9
-      );
-      if (outsidePoint >= 0) return `Route point ${outsidePoint + 1} must stay on the selected face.`;
-      if (feature.path.closed && feature.path.points.length < 3) {
-        return 'A closed routed path needs at least three points.';
-      }
-      const spanCount = feature.path.closed ? feature.path.points.length : feature.path.points.length - 1;
-      for (let index = 0; index < spanCount; index += 1) {
-        const current = feature.path.points[index];
-        const next = feature.path.points[(index + 1) % feature.path.points.length];
-        if (Math.hypot(next.primary - current.primary, next.secondary - current.secondary) < 1e-9) {
-          return `Route points ${index + 1} and ${((index + 1) % feature.path.points.length) + 1} overlap. Move or remove one point.`;
-        }
-      }
+      const issue = validateRoutedPath(feature, part, units);
+      if (issue) return issue;
     }
     if (feature.kind === 'edge_profile') {
       if (!(feature.parameters.size > 0) || !(feature.parameters.depth > 0)) {
@@ -420,8 +368,19 @@ export function usePartCutsEditorState({
   // would run first on the pass after an undo and put the stale draft straight
   // back, so undo did nothing at all while a cut was open.
   useEffect(() => {
+    const previous = previousFeatures.current;
+    previousFeatures.current = draftFeatures;
     if (!draft) return;
     const feature = draft.featureId ? draftFeatures.find((candidate) => candidate.id === draft.featureId) : undefined;
+    // Deletion and undo can remove the selected cut outside the inspector.
+    // Close its draft before autosave can resurrect the removed operation.
+    if (!feature && previous.some((candidate) => candidate.id === draft.featureId)) {
+      lastSeenFeature.current = null;
+      lastWrittenFeature.current = null;
+      setDraft(null);
+      setPanelMode('list');
+      return;
+    }
 
     // The list moved to something the inspector did not put there -- an undo,
     // a redo, a nudge, a mirror. That wins over what the panel is holding, so
@@ -587,8 +546,7 @@ export function usePartCutsEditorState({
       ? inspectorDraft.sizeWidth
       : inspectorDraft.sizeLength
     : null;
-  const inspectorUsesBlindOnlyDepth =
-    inspectorDraft?.mode === 'rect_cut' && rectCutIsBlindOnly(inspectorDraft.cutType, inspectorDraft.faceTarget);
+  const inspectorUsesBlindOnlyDepth = inspectorDraft?.mode === 'rect_cut' && rectCutIsBlindOnly(inspectorDraft.cutType);
   const inspectorHidesDepthSelector =
     inspectorUsesBlindOnlyDepth ||
     (inspectorDraft?.mode === 'rect_cut' &&
@@ -597,8 +555,7 @@ export function usePartCutsEditorState({
         // A tenon is sized by its tongue, not by a through/blind choice.
         inspectorDraft.cutType === 'tenon'));
   const inspectorUsesDerivedCrossWidth =
-    inspectorDraft?.mode === 'rect_cut' &&
-    ['dado', 'stopped_dado', 'rabbet', 'half_lap'].includes(inspectorDraft.cutType);
+    inspectorDraft?.mode === 'rect_cut' && ['dado', 'rabbet', 'half_lap'].includes(inspectorDraft.cutType);
   /** A half lap is half the stock, so its depth is not the maker's to type. */
   const inspectorUsesDerivedDepth = inspectorDraft?.mode === 'rect_cut' && inspectorDraft.cutType === 'half_lap';
   const preservedEndCutReferenceNote =

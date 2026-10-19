@@ -80,7 +80,8 @@ export const RotationHandle = memo(
     const halfThickness = liveDims.thickness / 2;
     const halfWidth = liveDims.width / 2;
     const minPartDimension = Math.min(liveDims.length, liveDims.width, liveDims.thickness);
-    const offset = 0.2; // Distance above the surface
+    const handleScale = Math.min(1, Math.max(0.02, Math.max(liveDims.length, liveDims.width, liveDims.thickness) / 24));
+    const offset = 0.2 * handleScale;
 
     // Face-center position in part-local space
     let facePosition: [number, number, number];
@@ -476,7 +477,7 @@ export const RotationHandle = memo(
     };
 
     return (
-      <group ref={groupRef} position={facePosition}>
+      <group ref={groupRef} position={facePosition} scale={handleScale}>
         {/* Invisible ring hit area stays for easier click-to-rotate, but drag uses grab handle */}
         <group quaternion={ringQuaternion}>
           <mesh

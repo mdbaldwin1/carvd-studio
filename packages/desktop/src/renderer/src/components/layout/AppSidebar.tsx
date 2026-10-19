@@ -120,11 +120,6 @@ export function AppSidebar({
     const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
 
     addPart({
-      position: {
-        x: (parts.length % 5) * 6,
-        y: 0.375,
-        z: Math.floor(parts.length / 5) * 6
-      },
       color: STOCK_COLORS[colorIndex],
       name: `Part ${nextNumber}`
     });

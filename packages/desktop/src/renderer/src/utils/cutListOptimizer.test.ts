@@ -581,7 +581,7 @@ describe('cutListOptimizer', () => {
       expect(cutList.stockBoards).toHaveLength(1);
     });
 
-    it('handles bypassed issues', () => {
+    it('retains warnings without labeling them bypassed errors', () => {
       const stock = createTestStock();
       const part = createTestPart({ stockId: stock.id });
 
@@ -597,8 +597,8 @@ describe('cutListOptimizer', () => {
 
       const cutList = generateOptimizedCutList([part], [stock], 0.125, 0.1, new Date().toISOString(), bypassedIssues);
 
-      expect(cutList.bypassedIssues).toHaveLength(1);
-      expect(cutList.bypassedIssues[0].type).toBe('grain_mismatch');
+      expect(cutList.bypassedIssues).toHaveLength(0);
+      expect(cutList.validationIssues?.[0].type).toBe('grain_mismatch');
     });
   });
 

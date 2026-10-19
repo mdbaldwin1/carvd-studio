@@ -30,6 +30,7 @@ import { FileRecoveryModal } from '../components/project/FileRecoveryModal';
 import { analytics } from '../utils/analytics';
 
 interface UseFileOperationsOptions {
+  prepareRecoveryForClose?: () => Promise<void | (() => void)>;
   // Template editing mode
   isEditingTemplate?: boolean;
   onSaveTemplate?: () => Promise<void>;
@@ -80,6 +81,7 @@ function hasUnsavedCutChanges(): boolean {
 
 export function useFileOperations(options: UseFileOperationsOptions = {}): UseFileOperationsResult {
   const {
+    prepareRecoveryForClose,
     isEditingTemplate = false,
     onSaveTemplate,
     isEditingAssembly = false,
@@ -306,24 +308,44 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
         }
         flushFocusedInput();
       }
-      if (hasUnsavedChanges() || hasUnsavedCutChanges()) {
-        // Show the unsaved changes dialog
-        setPendingAction({
-          type: 'close',
-          execute: async () => {
-            // This executes after user chooses "Don't Save"
-            await waitForPendingProjectSaves();
+      const pendingClose = {
+        type: 'close' as const,
+        execute: async () => {
+          await waitForPendingProjectSaves();
+          const resumeRecovery = await prepareRecoveryForClose?.();
+          try {
             await window.electronAPI.confirmClose();
+          } catch (error) {
+            resumeRecovery?.();
+            throw error;
           }
-        });
+        }
+      };
+      if (hasUnsavedChanges() || hasUnsavedCutChanges()) {
+        setPendingAction(pendingClose);
       } else {
-        // No unsaved changes, proceed with close
-        window.electronAPI.confirmClose();
+        // A clean save can still have a recovery write/delete in flight.
+        let resumeRecovery: void | (() => void) = undefined;
+        try {
+          resumeRecovery = await prepareRecoveryForClose?.();
+          flushFocusedInput();
+          if (hasUnsavedChanges() || hasUnsavedCutChanges()) {
+            // Cleanup may await a slow write. Preserve edits made meanwhile.
+            resumeRecovery?.();
+            setPendingAction(pendingClose);
+            return;
+          }
+          await window.electronAPI.confirmClose();
+        } catch (error) {
+          resumeRecovery?.();
+          showToast(`Could not finish closing: ${String(error)}`, 'error');
+          await window.electronAPI.cancelClose();
+        }
       }
     });
 
     return cleanup;
-  }, []);
+  }, [prepareRecoveryForClose, showToast]);
 
   // File operation handlers
   const createMenuProject = useCallback(async () => {
@@ -609,7 +631,7 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
             ? saveToast.message
             : 'Cannot save this cut. Cancel and correct the highlighted operation.'
         );
-        if (isCloseAction) await window.electronAPI.cancelClose();
+        if (isCloseAction) await window.electronAPI.cancelClose('save-failed');
         return;
       }
       setDialogSaveError(null);
@@ -629,9 +651,9 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
       } else if (result.error) {
         showToast(`Error saving: ${result.error}`, 'error');
         setDialogSaveError(`Error saving: ${result.error}`);
-        // If save failed during close, cancel the close
+        // Keep the dialog and original quit/update intent available for retry.
         if (isCloseAction) {
-          await window.electronAPI.cancelClose();
+          await window.electronAPI.cancelClose('save-failed');
         }
       } else if (result.canceled) {
         setPendingAction(null);
@@ -640,7 +662,7 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
       }
     } catch (error) {
       setDialogSaveError(`Error saving: ${String(error)}`);
-      if (isCloseAction) await window.electronAPI.cancelClose();
+      if (isCloseAction) await window.electronAPI.cancelClose('save-failed');
     } finally {
       dialogSavingRef.current = false;
       setIsDialogSaving(false);
@@ -660,6 +682,9 @@ export function useFileOperations(options: UseFileOperationsOptions = {}): UseFi
     try {
       await pending.execute();
       setPendingAction(null);
+    } catch (error) {
+      setDialogSaveError(`Could not finish this action: ${String(error)}`);
+      if (pending.type === 'close') await window.electronAPI.cancelClose('save-failed');
     } finally {
       if (drainsWrites) {
         dialogSavingRef.current = false;

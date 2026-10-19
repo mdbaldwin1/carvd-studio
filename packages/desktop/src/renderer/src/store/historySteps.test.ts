@@ -31,6 +31,15 @@ describe('undoing a rotation', () => {
     expect(useProjectStore.getState().parts[0].position.z).toBeCloseTo(0, 3);
   });
 
+  it('does not insert a timestamp-only undo step after marking an edited document dirty', () => {
+    useProjectStore.setState({ modifiedAt: '2000-01-01T00:00:00.000Z' });
+    useProjectStore.temporal.getState().clear();
+    useProjectStore.getState().updatePart('p', { position: { x: 0, y: 0.375, z: 2 } });
+    useProjectStore.getState().markDirty();
+    useProjectStore.temporal.getState().undo();
+    expect(useProjectStore.getState().parts[0].position.z).toBe(0);
+  });
+
   it('undoes a single quarter turn', () => {
     useProjectStore.getState().rotateSelectedParts('y', 90, { x: 0, y: 0, z: 0 });
     expect(rot()).toBeCloseTo(90, 3);
@@ -50,5 +59,58 @@ describe('undoing a rotation', () => {
     expect(rot()).toBeCloseTo(30, 3);
     useProjectStore.temporal.getState().undo();
     expect(rot()).toBeCloseTo(0, 3);
+  });
+});
+
+describe('document savepoints across undo and redo', () => {
+  beforeEach(() => {
+    useProjectStore.getState().newProject();
+    useProjectStore.setState({ parts: [createTestPart({ id: 'saved-part', position: { x: 0, y: 0.375, z: 0 } })] });
+    useProjectStore.getState().markClean();
+    useProjectStore.temporal.getState().clear();
+  });
+  const move = (z: number) => useProjectStore.getState().updatePart('saved-part', { position: { x: 0, y: 0.375, z } });
+  it('marks Undo after Save dirty and clears it only when Redo returns to the saved content', () => {
+    move(1);
+    move(2);
+    useProjectStore.getState().markClean();
+    const history = useProjectStore.temporal.getState();
+    expect(history.pastStates).toHaveLength(2);
+    history.undo();
+    expect(useProjectStore.getState().isDirty).toBe(true);
+    expect(useProjectStore.getState().parts[0].position.z).toBe(1);
+    history.undo();
+    expect(useProjectStore.getState().isDirty).toBe(true);
+    history.redo();
+    expect(useProjectStore.getState().isDirty).toBe(true);
+    history.redo();
+    expect(useProjectStore.getState().isDirty).toBe(false);
+    expect(useProjectStore.temporal.getState().pastStates).toHaveLength(2);
+  });
+  it('restores the original clean state and preserves history pause', () => {
+    move(1);
+    const history = useProjectStore.temporal.getState();
+    history.pause();
+    history.undo();
+    expect(useProjectStore.getState().isDirty).toBe(false);
+    expect(useProjectStore.temporal.getState().isTracking).toBe(false);
+    history.redo();
+    expect(useProjectStore.getState().isDirty).toBe(true);
+    history.resume();
+  });
+  it('tracks a new savepoint on an undone branch and does not dirty a new document on empty undo', () => {
+    move(1);
+    move(2);
+    const history = useProjectStore.temporal.getState();
+    history.undo();
+    useProjectStore.getState().markClean();
+    history.redo();
+    expect(useProjectStore.getState().isDirty).toBe(true);
+    history.undo();
+    expect(useProjectStore.getState().isDirty).toBe(false);
+    useProjectStore.getState().newProject();
+    history.clear();
+    history.undo();
+    expect(useProjectStore.getState().isDirty).toBe(false);
   });
 });

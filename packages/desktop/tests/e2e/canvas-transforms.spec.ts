@@ -216,7 +216,7 @@ test.describe('Canvas transform workflows', () => {
     // than mutating store data. Its nested size object must remain independent
     // from the original feature after the real copy/paste command.
     await running.window.getByRole('button', { name: /^2\./ }).click();
-    await running.window.getByLabel('Run Along Blank').fill('1.25');
+    await running.window.getByLabel('Dado Width').fill('1.25');
     await savePartCutsFromHeader(running.window);
     expect(
       await running.window.evaluate(() => JSON.stringify(window.useProjectStore.getState().parts[0].features))

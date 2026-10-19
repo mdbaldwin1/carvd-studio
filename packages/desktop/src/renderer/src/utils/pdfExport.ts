@@ -11,7 +11,7 @@ import {
   groupCutInstructions,
   type GroupedCutInstruction
 } from './cutListInstructions';
-import { formatFabricationMeasurement as formatMeasurementWithUnit } from './fractions';
+import { formatFabricationMeasurement as formatMeasurementWithUnit, formatReadableMeasurement } from './fractions';
 import { logger } from './logger';
 
 interface ExportOptions {
@@ -93,12 +93,13 @@ function drawFabricationOperations(
   groups: GroupedCutInstruction[],
   units: 'imperial' | 'metric',
   startY: number,
-  watermark: string | null
+  watermark: string | null,
+  warnings: CutList['bypassedIssues'] = []
 ): number {
   const groupsWithOperations = groups.filter(
     (group) => getInstructionFabricationLines(group.items[0], units).length > 0
   );
-  if (!groupsWithOperations.length) return startY;
+  if (!groupsWithOperations.length && !warnings.length) return startY;
   const margin = 40;
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -119,13 +120,26 @@ function drawFabricationOperations(
   doc.setTextColor(0, 0, 0);
   doc.text('Fabrication Operations', margin, y);
   y += 18;
+  setPdfFontSize(doc, 9);
+  doc.setFont('helvetica', 'normal');
+  for (const issue of warnings) {
+    for (const line of doc.splitTextToSize(
+      toPdfFabricationText(`REVIEW BEFORE FABRICATION - ${issue.partName}: ${issue.message}`),
+      contentWidth
+    )) {
+      if (y > pageHeight - 45) newPage();
+      doc.text(line, margin, y);
+      y += 12;
+    }
+  }
   for (const group of groupsWithOperations) {
     const identity = group.items.map((item) => `#${getShortPartId(item.partId)} ${item.partName}`).join(', ');
     const panel = group.items[0].stage === 'post_glue_up';
+    const purchased = group.items[0].stage === 'post_purchase';
     const dimensions = [group.cutLength, group.cutWidth, group.thickness]
       .map((value) => formatMeasurementWithUnit(value, units))
       .join(' x ');
-    const heading = `${panel ? 'After glue-up - finished panels' : 'Parts'}: ${identity} | Qty ${group.quantity}${panel ? ` | ${dimensions} (not additional stock blanks)` : ''}`;
+    const heading = `${panel ? 'After glue-up - finished panels' : purchased ? 'After purchase - component machining' : 'Parts'}: ${identity} | Qty ${group.quantity}${panel || purchased ? ` | ${dimensions} (not additional stock blanks)` : ''}`;
     const writeHeading = (continued: boolean) => {
       setPdfFontSize(doc, 9);
       doc.setFont('helvetica', 'bold');
@@ -212,7 +226,7 @@ async function loadSvgAsPngDataUrl(path: string, targetHeight: number): Promise<
 async function getWatermarkLogoDataUrl(): Promise<string | null> {
   if (!watermarkLogoPromise) {
     // Horizontal lockup renders best as a compact footer watermark on white PDF pages.
-    watermarkLogoPromise = loadSvgAsPngDataUrl('/branding/CarvdStudio-Horizontal.svg', 20);
+    watermarkLogoPromise = loadSvgAsPngDataUrl('./branding/CarvdStudio-Horizontal.svg', 20);
   }
   return watermarkLogoPromise;
 }
@@ -259,21 +273,35 @@ function drawBoardDiagram(
 ): void {
   const rotateBoard = options?.rotateBoard === true;
   const title = options?.title ?? `${stockName} - Board #${board.boardIndex}`;
-  const headerHeight = 34;
   setPdfFontSize(doc, 12);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(0, 0, 0);
-  doc.text(title, area.x, area.y + 14);
+  const wrappedTitle = doc.splitTextToSize(title, area.width) as string[];
+  // Bound unusually long user names so the diagram retains usable drawing space.
+  const titleLines = wrappedTitle.slice(0, 3);
+  if (wrappedTitle.length > titleLines.length) {
+    let last = titleLines[titleLines.length - 1];
+    while (last.length > 0 && doc.getTextWidth(`${last}...`) > area.width) last = last.slice(0, -1);
+    titleLines[titleLines.length - 1] = `${last}...`;
+  }
+  titleLines.forEach((line, index) => doc.text(line, area.x, area.y + 14 + index * 17));
 
   setPdfFontSize(doc, 9);
   doc.setFont('helvetica', 'normal');
   const dims = `${formatMeasurementWithUnit(board.stockLength, units)} × ${formatMeasurementWithUnit(board.stockWidth, units)}`;
-  doc.text(dims, area.x, area.y + 30);
-  doc.text(
+  const metadataY = area.y + 14 + titleLines.length * 17;
+  const metadataGap = 16;
+  const metadataWidth = (area.width - metadataGap) / 2;
+  const dimensionLines = doc.splitTextToSize(dims, metadataWidth) as string[];
+  const summaryLines = doc.splitTextToSize(
     `${board.placements.length} part${board.placements.length !== 1 ? 's' : ''} | ${board.utilizationPercent.toFixed(1)}% utilization`,
-    area.x + area.width - 150,
-    area.y + 14
+    metadataWidth
+  ) as string[];
+  dimensionLines.forEach((line, index) => doc.text(line, area.x, metadataY + index * 14));
+  summaryLines.forEach((line, index) =>
+    doc.text(line, area.x + area.width, metadataY + index * 14, { align: 'right' })
   );
+  const headerHeight = metadataY - area.y + Math.max(dimensionLines.length, summaryLines.length) * 14 + 4;
 
   const legendRowHeight = 13;
   const legendHeaderHeight = 16;
@@ -466,7 +494,7 @@ function drawBoardDiagram(
   doc.setFont('helvetica', 'bold');
   setPdfFontSize(doc, 8);
   doc.setTextColor(0, 0, 0);
-  doc.text('\u2610', colCheck, legendY + 11);
+  drawChecklistBox(doc, colCheck, legendY + 11, 7);
   doc.text('#', colNum, legendY + 11);
   doc.text('Part', colName, legendY + 11);
   doc.text('Dimensions', colDims, legendY + 11);
@@ -615,6 +643,7 @@ export async function exportCutListToPdf(
   cutList: CutList,
   options: ExportOptions
 ): Promise<{ success: boolean; filePath?: string; error?: string; canceled?: boolean }> {
+  if (cutList.isStale) return { success: false, error: 'Regenerate the outdated cut list before exporting.' };
   const { projectName, units } = options;
   const partBoardMap = buildPartBoardMap(cutList.stockBoards);
 
@@ -664,7 +693,7 @@ export async function exportCutListToPdf(
   doc.rect(margin, y - 12, contentWidth, 18, 'F');
   setPdfFontSize(doc, 9);
   doc.setFont('helvetica', 'bold');
-  doc.text('\u2610', colX[0], y);
+  drawChecklistBox(doc, colX[0], y, 7);
   doc.text('Qty', colX[1], y);
   doc.text('Part IDs + Names', colX[2], y);
   if (!stackedDimensions) {
@@ -737,10 +766,15 @@ export async function exportCutListToPdf(
 
   y = drawFabricationOperations(
     doc,
-    [...grouped, ...groupCutInstructions(cutList.postGlueUpInstructions ?? [])],
+    [
+      ...grouped,
+      ...groupCutInstructions(cutList.postGlueUpInstructions ?? []),
+      ...groupCutInstructions(cutList.postPurchaseInstructions ?? [])
+    ],
     units,
     y,
-    watermarkLogoDataUrl
+    watermarkLogoDataUrl,
+    cutList.validationIssues ?? cutList.bypassedIssues
   );
 
   addWatermark(doc, pageWidth, pageHeight, watermarkLogoDataUrl);
@@ -770,6 +804,99 @@ export async function exportCutListToPdf(
   }
 }
 
+/** Wrap shopping text within its columns and repeat headers on continuation pages. */
+function drawShoppingTable(
+  doc: jsPDF,
+  rows: string[][],
+  labels: string[],
+  columnOffsets: number[],
+  y: number,
+  pageWidth: number,
+  pageHeight: number,
+  margin: number,
+  logo: string | null
+): number {
+  const columns = columnOffsets.map((offset) => margin + offset);
+  const widths = columns.map((x, index) => (columns[index + 1] ?? pageWidth - margin) - x - 10);
+  const lineHeight = 14;
+  const bottom = pageHeight - 80;
+  const header = () => {
+    setPdfFontSize(doc, 9);
+    doc.setFont('helvetica', 'bold');
+    doc.setFillColor(240, 240, 240);
+    doc.rect(margin, y - 12, pageWidth - margin * 2, 18, 'F');
+    drawChecklistBox(doc, margin + 5, y, 7);
+    labels.forEach((label, index) => doc.text(label, columns[index], y));
+    y += 20;
+    doc.setFont('helvetica', 'normal');
+  };
+  const nextPage = () => {
+    addWatermark(doc, pageWidth, pageHeight, logo);
+    doc.addPage();
+    y = margin + 20;
+    header();
+  };
+  if (y + 34 > bottom) nextPage();
+  else header();
+
+  for (const row of rows) {
+    const cells = row.map((text, index) => doc.splitTextToSize(text, widths[index]) as string[]);
+    const lineCount = Math.max(1, ...cells.map((lines) => lines.length));
+    const fullPageCapacity = Math.floor((bottom - (margin + 40)) / lineHeight) + 1;
+    // Keep ordinary rows together; exceptionally long notes continue with headers.
+    if (lineCount <= fullPageCapacity && y + (lineCount - 1) * lineHeight > bottom) nextPage();
+    let offset = 0;
+    while (offset < lineCount) {
+      const capacity = Math.floor((bottom - y) / lineHeight) + 1;
+      if (capacity < 1) {
+        nextPage();
+        continue;
+      }
+      const count = Math.min(capacity, lineCount - offset);
+      if (offset === 0) drawChecklistBox(doc, margin + 5, y, 7);
+      cells.forEach((lines, column) => {
+        lines
+          .slice(offset, offset + count)
+          .forEach((line, index) => doc.text(line, columns[column], y + index * lineHeight));
+      });
+      offset += count;
+      y += count * lineHeight + 6;
+      if (offset < lineCount) nextPage();
+    }
+  }
+  // Keep the subtotal and grand total clear of the footer, including on a full last page.
+  if (y + 60 > bottom) {
+    addWatermark(doc, pageWidth, pageHeight, logo);
+    doc.addPage();
+    y = margin + 20;
+  }
+  return y;
+}
+
+function customShoppingRows(items: CustomShoppingItem[]): string[][] {
+  return items.map((item) => [
+    item.name,
+    item.description || '',
+    String(item.quantity),
+    `$${item.unitPrice.toFixed(2)}`,
+    `$${(item.quantity * item.unitPrice).toFixed(2)}`
+  ]);
+}
+
+function stockShoppingRows(cutList: CutList, units: 'imperial' | 'metric'): string[][] {
+  return cutList.statistics.byStock.map((summary) => [
+    summary.stockName,
+    [summary.stockLength, summary.stockWidth, summary.stockThickness]
+      .map((value) =>
+        summary.form === 'insert' ? formatReadableMeasurement(value, 'metric') : formatMeasurementWithUnit(value, units)
+      )
+      .join(' x '),
+    String(summary.boardsNeeded),
+    `$${summary.pricePerUnit.toFixed(2)}/${summary.pricingUnit === 'board_foot' ? 'bf' : 'ea'}`,
+    `$${summary.cost.toFixed(2)}`
+  ]);
+}
+
 /**
  * Export shopping list to PDF
  */
@@ -778,6 +905,7 @@ export async function exportShoppingListToPdf(
   customShoppingItems: CustomShoppingItem[],
   options: ExportOptions
 ): Promise<{ success: boolean; filePath?: string; error?: string; canceled?: boolean }> {
+  if (cutList.isStale) return { success: false, error: 'Regenerate the outdated cut list before exporting.' };
   const { projectName, units } = options;
 
   const doc = new jsPDF({
@@ -810,41 +938,17 @@ export async function exportShoppingListToPdf(
   doc.text('Lumber & Sheet Goods', margin, y);
   y += 25;
 
-  // Table header
-  doc.setFillColor(240, 240, 240);
-  doc.rect(margin, y - 12, contentWidth, 18, 'F');
-  setPdfFontSize(doc, 9);
-  doc.text('\u2610', margin + 5, y);
-  doc.text('Stock', margin + 22, y);
-  doc.text('Dimensions', margin + 176, y);
-  doc.text('Qty', margin + 332, y);
-  doc.text('Unit Price', margin + 378, y);
-  doc.text('Total', margin + 456, y);
-  y += 18;
-
-  doc.setFont('helvetica', 'normal');
-
-  for (const summary of cutList.statistics.byStock) {
-    if (y > pageHeight - 80) {
-      addWatermark(doc, pageWidth, pageHeight, watermarkLogoDataUrl);
-      doc.addPage();
-      y = margin + 20;
-    }
-
-    const dims = `${formatMeasurementWithUnit(summary.stockLength, units)} x ${formatMeasurementWithUnit(summary.stockWidth, units)} x ${formatMeasurementWithUnit(summary.stockThickness, units)}`;
-    const unitPrice =
-      summary.pricingUnit === 'board_foot'
-        ? `$${summary.pricePerUnit.toFixed(2)}/bf`
-        : `$${summary.pricePerUnit.toFixed(2)}/ea`;
-
-    drawChecklistBox(doc, margin + 5, y, 7);
-    doc.text(summary.stockName, margin + 22, y);
-    doc.text(dims, margin + 176, y);
-    doc.text(summary.boardsNeeded.toString(), margin + 332, y);
-    doc.text(unitPrice, margin + 378, y);
-    doc.text(`$${summary.cost.toFixed(2)}`, margin + 456, y);
-    y += 16;
-  }
+  y = drawShoppingTable(
+    doc,
+    stockShoppingRows(cutList, units),
+    ['Stock', 'Dimensions', 'Qty', 'Unit Price', 'Total'],
+    [22, 176, 332, 378, 456],
+    y,
+    pageWidth,
+    pageHeight,
+    margin,
+    watermarkLogoDataUrl
+  );
 
   // Lumber subtotal
   y += 5;
@@ -855,43 +959,27 @@ export async function exportShoppingListToPdf(
 
   // Custom items section
   if (customShoppingItems.length > 0) {
+    if (y + 80 > pageHeight - 80) {
+      addWatermark(doc, pageWidth, pageHeight, watermarkLogoDataUrl);
+      doc.addPage();
+      y = margin + 20;
+    }
     setPdfFontSize(doc, 14);
     doc.text('Other Items', margin, y);
     y += 25;
 
-    // Table header
-    doc.setFillColor(240, 240, 240);
-    doc.rect(margin, y - 12, contentWidth, 18, 'F');
-    setPdfFontSize(doc, 9);
-    doc.text('\u2610', margin + 5, y);
-    doc.text('Item', margin + 22, y);
-    doc.text('Description', margin + 190, y);
-    doc.text('Qty', margin + 332, y);
-    doc.text('Unit Price', margin + 378, y);
-    doc.text('Total', margin + 456, y);
-    y += 18;
-
-    doc.setFont('helvetica', 'normal');
-
-    let customTotal = 0;
-    for (const item of customShoppingItems) {
-      if (y > pageHeight - 80) {
-        addWatermark(doc, pageWidth, pageHeight, watermarkLogoDataUrl);
-        doc.addPage();
-        y = margin + 20;
-      }
-
-      const itemTotal = item.quantity * item.unitPrice;
-      customTotal += itemTotal;
-
-      drawChecklistBox(doc, margin + 5, y, 7);
-      doc.text(item.name, margin + 22, y);
-      doc.text(item.description || '', margin + 190, y);
-      doc.text(item.quantity.toString(), margin + 332, y);
-      doc.text(`$${item.unitPrice.toFixed(2)}`, margin + 378, y);
-      doc.text(`$${itemTotal.toFixed(2)}`, margin + 456, y);
-      y += 16;
-    }
+    y = drawShoppingTable(
+      doc,
+      customShoppingRows(customShoppingItems),
+      ['Item', 'Description', 'Qty', 'Unit Price', 'Total'],
+      [22, 184, 332, 378, 456],
+      y,
+      pageWidth,
+      pageHeight,
+      margin,
+      watermarkLogoDataUrl
+    );
+    const customTotal = customShoppingItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
 
     // Custom items subtotal
     y += 5;
@@ -947,6 +1035,7 @@ export async function exportProjectReportToPdf(
   cutList: CutList,
   options: ProjectReportOptions
 ): Promise<{ success: boolean; filePath?: string; error?: string; canceled?: boolean }> {
+  if (cutList.isStale) return { success: false, error: 'Regenerate the outdated cut list before exporting.' };
   const { projectName, projectNotes, thumbnailData, units, customShoppingItems } = options;
   const partBoardMap = buildPartBoardMap(cutList.stockBoards);
 
@@ -1084,7 +1173,7 @@ export async function exportProjectReportToPdf(
   doc.rect(margin, y - 12, contentWidth, 18, 'F');
   setPdfFontSize(doc, 9);
   doc.setFont('helvetica', 'bold');
-  doc.text('\u2610', colX2[0], y);
+  drawChecklistBox(doc, colX2[0], y, 7);
   doc.text('Qty', colX2[1], y);
   doc.text('Part IDs + Names', colX2[2], y);
   if (!stackedDimensions) {
@@ -1151,10 +1240,15 @@ export async function exportProjectReportToPdf(
 
   y = drawFabricationOperations(
     doc,
-    [...grouped, ...groupCutInstructions(cutList.postGlueUpInstructions ?? [])],
+    [
+      ...grouped,
+      ...groupCutInstructions(cutList.postGlueUpInstructions ?? []),
+      ...groupCutInstructions(cutList.postPurchaseInstructions ?? [])
+    ],
     units,
     y,
-    watermarkLogoDataUrl
+    watermarkLogoDataUrl,
+    cutList.validationIssues ?? cutList.bypassedIssues
   );
 
   addWatermark(doc, pageWidth, pageHeight, watermarkLogoDataUrl);
@@ -1228,40 +1322,17 @@ export async function exportProjectReportToPdf(
   doc.text('Lumber & Sheet Goods', margin, y);
   y += 20;
 
-  doc.setFillColor(240, 240, 240);
-  doc.rect(margin, y - 12, contentWidth, 18, 'F');
-  setPdfFontSize(doc, 9);
-  doc.text('\u2610', margin + 5, y);
-  doc.text('Stock', margin + 20, y);
-  doc.text('Dimensions', margin + 162, y);
-  doc.text('Qty', margin + 314, y);
-  doc.text('Unit Price', margin + 362, y);
-  doc.text('Total', margin + 452, y);
-  y += 18;
-
-  doc.setFont('helvetica', 'normal');
-
-  for (const summary of cutList.statistics.byStock) {
-    if (y > pageHeight - 100) {
-      addWatermark(doc, pageWidth, pageHeight, watermarkLogoDataUrl);
-      doc.addPage();
-      y = margin + 20;
-    }
-
-    const dims = `${formatMeasurementWithUnit(summary.stockLength, units)} x ${formatMeasurementWithUnit(summary.stockWidth, units)} x ${formatMeasurementWithUnit(summary.stockThickness, units)}`;
-    const unitPrice =
-      summary.pricingUnit === 'board_foot'
-        ? `$${summary.pricePerUnit.toFixed(2)}/bf`
-        : `$${summary.pricePerUnit.toFixed(2)}/ea`;
-
-    drawChecklistBox(doc, margin + 5, y, 7);
-    doc.text(summary.stockName, margin + 20, y);
-    doc.text(dims, margin + 162, y);
-    doc.text(summary.boardsNeeded.toString(), margin + 314, y);
-    doc.text(unitPrice, margin + 362, y);
-    doc.text(`$${summary.cost.toFixed(2)}`, margin + 452, y);
-    y += 16;
-  }
+  y = drawShoppingTable(
+    doc,
+    stockShoppingRows(cutList, units),
+    ['Stock', 'Dimensions', 'Qty', 'Unit Price', 'Total'],
+    [20, 162, 314, 362, 452],
+    y,
+    pageWidth,
+    pageHeight,
+    margin,
+    watermarkLogoDataUrl
+  );
 
   y += 5;
   doc.setFont('helvetica', 'bold');
@@ -1271,39 +1342,26 @@ export async function exportProjectReportToPdf(
 
   // Custom items
   if (customShoppingItems.length > 0) {
+    if (y + 80 > pageHeight - 80) {
+      addWatermark(doc, pageWidth, pageHeight, watermarkLogoDataUrl);
+      doc.addPage();
+      y = margin + 20;
+    }
     setPdfFontSize(doc, 12);
     doc.text('Other Items', margin, y);
     y += 20;
 
-    doc.setFillColor(240, 240, 240);
-    doc.rect(margin, y - 12, contentWidth, 18, 'F');
-    setPdfFontSize(doc, 9);
-    doc.text('\u2610', margin + 5, y);
-    doc.text('Item', margin + 20, y);
-    doc.text('Description', margin + 178, y);
-    doc.text('Qty', margin + 314, y);
-    doc.text('Unit Price', margin + 362, y);
-    doc.text('Total', margin + 452, y);
-    y += 18;
-
-    doc.setFont('helvetica', 'normal');
-
-    for (const item of customShoppingItems) {
-      if (y > pageHeight - 80) {
-        addWatermark(doc, pageWidth, pageHeight, watermarkLogoDataUrl);
-        doc.addPage();
-        y = margin + 20;
-      }
-
-      const itemTotal = item.quantity * item.unitPrice;
-      drawChecklistBox(doc, margin + 5, y, 7);
-      doc.text(item.name, margin + 20, y);
-      doc.text(item.description || '', margin + 178, y);
-      doc.text(item.quantity.toString(), margin + 314, y);
-      doc.text(`$${item.unitPrice.toFixed(2)}`, margin + 362, y);
-      doc.text(`$${itemTotal.toFixed(2)}`, margin + 452, y);
-      y += 16;
-    }
+    y = drawShoppingTable(
+      doc,
+      customShoppingRows(customShoppingItems),
+      ['Item', 'Description', 'Qty', 'Unit Price', 'Total'],
+      [22, 184, 332, 378, 456],
+      y,
+      pageWidth,
+      pageHeight,
+      margin,
+      watermarkLogoDataUrl
+    );
 
     y += 5;
     doc.setFont('helvetica', 'bold');
@@ -1355,6 +1413,7 @@ export async function exportDiagramsToPdf(
   cutList: CutList,
   options: ExportOptions
 ): Promise<{ success: boolean; filePath?: string; error?: string; canceled?: boolean }> {
+  if (cutList.isStale) return { success: false, error: 'Regenerate the outdated cut list before exporting.' };
   const { projectName, units } = options;
 
   // Group boards by stock
@@ -1459,9 +1518,11 @@ export async function exportDiagramsToPdf(
  * Export cut list to CSV with watermark header
  */
 export function exportCutListToCsv(cutList: CutList, units: 'imperial' | 'metric'): string {
+  if (cutList.isStale) throw new Error('Regenerate the outdated cut list before exporting.');
   const grouped = [
     ...groupCutInstructions(cutList.instructions),
-    ...groupCutInstructions(cutList.postGlueUpInstructions ?? [])
+    ...groupCutInstructions(cutList.postGlueUpInstructions ?? []),
+    ...groupCutInstructions(cutList.postPurchaseInstructions ?? [])
   ];
   const partBoardMap = buildPartBoardMap(cutList.stockBoards);
   const unitLabel = units === 'imperial' ? 'inches' : 'mm';
@@ -1514,11 +1575,16 @@ export function exportCutListToCsv(cutList: CutList, units: 'imperial' | 'metric
         csvEscape(fabricationSummary),
         group.items[0].stage === 'post_glue_up'
           ? 'After glue-up - finished panel (not an additional stock blank)'
-          : 'Stock blank'
+          : group.items[0].stage === 'post_purchase'
+            ? 'After purchase - component machining (not a stock blank)'
+            : 'Stock blank'
       ].join(',')
     );
   }
 
+  for (const issue of cutList.validationIssues ?? cutList.bypassedIssues ?? []) {
+    rows.push(['FABRICATION WARNING', csvEscape(issue.partName), csvEscape(issue.message)].join(','));
+  }
   return rows.join('\n');
 }
 
@@ -1530,6 +1596,7 @@ export function exportShoppingListToCsv(
   customShoppingItems: CustomShoppingItem[],
   units: 'imperial' | 'metric'
 ): string {
+  if (cutList.isStale) throw new Error('Regenerate the outdated cut list before exporting.');
   const unitLabel = units === 'imperial' ? 'inches' : 'mm';
   const lines = [
     getCsvHeader(),
@@ -1541,7 +1608,11 @@ export function exportShoppingListToCsv(
   ];
 
   for (const summary of cutList.statistics.byStock) {
-    const dims = `${formatMeasurementWithUnit(summary.stockLength, units)} x ${formatMeasurementWithUnit(summary.stockWidth, units)} x ${formatMeasurementWithUnit(summary.stockThickness, units)}`;
+    const dims = [summary.stockLength, summary.stockWidth, summary.stockThickness]
+      .map((value) =>
+        summary.form === 'insert' ? formatReadableMeasurement(value, 'metric') : formatMeasurementWithUnit(value, units)
+      )
+      .join(' x ');
     const unitPrice =
       summary.pricingUnit === 'board_foot'
         ? `$${summary.pricePerUnit.toFixed(2)}/bf`

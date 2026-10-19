@@ -1,11 +1,13 @@
+import { MIN_DIMENSION_INCHES } from '../../constants';
 import { FractionInput } from '@renderer/components/common/FractionInput';
 import { HelpTooltip } from '@renderer/components/common/HelpTooltip';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@renderer/components/ui/accordion';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
 import { Part, Stock } from '@renderer/types';
-import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
+import { formatReadableMeasurement } from '@renderer/utils/fractions';
 import { KeyboardEvent, useEffect, useState } from 'react';
+import { isStockDimensionFixed } from '../../../../shared/stock';
 
 interface SinglePartBasicsCardProps {
   selectedPart: Part;
@@ -113,30 +115,48 @@ export function SinglePartBasicsCard({
         <div className="dimension-inputs flex items-center gap-1">
           <FractionInput
             key={`${selectedPart.id}-length`}
+            ariaLabel="Part length"
             value={selectedPart.length}
             onChange={onLengthChange}
-            min={0.5}
+            min={MIN_DIMENSION_INCHES}
+            disabled={Boolean(assignedStock && isStockDimensionFixed(assignedStock, 'length'))}
           />
           <span>×</span>
           <FractionInput
             key={`${selectedPart.id}-width`}
+            ariaLabel="Part width"
             value={selectedPart.width}
             onChange={onWidthChange}
-            min={0.5}
+            min={MIN_DIMENSION_INCHES}
+            disabled={Boolean(assignedStock && isStockDimensionFixed(assignedStock, 'width'))}
           />
           <span>×</span>
           <FractionInput
             key={`${selectedPart.id}-thickness`}
+            ariaLabel="Part thickness"
             value={selectedPart.thickness}
             onChange={onThicknessChange}
-            min={0.25}
+            min={MIN_DIMENSION_INCHES}
+            disabled={Boolean(assignedStock && isStockDimensionFixed(assignedStock, 'thickness'))}
           />
         </div>
         {isDimensionConstrained && assignedStock && (
           <p className="text-[11px] text-text-muted mt-1">
-            Max: {formatMeasurementWithUnit(assignedStock.length, units)} ×{' '}
-            {formatMeasurementWithUnit(assignedStock.width, units)} ×{' '}
-            {formatMeasurementWithUnit(assignedStock.thickness, units)} (from {assignedStock.name})
+            {assignedStock.form === 'insert'
+              ? assignedStock.insertKind === 'loose_tenon'
+                ? 'Prepared size'
+                : 'Purchased size'
+              : 'Max'}
+            :{' '}
+            {[assignedStock.length, assignedStock.width, assignedStock.thickness]
+              .map((value) =>
+                formatReadableMeasurement(
+                  value,
+                  assignedStock.form === 'insert' && assignedStock.insertKind !== 'loose_tenon' ? 'metric' : units
+                )
+              )
+              .join(' × ')}{' '}
+            (from {assignedStock.name})
           </p>
         )}
       </div>
@@ -156,18 +176,21 @@ export function SinglePartBasicsCard({
               <FractionInput
                 key={`${selectedPart.id}-posX`}
                 value={selectedPart.position.x}
+                min={-Infinity}
                 onChange={onPositionXChange}
               />
               <span>,</span>
               <FractionInput
                 key={`${selectedPart.id}-posY`}
                 value={selectedPart.position.y}
+                min={-Infinity}
                 onChange={onPositionYChange}
               />
               <span>,</span>
               <FractionInput
                 key={`${selectedPart.id}-posZ`}
                 value={selectedPart.position.z}
+                min={-Infinity}
                 onChange={onPositionZChange}
               />
             </div>

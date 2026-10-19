@@ -12,7 +12,7 @@ import { getAncestorGroupIds } from '../../utils/interactionSelection';
 import { showSavedFileToast } from '../../utils/fileToast';
 import { logger } from '../../utils/logger';
 import { analytics } from '../../utils/analytics';
-import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { formatFabricationMeasurement as formatMeasurementWithUnit } from '../../utils/fractions';
 import { CutList, CutPlacement, StockBoard } from '../../types';
 import { DropdownButton, DropdownItem } from '../common/DropdownButton';
 import { StockBoardDiagram } from './StockBoardDiagram';

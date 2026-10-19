@@ -1,5 +1,14 @@
 import { test, expect } from "@playwright/test";
 
+test.beforeEach(async ({ page }) => {
+  // Navigation should remain testable when optional third-party resources hang.
+  // Local styles, screenshots and application requests still load normally.
+  await page.route(
+    /^https:\/\/(?:fonts\.googleapis\.com|fonts\.gstatic\.com|va\.vercel-scripts\.com)\//,
+    (route) => route.abort(),
+  );
+});
+
 test.describe("Navigation", () => {
   test("homepage loads successfully", async ({ page }) => {
     await page.goto("/");
@@ -27,19 +36,27 @@ test.describe("Navigation", () => {
     await expect(page).toHaveURL("/docs");
   });
 
-  test("documents round cuts and paired dowel joinery without CNC promises", async ({
+  test("joinery guides link the modeled workflow to fabrication limits", async ({
     page,
   }) => {
     await page.goto("/docs/joinery");
-
     await expect(
-      page.getByRole("heading", { name: "Round cuts and dowel joints" }),
+      page.getByRole("heading", { name: "Custom Cuts & Joinery", exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByText(/round holes, countersinks, counterbores/i),
+      page.getByRole("heading", { name: "Dowels, biscuits & loose tenons" }),
     ).toBeVisible();
     await expect(
-      page.getByText(/does not generate CNC or G-code/i),
+      page.getByText(/does not produce CNC toolpaths or G-code/),
+    ).toBeVisible();
+    await page
+      .getByRole("link", { name: "Cut List Generation", exact: true })
+      .last()
+      .click();
+    await expect(page).toHaveURL("/docs/cut-lists");
+    await expect(page.getByText(/After purchase — component/)).toBeVisible();
+    await expect(
+      page.getByText(/Custom items belong to the project/),
     ).toBeVisible();
   });
 
@@ -47,6 +64,47 @@ test.describe("Navigation", () => {
     await page.goto("/features");
     await page.click('header a[href="/"]');
     await expect(page).toHaveURL("/");
+  });
+
+  test("joint recipes keep wide tables inside the mobile reading column", async ({
+    page,
+    isMobile,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/docs/joint-recipes#cutter-sampler", {
+      waitUntil: "domcontentloaded",
+    });
+    const sampler = page.locator("#cutter-sampler");
+    await expect(sampler.getByRole("table")).toBeVisible();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(390);
+    await sampler.scrollIntoViewIfNeeded();
+    const screenshot = sampler.getByRole("img");
+    await screenshot.scrollIntoViewIfNeeded();
+    await expect
+      .poll(() =>
+        screenshot.evaluate((image: HTMLImageElement) => image.naturalWidth),
+      )
+      .toBeGreaterThan(0);
+    const tableRegion = sampler.getByRole("region", {
+      name: "Cutter sampler machining dimensions",
+    });
+    if (isMobile) {
+      // Mobile coverage verifies scroll containment; desktop browsers also
+      // exercise hardware-keyboard input.
+      await tableRegion.evaluate((region) => {
+        region.scrollLeft = region.scrollWidth;
+      });
+    } else {
+      await tableRegion.focus();
+      await expect(tableRegion).toBeFocused();
+      await page.keyboard.press("ArrowRight", { delay: 100 });
+    }
+    await expect
+      .poll(() => tableRegion.evaluate((region) => region.scrollLeft))
+      .toBeGreaterThan(0);
+    expect(await page.evaluate(() => window.scrollX)).toBe(0);
   });
 
   test("404 page shows for unknown routes", async ({ page }) => {

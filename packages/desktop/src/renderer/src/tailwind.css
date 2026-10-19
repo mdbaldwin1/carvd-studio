@@ -309,11 +309,17 @@
 }
 
 [data-sonner-toaster] [data-sonner-toast].carvd-toast {
-  pointer-events: auto !important;
+  pointer-events: none !important;
   background: var(--color-surface) !important;
   border: 1px solid var(--color-border) !important;
   color: var(--color-text) !important;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.28) !important;
+}
+
+/* Sonner keeps hidden stack entries mounted. Only visible, live toasts may
+   intercept input; exited entries must not block controls beneath them. */
+[data-sonner-toaster] [data-sonner-toast].carvd-toast[data-visible='true']:not([data-removed='true']) {
+  pointer-events: auto !important;
 }
 
 [data-sonner-toaster] [data-sonner-toast].carvd-toast [data-title] {

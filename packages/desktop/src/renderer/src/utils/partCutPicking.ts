@@ -357,6 +357,10 @@ export function isTargetValidForDraft(target: PartFeatureTarget, draft: FeatureD
 
   if (draft.mode === 'edge_profile') return target.type === 'edge';
 
+  if (['mortise', 'cutout', 'groove', 'stopped_groove'].includes(draft.cutType)) {
+    return target.type === 'face' && ['top_face', 'bottom_face', 'front_face', 'back_face'].includes(target.face);
+  }
+
   if (draft.cutType === 'corner_notch') {
     // Every CornerTarget is front/back + left/right; none contains "top" or
     // "bottom", so testing for those offered a blind corner notch no pick

@@ -197,8 +197,8 @@ export function validateCircularCut(feature: CircularCutFeature, part: Part): st
   if (!Number.isFinite(feature.parameters.diameter) || feature.parameters.diameter <= 0)
     return 'Hole diameter must be greater than zero.';
   if (!Number.isFinite(feature.parameters.tilt) || feature.parameters.tilt < 0 || feature.parameters.tilt >= 90)
-    return 'Hole tilt must be at least 0° and less than 90°.';
-  if (!Number.isFinite(feature.parameters.direction)) return 'Hole tilt direction must be a finite angle.';
+    return 'Drill angle from face must be greater than 0° and at most 90°.';
+  if (!Number.isFinite(feature.parameters.direction)) return 'Drill direction across face must be a finite angle.';
   if (
     !Number.isFinite(feature.placement.primary) ||
     !Number.isFinite(feature.placement.secondary) ||
@@ -301,7 +301,7 @@ export function validateCircularCut(feature: CircularCutFeature, part: Part): st
       feature.cutType === 'countersink' ? Math.tan(degrees(feature.parameters.countersink!.includedAngle) / 2) : 0;
     const ellipseDenominator = cosine * cosine - taper * taper * sine * sine;
     if (ellipseDenominator <= 1e-12)
-      return 'Countersink tilt and angle must form a bounded entry on the selected face.';
+      return 'The drill angle from face and countersink included angle must form a bounded entry on the selected face.';
     const centerShift = (-radius * taper * sine) / ellipseDenominator;
     const alongRadius = (radius * cosine) / ellipseDenominator;
     const acrossRadius = (radius * cosine) / Math.sqrt(ellipseDenominator);
@@ -340,11 +340,33 @@ export function validateCircularCut(feature: CircularCutFeature, part: Part): st
     const pilotEntrySupport = (normal: Point3) =>
       dot(normal, member.entryPoint) +
       Math.hypot((dot(normal, along) * pilotRadius) / cosine, dot(normal, across) * pilotRadius);
+    // A straight through-bore may start in air above a tenon's recessed
+    // cheek. Its modeled cylinder still cuts the tongue; test the footprint
+    // on that actual cheek rather than rejecting the removed shoulder stock.
+    let stockEntry = member.entryPoint;
     if (
-      !fitsRemainingStock(part, entryCenter, (normal) =>
+      feature.cutType === 'round_hole' &&
+      feature.parameters.depthMode === 'through' &&
+      Math.abs(feature.parameters.tilt ?? 0) < 1e-9 &&
+      (feature.target.face === 'top_face' || feature.target.face === 'bottom_face')
+    ) {
+      for (const cut of part.features ?? []) {
+        if (!cut.enabled || cut.kind !== 'rect_cut' || cut.cutType !== 'tenon') continue;
+        const side = cut.target.type === 'face' && cut.target.face === 'left_end' ? -1 : 1;
+        const shoulder = part.length / 2 - cut.parameters.size.length;
+        if (side * stockEntry.x - pilotRadius < shoulder - 1e-9) continue;
+        stockEntry = {
+          ...stockEntry,
+          y: ((feature.target.face === 'top_face' ? 1 : -1) * Number(cut.parameters.depth)) / 2
+        };
+      }
+    }
+    const stockRecessEntry = stockEntry === member.entryPoint ? entryCenter : stockEntry;
+    if (
+      !fitsRemainingStock(part, stockRecessEntry, (normal) =>
         Math.hypot(dot(normal, along) * alongRadius, dot(normal, across) * acrossRadius)
       ) ||
-      !fitsRemainingStock(part, member.entryPoint, (normal) =>
+      !fitsRemainingStock(part, stockEntry, (normal) =>
         Math.hypot((dot(normal, along) * pilotRadius) / cosine, dot(normal, across) * pilotRadius)
       )
     )
@@ -415,6 +437,15 @@ export function validateCircularCut(feature: CircularCutFeature, part: Part): st
 }
 
 export function validateRoundedCut(feature: RoundedCutFeature, part: Part): string | null {
+  if (
+    feature.parameters.plateJoiner &&
+    (!['front_face', 'back_face'].includes(feature.target.face) ||
+      feature.placement.rotation !== 0 ||
+      feature.parameters.depthMode !== 'blind' ||
+      feature.cutType !== 'rounded_slot' ||
+      !(feature.parameters.depth && feature.parameters.depth <= feature.parameters.length / 2))
+  )
+    return 'A plate-joiner slot is a blind cut in a long edge, parallel to the board face, no deeper than half its opening length.';
   if (
     feature.target.face !== 'top_face' &&
     feature.target.face !== 'bottom_face' &&

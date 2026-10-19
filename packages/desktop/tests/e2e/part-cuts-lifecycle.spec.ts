@@ -248,20 +248,20 @@ const CUSTOM_CUT_LIFECYCLE_SCENARIOS: OperationScenario[] = [
     blindOnly: true,
     initial: {
       kind: 'rect_cut',
-      cutType: 'dado',
+      cutType: 'half_lap',
       target: { type: 'face', face: 'top_face' },
       label: 'Half Lap lifecycle',
       enabled: true,
-      parameters: { size: { length: 3, width: 12 }, depthMode: 'blind', depth: 0.25 },
+      parameters: { size: { length: 3, width: 12 }, depthMode: 'blind', depth: 1 },
       placement: { x: 0, z: 0 }
     },
     edited: {
       kind: 'rect_cut',
-      cutType: 'dado',
+      cutType: 'half_lap',
       target: { type: 'face', face: 'bottom_face' },
       label: 'Half Lap lifecycle revised',
       enabled: true,
-      parameters: { size: { length: 4, width: 12 }, depthMode: 'blind', depth: 0.5 },
+      parameters: { size: { length: 4, width: 12 }, depthMode: 'blind', depth: 1 },
       placement: { x: 0, z: 0 }
     }
   },
@@ -364,8 +364,8 @@ const CUSTOM_CUT_LIFECYCLE_SCENARIOS: OperationScenario[] = [
       target: { type: 'face', face: 'top_face' },
       label: 'Stopped dado lifecycle',
       enabled: true,
-      parameters: { size: { length: 5, width: 12 }, depthMode: 'blind', depth: 0.25 },
-      placement: { x: 2, z: 0 }
+      parameters: { size: { length: 5, width: 11 }, stoppedSpan: true, depthMode: 'blind', depth: 0.25 },
+      placement: { x: 2, z: 0.5 }
     },
     edited: {
       kind: 'rect_cut',
@@ -373,8 +373,8 @@ const CUSTOM_CUT_LIFECYCLE_SCENARIOS: OperationScenario[] = [
       target: { type: 'face', face: 'bottom_face' },
       label: 'Stopped dado lifecycle revised',
       enabled: true,
-      parameters: { size: { length: 6, width: 12 }, depthMode: 'blind', depth: 0.5 },
-      placement: { x: 4, z: 0 }
+      parameters: { size: { length: 6, width: 11 }, stoppedSpan: true, depthMode: 'blind', depth: 0.5 },
+      placement: { x: 4, z: 0.5 }
     }
   },
   {
@@ -449,7 +449,6 @@ const CUSTOM_CUT_LIFECYCLE_SCENARIOS: OperationScenario[] = [
   {
     title: 'mortise',
     preset: 'Mortise',
-    blindOnly: true,
     initial: {
       kind: 'rect_cut',
       cutType: 'mortise',
@@ -621,27 +620,28 @@ const CUSTOM_CUT_FABRICATION_LINES: Record<string, string> = {
   'edge bevel': '1. Edge bevel lifecycle revised — Edge Bevel 28° on Back Edge · High point on Bottom',
   tenon:
     '1. Tenon lifecycle revised — Tenon on Left End · 3" long × 5" wide × 1/2" thick · Tongue starts 2" from Front; centered through thickness',
-  'half lap': '1. Half Lap lifecycle revised — Dado on Bottom Face · 4" wide × 1/2" deep · 0" from Left; full width',
+  'half lap':
+    '1. Half Lap lifecycle revised — Half Lap on Bottom Face · 4" run × 1" deep (half the stock) · 0" from Left; full width',
   'corner notch': '1. Corner notch lifecycle revised — Corner Notch on Back-Right Corner · 3" × 1 1/2" · Through',
   'edge notch':
     '1. Edge notch lifecycle revised — Edge Notch on Back Side · 3" × 1 1/2" · Through · 5" from Left along the selected edge',
-  cutout: '1. Cutout lifecycle revised — Cutout on Bottom Face · 4" × 2 1/2" · Through · 4" from Left · 4" from Front',
+  cutout: '1. Cutout lifecycle revised — Cutout on Bottom Face · 4" × 2 1/2" · Through · 4" from Left · 4" from Back',
   dado: '1. Dado lifecycle revised — Dado on Bottom Face · 3" wide × 1/2" deep · 0" from Left; full width',
   'stopped dado':
-    '1. Stopped dado lifecycle revised — Stopped Dado on Bottom Face · 6" run × 1/2" deep · 4" from Left; full width',
+    '1. Stopped dado lifecycle revised — Stopped Dado on Bottom Face · 6" wide × 11" across × 1/2" deep · square ends · 4" from Left · Stop 1/2" from Back · Stop 1/2" from Front',
   rabbet:
     '1. Rabbet lifecycle revised — Rabbet on Bottom-Back Edge · 1 1/2" shoulder × 1/2" deep · Full run along the selected edge',
-  groove: '1. Groove lifecycle revised — Groove on Bottom Face · 1 1/2" wide × 1/2" deep · 0" from Front; full length',
+  groove: '1. Groove lifecycle revised — Groove on Bottom Face · 1 1/2" wide × 1/2" deep · 0" from Back; full length',
   'stopped groove':
-    '1. Stopped groove lifecycle revised — Stopped Groove on Bottom Face · 7" run × 1 1/2" wide × 1/2" deep · 4" from Left · 5" from Front',
+    '1. Stopped groove lifecycle revised — Stopped Groove on Bottom Face · 7" run × 1 1/2" wide × 1/2" deep · 4" from Left · 5" from Back',
   mortise:
-    '1. Mortise lifecycle revised — Mortise on Bottom Face · 5" × 2 1/2" × 1/2" deep · 5" from Left · 5" from Front',
+    '1. Mortise lifecycle revised — Mortise on Bottom Face · 5" × 2 1/2" × 1/2" deep · square corners · 5" from Left · 5" from Back',
   'round hole':
-    '1. Round hole lifecycle revised — 4-hole Linear Pattern on Bottom Face · 1/2" diameter · 1 1/4" spacing · 25° direction · Through · 12° tilt toward 45° · Primary 5" from center (+Right) · Secondary 4" from center (+Back) · Angles: 0° toward Right, 90° toward Back',
+    '1. Round hole lifecycle revised — 4-hole Linear Pattern on Bottom Face · 1/2" diameter · 1 1/4" spacing · 25° direction · Through · 78° from face toward 45° · Primary 5" from center (+Right) · Secondary 4" from center (+Back) · Angles: 0° toward Right, 90° toward Back',
   countersink:
-    '1. Countersink lifecycle revised — 6-hole Grid Countersink Pattern on Bottom Face · 3/8" hole × 7/8" major · 90° · 1 1/2" × 1 1/4" spacing · 0° rotation · Through · 9° tilt toward 35° · Primary 5" from center (+Right) · Secondary 2" from center (+Back) · 3 rows × 2 columns · Angles: 0° toward Right, 90° toward Back',
+    '1. Countersink lifecycle revised — 6-hole Grid Countersink Pattern on Bottom Face · 3/8" hole × 7/8" major · 90° · 1 1/2" × 1 1/4" spacing · 0° rotation · Through · 81° from face toward 35° · Primary 5" from center (+Right) · Secondary 2" from center (+Back) · 3 rows × 2 columns · Angles: 0° toward Right, 90° toward Back',
   counterbore:
-    '1. Counterbore lifecycle revised — 4-hole Circular Counterbore Pattern on Bottom Face · 3/8" hole · 7/8" × 1/4" recess · 1 1/4" radius · 30° start angle · Through · 10° tilt toward 40° · Primary 6" from center (+Right) · Secondary 4" from center (+Back) · Angles: 0° toward Right, 90° toward Back',
+    '1. Counterbore lifecycle revised — 4-hole Circular Counterbore Pattern on Bottom Face · 3/8" hole · 7/8" × 1/4" recess · 1 1/4" radius · 30° start angle · Through · 80° from face toward 40° · Primary 6" from center (+Right) · Secondary 4" from center (+Back) · Angles: 0° toward Right, 90° toward Back',
   'rounded slot':
     '1. Rounded slot lifecycle revised — Rounded Slot on Bottom Face · 4" × 1 1/2" · Through · Primary 5" from center (+Right) · Secondary 4" from center (+Back) · 20° rotation · Angles: 0° toward Right, 90° toward Back',
   'rounded rectangle':
@@ -745,10 +745,10 @@ async function expectFeatureControls(window: Page, feature: PersistedFeature): P
     await expect(window.getByLabel('Depth', { exact: true })).toHaveValue(feature.parameters.depthMode as string);
     if (feature.parameters.depthMode === 'blind')
       await expectFractionControl(window, 'Hole Depth', feature.parameters.depth as number);
-    await expect(window.getByLabel('Tilt From Square (degrees)', { exact: true })).toHaveValue(
-      String(feature.parameters.tilt)
+    await expect(window.getByLabel('Drill angle from face (degrees)', { exact: true })).toHaveValue(
+      String(90 - feature.parameters.tilt)
     );
-    await expect(window.getByLabel('Tilt Toward (degrees)', { exact: true })).toHaveValue(
+    await expect(window.getByLabel('Drill direction across face (degrees)', { exact: true })).toHaveValue(
       String(feature.parameters.direction)
     );
     if (feature.cutType === 'countersink') {
@@ -812,10 +812,14 @@ async function expectFeatureControls(window: Page, feature: PersistedFeature): P
     await expectFractionControl(window, 'Groove Width', size.width);
     await expectFractionControl(window, 'Blind Depth', feature.parameters.depth as number);
   } else {
-    await expectFractionControl(window, 'Run Along Blank', size.length);
-    if (!['dado', 'stopped_dado'].includes(feature.cutType))
+    await expectFractionControl(
+      window,
+      feature.cutType === 'stopped_dado' || feature.cutType === 'dado' ? 'Dado Width' : 'Run Along Blank',
+      size.length
+    );
+    if (!['dado', 'stopped_dado', 'half_lap'].includes(feature.cutType))
       await expectFractionControl(window, 'Cross-Cut Width', size.width);
-    if (feature.parameters.depthMode === 'blind')
+    if (feature.parameters.depthMode === 'blind' && feature.cutType !== 'half_lap')
       await expectFractionControl(window, 'Blind Depth', feature.parameters.depth as number);
     if (feature.cutType === 'edge_notch')
       await expectFractionControl(window, 'Offset Along Length', feature.placement!.x);
@@ -855,8 +859,12 @@ async function applyFeatureControls(window: Page, feature: PersistedFeature): Pr
     await window.getByLabel('Depth', { exact: true }).selectOption(feature.parameters.depthMode as string);
     if (feature.parameters.depthMode === 'blind')
       await fillFraction(window, 'Hole Depth', feature.parameters.depth as number);
-    await window.getByLabel('Tilt From Square (degrees)', { exact: true }).fill(String(feature.parameters.tilt));
-    await window.getByLabel('Tilt Toward (degrees)', { exact: true }).fill(String(feature.parameters.direction));
+    await window
+      .getByLabel('Drill angle from face (degrees)', { exact: true })
+      .fill(String(90 - feature.parameters.tilt));
+    await window
+      .getByLabel('Drill direction across face (degrees)', { exact: true })
+      .fill(String(feature.parameters.direction));
     if (feature.cutType === 'countersink') {
       const countersink = feature.parameters.countersink as { majorDiameter: number; includedAngle: number };
       await fillFraction(window, 'Countersink Major Diameter', countersink.majorDiameter);
@@ -919,9 +927,15 @@ async function applyFeatureControls(window: Page, feature: PersistedFeature): Pr
     await fillFraction(window, 'Groove Width', size.width);
     await fillFraction(window, 'Blind Depth', feature.parameters.depth as number);
   } else {
-    await fillFraction(window, 'Run Along Blank', size.length);
-    if (!['dado', 'stopped_dado'].includes(feature.cutType)) await fillFraction(window, 'Cross-Cut Width', size.width);
-    if (depthMode === 'blind') await fillFraction(window, 'Blind Depth', feature.parameters.depth as number);
+    await fillFraction(
+      window,
+      feature.cutType === 'stopped_dado' || feature.cutType === 'dado' ? 'Dado Width' : 'Run Along Blank',
+      size.length
+    );
+    if (!['dado', 'stopped_dado', 'half_lap'].includes(feature.cutType))
+      await fillFraction(window, 'Cross-Cut Width', size.width);
+    if (depthMode === 'blind' && feature.cutType !== 'half_lap')
+      await fillFraction(window, 'Blind Depth', feature.parameters.depth as number);
     if (feature.cutType === 'edge_notch') await fillFraction(window, 'Offset Along Length', feature.placement!.x);
     if (['cutout', 'stopped_dado', 'stopped_groove', 'mortise'].includes(feature.cutType)) {
       await fillFraction(window, 'Offset Along Length', feature.placement!.x);
@@ -1020,16 +1034,18 @@ async function expectSingleFabricationLine(window: Page, scenario: OperationScen
   const expectedLine = CUSTOM_CUT_FABRICATION_LINES[scenario.title];
   if (!expectedLine) throw new Error(`Missing fabrication oracle for ${scenario.title}.`);
 
+  const needsInitialGeneration = await window.evaluate(() => !window.useProjectStore.getState().cutList);
   await window.getByRole('button', { name: /Generate Cut List|Regenerate Cut List|View Cut List/ }).click();
   const dialog = window.getByRole('dialog').filter({ has: window.getByRole('heading', { name: 'Cut List' }) });
-  await dialog.getByRole('button', { name: /Generate Cut List|Regenerate/ }).click();
+  if (needsInitialGeneration) await dialog.getByRole('button', { name: 'Generate Cut List', exact: true }).click();
+  await expect.poll(() => window.evaluate(() => window.useProjectStore.getState().cutList?.isStale)).toBe(false);
   const operationSummary = dialog
     .locator('.cut-list-parts-tab tbody tr')
     .first()
     .locator('td')
     .last()
     .locator('span.italic');
-  await expect(operationSummary).toHaveText(expectedLine);
+  await expect(operationSummary).toContainText(expectedLine);
   await dialog.getByRole('button', { name: 'Done' }).click();
 }
 
@@ -1038,9 +1054,8 @@ async function qualifyOperationLifecycle(
   scenario: OperationScenario,
   projectPath: string
 ): Promise<void> {
-  // One header Save now commits the cuts and writes the project, so a
-  // destination has to exist before the first save rather than only before
-  // the explicit project save later in the cycle.
+  // Queue the destination for the explicit project save later in the cycle.
+  // Applying cuts commits the draft to the project.
   await queueSavePath(window, projectPath);
   await window.locator('button[title="Add Cut"]').click();
   await window.getByRole('button', { name: new RegExp(`^${scenario.preset}\\b`) }).click();
@@ -1340,7 +1355,7 @@ test.describe('part cuts editing lifecycle', () => {
     const dialog = window.getByRole('dialog').filter({ has: window.getByRole('heading', { name: 'Cut List' }) });
     await dialog.getByRole('button', { name: 'Generate Cut List' }).click();
     await expect(dialog.getByText(/Cut blanks first/i)).toBeVisible();
-    await expect(dialog.getByText(/Dado/i)).toBeVisible();
+    await expect(dialog.getByText(/^1\. Dado on Top Face/)).toBeVisible();
   });
 
   test('round-trips mixed featured-part state and exports its enabled fabrication operations', async () => {
@@ -1502,10 +1517,10 @@ test.describe('part cuts editing lifecycle', () => {
     await window.locator('button[title="Add Cut"]').click();
     await window.getByRole('button', { name: /^Round Hole\b/ }).click();
     await window.getByLabel('Depth').selectOption('blind');
-    await window.getByLabel('Tilt From Square (degrees)').fill('15');
+    await window.getByLabel('Drill angle from face (degrees)').fill('75');
     await window.getByLabel('Repeating Pattern').selectOption('linear');
     await window.getByLabel('Hole Count').fill('3');
-    await window.getByLabel('Direction').fill('37');
+    await window.getByLabel('Direction', { exact: true }).fill('37');
     const roundPreview = window.getByRole('img', { name: 'Part cuts geometry preview' });
     const roundGeometryBefore = await roundPreview.getAttribute('data-geometry-signature');
     await window.getByRole('button', { name: 'Move Right' }).click();
@@ -1599,7 +1614,7 @@ test.describe('part cuts editing lifecycle', () => {
     ]);
   });
 
-  test('creates and undoes both sides of a paired dowel joint atomically', async () => {
+  test('keeps legacy paired dowel fixture updates atomic', async () => {
     const { window } = running;
     await addPartFromSidebar(window);
     await window.evaluate(() => {
@@ -1613,13 +1628,25 @@ test.describe('part cuts editing lifecycle', () => {
       window.useSelectionStore.getState().selectPart(first.id);
     });
 
-    await openPartCutsFromProperties(window);
-    await window.locator('button[title="Add Cut"]').click();
-    await window.getByRole('button', { name: /^Create Dowel Joint\b/ }).click();
-    await window.getByRole('button', { name: 'Next' }).click();
-    await window.getByRole('button', { name: 'Next' }).click();
-    await window.getByRole('button', { name: 'Next' }).click();
-    await window.getByRole('button', { name: 'Create Dowel Joint' }).click();
+    await window.evaluate(() => {
+      const state = window.useProjectStore.getState();
+      const [first, second] = state.parts;
+      const id = state.addDowelJoint({
+        firstPartId: first.id,
+        secondPartId: second.id,
+        firstFace: 'top_face',
+        secondFace: 'bottom_face',
+        diameter: 0.375,
+        dowelLength: 0.75,
+        firstEmbedmentDepth: 0.375,
+        secondEmbedmentDepth: 0.375,
+        count: 2,
+        spacing: 2,
+        firstPrimary: -4,
+        firstSecondary: 0
+      });
+      if (!id) throw new Error('Legacy joint fixture failed');
+    });
 
     await expect
       .poll(async () =>

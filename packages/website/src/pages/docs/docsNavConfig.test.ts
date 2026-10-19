@@ -3,8 +3,8 @@ import { docPages, getNavSections, getPrevNext } from "./docsNavConfig";
 
 describe("docsNavConfig", () => {
   describe("docPages", () => {
-    it("has 16 doc pages", () => {
-      expect(docPages).toHaveLength(16);
+    it("has 18 doc pages", () => {
+      expect(docPages).toHaveLength(18);
     });
 
     it("all pages have slug, title, and section", () => {
@@ -47,9 +47,9 @@ describe("docsNavConfig", () => {
       expect(sections[1].pages).toHaveLength(4);
     });
 
-    it("Advanced Features has 4 pages", () => {
+    it("Advanced Features has 6 pages", () => {
       const sections = getNavSections();
-      expect(sections[2].pages).toHaveLength(4);
+      expect(sections[2].pages).toHaveLength(6);
     });
 
     it("Reference has 5 pages", () => {

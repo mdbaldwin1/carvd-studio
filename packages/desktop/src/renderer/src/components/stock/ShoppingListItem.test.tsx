@@ -31,6 +31,28 @@ describe('ShoppingListItem for dowel rod', () => {
     expect(screen.getByText(/Buy: 2 rods/)).toBeInTheDocument();
     expect(screen.getByText('$3.50/rod')).toBeInTheDocument();
   });
+  it('keeps a metric insert’s actual size in an imperial shopping list', () => {
+    renderRod({ form: 'insert', stockLength: 56 / 25.4, stockWidth: 23 / 25.4, stockThickness: 4 / 25.4 });
+    expect(screen.getByText('56mm × 23mm × 4mm')).toBeInTheDocument();
+  });
+
+  it('preserves prepared board sizes and charges per board', () => {
+    renderRod({ form: 'board', stockLength: 24, stockWidth: 0.47, stockThickness: 0.1675 });
+    expect(screen.getByText('24" × 0.47" × 0.1675"')).toBeInTheDocument();
+    expect(screen.getByText('$3.50/board')).toBeInTheDocument();
+    expect(screen.getByText(/Buy: 2 boards/)).toBeInTheDocument();
+  });
+
+  it('keeps sheet purchase quantity and pricing labeled as sheets', () => {
+    renderRod({ form: 'sheet' });
+    expect(screen.getByText('$3.50/sheet')).toBeInTheDocument();
+    expect(screen.getByText(/Buy: 2 sheets/)).toBeInTheDocument();
+  });
+
+  it('preserves non-fractional rod diameters', () => {
+    renderRod({ stockWidth: 8 / 25.4 });
+    expect(screen.getByText('0.315" dia × 36"')).toBeInTheDocument();
+  });
 
   it('says one rod in the singular', () => {
     renderRod({ boardsNeeded: 1, actualBoardsUsed: 1 });

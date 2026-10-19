@@ -100,6 +100,42 @@ describe('projectStore', () => {
 
   describe('parts', () => {
     describe('addPart', () => {
+      it('uses a dowel’s stock diameter and keeps an assigned insert on the bench', () => {
+        const rod = createTestStock({ id: 'rod', form: 'rod', width: 0.375, thickness: 0.375 });
+        const domino = createTestStock({
+          id: 'domino',
+          form: 'insert',
+          insertKind: 'domino',
+          length: 40 / 25.4,
+          width: 20 / 25.4,
+          thickness: 6 / 25.4
+        });
+        useProjectStore.setState({ stocks: [rod, domino] });
+        const store = useProjectStore.getState();
+        const id = store.addPart({ stockId: rod.id, length: 2 })!;
+        expect(useProjectStore.getState().parts[0]).toMatchObject({
+          length: 2,
+          width: 0.375,
+          thickness: 0.375,
+          blankShape: 'round',
+          position: { y: 0.1875 }
+        });
+        expect(store.updatePart(id, { stockId: domino.id })).toBe(true);
+        const part = useProjectStore.getState().parts[0];
+        expect(part.length).toBeCloseTo(40 / 25.4);
+        expect(part.position.y).toBeCloseTo(3 / 25.4);
+        expect(part.blankShape).toBe('domino');
+      });
+      it('places fresh stock clear of the work so it can be resized before assembly', () => {
+        const store = useProjectStore.getState();
+        store.addPart({ length: 24, width: 8, position: { x: 0, y: 0.375, z: 0 } });
+        const nextId = store.addPart()!;
+        const next = useProjectStore.getState().parts.find((part) => part.id === nextId)!;
+        expect(next.position.x - next.length / 2).toBeGreaterThan(12);
+        store.updatePart(nextId, { width: 8 });
+        expect(useProjectStore.getState().parts.find((part) => part.id === nextId)?.width).toBe(8);
+      });
+
       it('creates a new part with default values', () => {
         const store = useProjectStore.getState();
         const partId = store.addPart()!;
@@ -3287,4 +3323,220 @@ describe('cut list validation of router tool feasibility', () => {
     const issues = validatePartsForCutList([disabled], [stock]);
     expect(issues.some((issue) => issue.message.startsWith('Router tool feasibility'))).toBe(false);
   });
+});
+
+describe('stock thickness identity', () => {
+  it('rejects a thin plywood part assigned to thick plywood but permits solid-wood preparation', () => {
+    const sheet = createTestStock({ id: 'sheet', form: 'sheet', thickness: 0.71875 });
+    const spline = createTestPart({ stockId: sheet.id, thickness: 0.125, grainSensitive: false });
+    expect(validatePartsForCutList([spline], [sheet])).toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: 'stock_thickness_mismatch', severity: 'error' })])
+    );
+    expect(
+      validatePartsForCutList([spline], [{ ...sheet, thickness: 0.125 }]).some(
+        (issue) => issue.type === 'stock_thickness_mismatch'
+      )
+    ).toBe(false);
+    expect(
+      validatePartsForCutList([spline], [{ ...sheet, form: 'board' }]).some(
+        (issue) => issue.type === 'stock_thickness_mismatch'
+      )
+    ).toBe(false);
+  });
+});
+
+describe('fabrication state release regressions', () => {
+  beforeEach(resetStore);
+
+  it('marks unversioned saved reports stale when loading for repair', () => {
+    const project = createTestProject({ cutList: { isStale: false } as CutList });
+    useProjectStore.getState().loadProject(project, '/tmp/legacy-report.carvd');
+    expect(useProjectStore.getState().cutList?.isStale).toBe(true);
+  });
+
+  it('invalidates reports on Reset to Stock and clears rough allowances', () => {
+    const stock = createTestStock({ id: 'stock', form: 'board', length: 24, width: 6 });
+    const part = createTestPart({ id: 'part', stockId: stock.id, length: 10, width: 3, extraLength: 2 });
+    useProjectStore.setState({ stocks: [stock], parts: [part], cutList: { isStale: false } as CutList });
+    useSelectionStore.setState({ selectedPartIds: [part.id] });
+    useProjectStore.getState().resetSelectedPartsToStock();
+    expect(useProjectStore.getState().cutList?.isStale).toBe(true);
+    expect(useProjectStore.getState().parts[0]).toMatchObject({ length: 24, extraLength: 0 });
+  });
+
+  it('blocks mismatched purchased dimensions without silently resizing assembled geometry', () => {
+    const stock = createTestStock({ id: 'stock', form: 'insert', length: 2, width: 0.5, thickness: 0.25 });
+    const part = createTestPart({ id: 'part', stockId: stock.id, length: 2, width: 0.5, thickness: 0.25 });
+    useProjectStore.setState({ stocks: [stock], parts: [part] });
+    useProjectStore.getState().updateStock(stock.id, { length: 3, width: 0.75, thickness: 0.375 });
+    const state = useProjectStore.getState();
+    expect(state.parts[0]).toEqual(part);
+    expect(validatePartsForCutList(state.parts, state.stocks)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: 'purchased_size_mismatch', severity: 'error' })])
+    );
+    expect(validatePartsForCutList([part], [stock])).toEqual([]);
+    expect(validatePartsForCutList([{ ...part, extraLength: 1 }], [stock])).toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: 'purchased_size_mismatch' })])
+    );
+  });
+
+  it.each(['board', 'sheet'] as const)('inherits constrained %s grain including sensitivity', (form) => {
+    const stock = createTestStock({ id: 'stock', form, grainDirection: 'width' });
+    const part = createTestPart({ id: 'part', grainSensitive: false, grainDirection: 'length' });
+    useProjectStore.setState({ stocks: [stock], parts: [part] });
+    useSelectionStore.setState({ selectedPartIds: [part.id] });
+    useProjectStore.getState().assignStockToSelectedParts(stock.id);
+    expect(useProjectStore.getState().parts[0]).toMatchObject({ grainSensitive: true, grainDirection: 'width' });
+  });
+
+  it('clears constrained grain for directionless stock and preserves unconstrained overrides', () => {
+    const stock = createTestStock({ id: 'stock', form: 'sheet', grainDirection: 'none' });
+    const part = createTestPart({ id: 'part', grainSensitive: true, grainDirection: 'width' });
+    useProjectStore.setState({ stocks: [stock], parts: [part] });
+    useSelectionStore.setState({ selectedPartIds: [part.id] });
+    useProjectStore.getState().assignStockToSelectedParts(stock.id);
+    expect(useProjectStore.getState().parts[0].grainSensitive).toBe(false);
+    useProjectStore.setState({
+      parts: [part],
+      stockConstraints: { ...useProjectStore.getState().stockConstraints, constrainGrain: false }
+    });
+    useProjectStore.getState().assignStockToSelectedParts(stock.id);
+    expect(useProjectStore.getState().parts[0]).toMatchObject({ grainSensitive: true, grainDirection: 'width' });
+  });
+});
+
+describe('all constrained grain stock entry points', () => {
+  beforeEach(resetStore);
+  it('reconciles add, single and batch stock assignment, stock edits and enabling constraints', () => {
+    const stock = createTestStock({ id: 'grain', form: 'sheet', grainDirection: 'width' });
+    useProjectStore.setState({ stocks: [stock] });
+    const store = useProjectStore.getState();
+    const id = store.addPart({ stockId: stock.id, grainSensitive: false, grainDirection: 'length' })!;
+    expect(useProjectStore.getState().parts[0]).toMatchObject({ grainSensitive: true, grainDirection: 'width' });
+    store.updatePart(id, { stockId: null, grainSensitive: false, grainDirection: 'length' });
+    store.updatePart(id, { stockId: stock.id });
+    expect(useProjectStore.getState().parts[0]).toMatchObject({ grainSensitive: true, grainDirection: 'width' });
+    store.updatePart(id, { stockId: null, grainSensitive: false });
+    store.batchUpdateParts([{ id, changes: { stockId: stock.id } }]);
+    expect(useProjectStore.getState().parts[0].grainSensitive).toBe(true);
+    store.updateStock(stock.id, { grainDirection: 'none' });
+    expect(useProjectStore.getState().parts[0].grainSensitive).toBe(false);
+    store.setStockConstraints({ ...useProjectStore.getState().stockConstraints, constrainGrain: false });
+    store.updateStock(stock.id, { grainDirection: 'length' });
+    expect(useProjectStore.getState().parts[0].grainSensitive).toBe(false);
+    store.setStockConstraints({ ...useProjectStore.getState().stockConstraints, constrainGrain: true });
+    expect(useProjectStore.getState().parts[0]).toMatchObject({ grainSensitive: true, grainDirection: 'length' });
+  });
+});
+
+describe('derived report invalidation and history', () => {
+  beforeEach(resetStore);
+  it.each(['part', 'stock'] as const)('undoes a %s edit together with its report invalidation', (kind) => {
+    const stock = createTestStock({ id: 'stock', form: 'board', length: 24, width: 6 });
+    const part = createTestPart({ id: 'part', stockId: stock.id, length: 10, width: 3 });
+    useProjectStore.setState({ stocks: [stock], parts: [part], cutList: { isStale: false } as CutList });
+    useProjectStore.temporal.getState().clear();
+    const store = useProjectStore.getState();
+    if (kind === 'part') store.updatePart(part.id, { length: 12 });
+    else store.updateStock(stock.id, { length: 30 });
+    expect(useProjectStore.getState().cutList?.isStale).toBe(true);
+    useProjectStore.temporal.getState().undo();
+    expect(useProjectStore.getState().parts[0].length).toBe(10);
+    expect(useProjectStore.getState().stocks[0].length).toBe(24);
+    expect(useProjectStore.getState().cutList?.isStale).toBe(false);
+    useProjectStore.temporal.getState().redo();
+    expect(useProjectStore.getState().cutList?.isStale).toBe(true);
+    expect(
+      kind === 'part' ? useProjectStore.getState().parts[0].length : useProjectStore.getState().stocks[0].length
+    ).toBe(kind === 'part' ? 12 : 30);
+  });
+});
+
+it('derived invalidation preserves an existing temporal pause', () => {
+  resetStore();
+  useProjectStore.setState({ cutList: { isStale: false } as CutList });
+  const history = useProjectStore.temporal.getState();
+  history.clear();
+  history.pause();
+  try {
+    useProjectStore.getState().markCutListStale();
+    expect(useProjectStore.temporal.getState().isTracking).toBe(false);
+    expect(useProjectStore.temporal.getState().pastStates).toHaveLength(0);
+    expect(useProjectStore.getState().cutList?.isStale).toBe(true);
+  } finally {
+    history.resume();
+  }
+});
+
+describe('purchased identity independent review', () => {
+  beforeEach(resetStore);
+  it('blocks a factory-shape mismatch even when all catalog dimensions agree', () => {
+    const stock = createTestStock({
+      id: 's',
+      form: 'insert',
+      insertKind: 'domino',
+      length: 2,
+      width: 0.75,
+      thickness: 0.25
+    });
+    const part = createTestPart({
+      id: 'p',
+      stockId: 's',
+      blankShape: 'biscuit',
+      length: 2,
+      width: 0.75,
+      thickness: 0.25
+    });
+    expect(validatePartsForCutList([part], [stock])).toEqual(
+      expect.arrayContaining([expect.objectContaining({ type: 'purchased_size_mismatch', severity: 'error' })])
+    );
+    expect(validatePartsForCutList([{ ...part, blankShape: 'domino' }], [stock])).toEqual([]);
+  });
+
+  it('keeps catalog geometry coherent after changing insert kind and explicitly resetting', () => {
+    const stock = createTestStock({
+      id: 's',
+      form: 'insert',
+      insertKind: 'biscuit',
+      length: 2,
+      width: 0.75,
+      thickness: 0.125
+    });
+    const part = createTestPart({
+      id: 'p',
+      stockId: 's',
+      blankShape: 'biscuit',
+      length: 2,
+      width: 0.75,
+      thickness: 0.125
+    });
+    useProjectStore.setState({ stocks: [stock], parts: [part] });
+    useSelectionStore.setState({ selectedPartIds: ['p'], selectedGroupIds: [], editingGroupId: null });
+    useProjectStore.getState().updateStock('s', { insertKind: 'domino', length: 1.5, width: 0.5, thickness: 0.25 });
+    expect(
+      validatePartsForCutList(useProjectStore.getState().parts, useProjectStore.getState().stocks).some(
+        (i) => i.severity === 'error'
+      )
+    ).toBe(true);
+    useProjectStore.getState().resetSelectedPartsToStock();
+    const state = useProjectStore.getState();
+    expect(validatePartsForCutList(state.parts, state.stocks)).toEqual([]);
+    expect(state.parts[0].blankShape).toBe('domino');
+  });
+});
+
+it('blocks model diameter diverging after a rod stock edit', () => {
+  const stock = createTestStock({ id: 's', form: 'rod', length: 36, width: 0.375, thickness: 0.375 });
+  const part = createTestPart({
+    id: 'p',
+    stockId: 's',
+    blankShape: 'round',
+    length: 1,
+    width: 0.375,
+    thickness: 0.375
+  });
+  useProjectStore.setState({ stocks: [stock], parts: [part] });
+  useProjectStore.getState().updateStock('s', { width: 0.5, thickness: 0.5 });
+  const state = useProjectStore.getState();
+  expect(validatePartsForCutList(state.parts, state.stocks).some((i) => i.severity === 'error')).toBe(true);
 });

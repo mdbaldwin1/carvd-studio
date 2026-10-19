@@ -53,6 +53,8 @@ const OAK8 = {
   color: '#c9a978',
   form: 'board'
 };
+const OAK12 = { ...OAK8, id: id(), name: '12/4 White Oak (surfaced)', thickness: 2.5, pricePerUnit: 18 };
+const OAK_PANEL = { ...OAK, id: id(), name: 'White Oak Panel (purchased pre-glued)', width: 14 };
 const WAL = {
   id: id(),
   name: '4/4 Black Walnut',
@@ -165,7 +167,16 @@ const DOMINO = {
   insertKind: 'domino',
   packSize: 190
 };
-const stocks = [OAK, OAK8, WAL, WAL8, MAP, MAP8, PLY, DOWEL38, DOWEL14, BISCUIT, DOMINO];
+const THIN_PLY = {
+  ...PLY,
+  id: id(),
+  name: '1/8" Baltic Birch Plywood',
+  length: 24,
+  width: 24,
+  thickness: 0.125,
+  pricePerUnit: 0 // Unpriced sample stock; obtain a supplier quote.
+};
+const stocks = [THIN_PLY, OAK, OAK8, OAK12, OAK_PANEL, WAL, WAL8, MAP, MAP8, PLY, DOWEL38, DOWEL14, BISCUIT, DOMINO];
 
 /**
  * Which board a species comes out of, thin or thick.
@@ -212,6 +223,45 @@ const hole = (label, f, diameter, depth, primary, secondary) => ({
     depth === null
       ? { diameter, depthMode: 'through', tilt: 0, direction: 0 }
       : { diameter, depthMode: 'blind', depth, tilt: 0, direction: 0 }
+});
+
+// A through bore may be drilled before the cheeks are sawn. Author the
+// individual shoulder cuts so all operations remain in blank coordinates.
+const sawnTenon = (length, width = 2, thickness = 0.25, blankLength = 12, blankWidth = 3, blankThickness = 0.75) => {
+  const x = blankLength - length;
+  const shoulder = (blankWidth - width) / 2;
+  return [
+    ...['top_face', 'bottom_face'].map((f) =>
+      rect(
+        'Tenon cheek',
+        'cutout',
+        face(f),
+        { size: { length, width }, depthMode: 'blind', depth: (blankThickness - thickness) / 2 },
+        { x, z: shoulder }
+      )
+    ),
+    ...[0, blankWidth - shoulder].map((z) =>
+      rect(
+        'Tenon edge shoulder',
+        'cutout',
+        face('top_face'),
+        { size: { length, width: shoulder }, depthMode: 'through' },
+        { x, z }
+      )
+    )
+  ];
+};
+const routerPass = (label, f, points, diameter, depth, bit = {}) => ({
+  id: id(),
+  kind: 'routed_path',
+  version: 1,
+  enabled: true,
+  label,
+  target: face(f),
+  reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+  path: { points: points.map(([primary, secondary]) => ({ primary, secondary })) },
+  bit: { profile: 'straight', diameter, ...bit },
+  parameters: depth === null ? { depthMode: 'through' } : { depthMode: 'blind', depth }
 });
 
 const endCut = (label, f, horizontalAngle, horizontalFlip = false) => ({
@@ -296,17 +346,22 @@ const edgeGroove = (label, f, width, depth, thickness = 0.75, length = 12) =>
  * length/thickness/width simply swap places rather than needing a matrix.
  */
 function ext(p) {
-  const turn = (a) => (((a ?? 0) % 360) + 360) % 360;
-  const rx = turn(p.rotation?.x),
-    ry = turn(p.rotation?.y),
-    rz = turn(p.rotation?.z);
-  let e = { x: p.length / 2, y: p.thickness / 2, z: p.width / 2 };
-  // Three.js reads these as Euler XYZ, which is R = Rx * Ry * Rz, so Z turns
-  // first and X last. Doing them in any other order transposes the part.
-  if (rz === 90 || rz === 270) e = { x: e.y, y: e.x, z: e.z };
-  if (ry === 90 || ry === 270) e = { x: e.z, y: e.y, z: e.x };
-  if (rx === 90 || rx === 270) e = { x: e.x, y: e.z, z: e.y };
-  return e;
+  const [rx, ry, rz] = ['x', 'y', 'z'].map((k) => ((p.rotation?.[k] ?? 0) * Math.PI) / 180);
+  const out = { x: 0, y: 0, z: 0 };
+  for (const v of [
+    [p.length / 2, 0, 0],
+    [0, p.thickness / 2, 0],
+    [0, 0, p.width / 2]
+  ]) {
+    const x1 = v[0] * Math.cos(rz) - v[1] * Math.sin(rz),
+      y1 = v[0] * Math.sin(rz) + v[1] * Math.cos(rz);
+    const x2 = x1 * Math.cos(ry) + v[2] * Math.sin(ry),
+      z2 = -x1 * Math.sin(ry) + v[2] * Math.cos(ry);
+    out.x += Math.abs(x2);
+    out.y += Math.abs(y1 * Math.cos(rx) - z2 * Math.sin(rx));
+    out.z += Math.abs(y1 * Math.sin(rx) + z2 * Math.cos(rx));
+  }
+  return out;
 }
 /** Stand a part on the ground. */
 const onGround = (p) => {
@@ -364,7 +419,8 @@ const groups = [];
 const groupMembers = [];
 
 function station(name, note, build) {
-  const group = { id: id(), name };
+  const status = note.includes('APPROXIMATE') ? ' (Approximate)' : note.startsWith('EXPLODED') ? ' (Exploded)' : '';
+  const group = { id: id(), name: name + status };
   groups.push(group);
   let role = 0;
   for (const part of build()) {
@@ -380,6 +436,8 @@ function station(name, note, build) {
       part.color = stock.color;
       role += 1;
     }
+    const assigned = stocks.find((stock) => stock.id === part.stockId);
+    if (assigned?.form === 'rod' || assigned?.insertKind === 'dowel_pin') part.blankShape = 'round';
     delete part.__species;
     delete part.__chosen;
     parts.push(part);
@@ -421,6 +479,7 @@ const board = (name, o, opts = {}) => {
     __species: opts.species ?? null,
     __chosen: opts.stockId !== undefined,
     features: opts.features ?? [],
+    ...(opts.blankShape ? { blankShape: opts.blankShape } : {}),
     ...(opts.notes ? { notes: opts.notes } : {})
   };
   return onGround(p);
@@ -473,10 +532,12 @@ station('03 Dowel Joint', 'SEATED and assembled: try Transfer Holes to Mating Pa
 station('04 Biscuit Joint', 'SEATED: slots cut in the meeting edges, the biscuit floating in both.', () => {
   const o = origin();
   const T = 0.75;
-  // A plate joiner is run along the edge the boards meet on, with its fence
-  // registered off the face, and the blade being round leaves an arc at each
-  // end -- which is why this is a rounded slot and not a squared-off mortise.
-  const biscuitSlot = (f) => slot('Biscuit slot', f, 56 * MM, 4 * MM, 0.5, 0, 0);
+  // A 100 mm circular blade leaves its arc in the board plane, with a 4 mm kerf.
+  const biscuitSlot = (f) => {
+    const feature = slot('Biscuit slot', f, 2 * Math.sqrt(2 * 50 * MM * 0.5 - 0.5 ** 2), 4 * MM, 0.5, 0, 0);
+    feature.parameters.plateJoiner = true;
+    return feature;
+  };
   const a = board('Biscuit — Board A', o, { width: 6, features: [biscuitSlot('front_face')] });
   const b = board('Biscuit — Board B', o, { width: 6, features: [biscuitSlot('back_face')] });
   against(a, b, 'z');
@@ -487,6 +548,7 @@ station('04 Biscuit Joint', 'SEATED: slots cut in the meeting edges, the biscuit
     width: 23 * MM,
     thickness: 4 * MM,
     stockId: BISCUIT.id,
+    blankShape: 'biscuit',
     color: BISCUIT.color,
     grainSensitive: false
   });
@@ -497,7 +559,7 @@ station('04 Biscuit Joint', 'SEATED: slots cut in the meeting edges, the biscuit
 });
 
 // 05 Dado — the shelf sits home in the housing -------------------------
-station('05 Dado Joint', 'SEATED: real 23/32 plywood in a dado typed 3/4 — try Fit Dado to Mating Part.', () => {
+station('05 Dado Joint', 'SEATED: real 23/32-inch plywood seated in a matching 23/32-inch housing.', () => {
   const o = origin();
   const side = board('Dado — Side', o, {
     species: 'walnut',
@@ -508,7 +570,7 @@ station('05 Dado Joint', 'SEATED: real 23/32 plywood in a dado typed 3/4 — try
         'Shelf dado',
         'dado',
         face('top_face'),
-        { size: { length: 0.75, width: 8 }, depthMode: 'blind', depth: 0.25 },
+        { size: { length: 0.71875, width: 8 }, depthMode: 'blind', depth: 0.25 },
         { x: 8, z: 0 }
       )
     ]
@@ -523,7 +585,7 @@ station('05 Dado Joint', 'SEATED: real 23/32 plywood in a dado typed 3/4 — try
     grainSensitive: false,
     rotation: { x: 0, y: 0, z: 90 }
   });
-  shelf.position.x = side.position.x - ext(side).x + 8 + 0.375;
+  shelf.position.x = side.position.x - ext(side).x + 8 + 0.71875 / 2;
   shelf.position.z = side.position.z;
   shelf.position.y = side.position.y + ext(side).y - 0.25 + ext(shelf).y;
   return [side, shelf];
@@ -599,7 +661,7 @@ station('07 Mortise & Tenon', 'SEATED: try Fit Tenon to Mortise on these two.', 
 // 08 Box joint — fingers interleaved at a corner -----------------------
 station(
   '08 Box Joint',
-  'SEATED: fingers interleaved at a corner, cut one at a time — Carvd has no repeat for rectangular cuts.',
+  'SEATED: fingers interleaved at a corner, laid out as matching fingers from the two boards’ actual thickness.',
   () => {
     const o = origin();
     const T = 0.75;
@@ -625,15 +687,11 @@ station(
   }
 );
 
-// Dovetails — the splay is the one thing Carvd cannot cut --------------
+// Dovetails — tapered tails and angled socket walls -------------------
 //
-// A dovetail is a box joint whose pins and tails are splayed, and it is the
-// splay that makes it resist being pulled apart. Every rectangular cut in
-// Carvd is a prism square to the board, so the splay cannot be cut. Rather
-// than four bare boards, each station is built as far as it can go and its
-// note says exactly what is missing.
+// Tapered cuts and angled socket walls express the dovetail's splay.
 
-// 09 Through dovetail — square fingers standing in for tails and pins --
+// 09 Through dovetail — matching splayed tails and pins ----------------
 station(
   '09 Through Dovetail',
   'SEATED: tails and pins with the splay that holds them — 10 degrees, cut right through.',
@@ -737,14 +795,15 @@ station(
   }
 );
 
-// 11 Sliding dovetail — a sliding dado, less the splay -----------------
+// 11 Sliding dovetail — matching flared tongue and undercut housing -----------------
 station(
   '11 Sliding Dovetail',
-  'SEATED and APPROXIMATE: the housing is undercut as a dovetail bit cuts it; the shelf is left square, so it slides but would lift.',
+  'SEATED: a flared tongue slides into a matching 10-degree undercut housing. The tongue is wider at its tip than at the mouth, so it cannot lift out.',
   () => {
     const o = origin();
     const T = 0.75;
     const HOUSING = 0.375;
+    const neck = T - 2 * HOUSING * Math.tan((10 * Math.PI) / 180);
     const side = board('Sliding DT — Side', o, {
       length: 18,
       width: 8,
@@ -753,13 +812,30 @@ station(
           'Sliding housing',
           'dado',
           face('top_face'),
-          { size: { length: T, width: 8 }, depthMode: 'blind', depth: HOUSING, wallAngle: 10 },
+          { size: { length: neck, width: 8 }, depthMode: 'blind', depth: HOUSING, wallAngle: 10 },
           { x: 8, z: 0 }
         )
       ]
     });
-    const shelf = board('Sliding DT — Shelf', o, { length: 8, width: 8, rotation: { x: 0, y: 0, z: 90 } });
-    shelf.position.x = side.position.x - ext(side).x + 8 + T / 2;
+    const shelf = board('Sliding DT — Shelf', o, {
+      length: 8,
+      width: 8,
+      rotation: { x: 0, y: 0, z: 90 },
+      features: [-1, 1].map((direction) =>
+        routerPass(
+          'Dovetail shoulder',
+          'left_end',
+          [
+            [-4.5, (direction * (T + 0.25)) / 2],
+            [4.5, (direction * (T + 0.25)) / 2]
+          ],
+          0.25 + 2 * HOUSING * Math.tan((10 * Math.PI) / 180),
+          HOUSING,
+          { profile: 'dovetail', shankDiameter: 0.25, includedAngle: 20 }
+        )
+      )
+    });
+    shelf.position.x = side.position.x - ext(side).x + 8 + neck / 2;
     shelf.position.z = side.position.z;
     shelf.position.y = side.position.y + ext(side).y - HOUSING + ext(shelf).y;
     return [side, shelf];
@@ -962,7 +1038,7 @@ station('16 Edge Joint', 'SEATED: two boards glued edge to edge, no joinery at a
 // 17 Tambour — shiplapped slats running in a track --------------------
 station(
   '17 Tambour Joint',
-  'SEATED and APPROXIMATE: slats shiplapped so they interlock and still roll; the canvas backing is not modelled.',
+  'SEATED: shiplapped slats sit in opposing tracks. Glue a 3-1/4 × 5-1/2-inch canvas backing to their undersides; canvas and adhesive are shopping-list supplies, omitted from 3D. Shown straight; bending is not simulated.',
   () => {
     const o = origin();
     const SLAT_W = 0.75;
@@ -995,7 +1071,7 @@ station(
         width: SLAT_W,
         thickness: SLAT_T,
         rotation: { x: 0, y: 90, z: 0 },
-        species: 'walnut',
+        species: i % 2 === 0 ? 'walnut' : 'maple',
         features: [shiplap('top', 'front'), shiplap('bottom', 'back')]
       });
       slat.position.x = side.position.x - 4 + i * (SLAT_W - LAP);
@@ -1004,7 +1080,13 @@ station(
       slat.position.y = side.position.y;
       made.push(slat);
     }
-    return made;
+    const opposite = board('Tambour — Opposite Guide', o, {
+      length: 14,
+      width: 4,
+      features: [edgeGroove('Tambour track', 'front_face', TRACK, TRACK, SIDE_T)]
+    });
+    opposite.position = { ...side.position, z: side.position.z - 9.5 };
+    return [...made, opposite];
   }
 );
 
@@ -1151,7 +1233,7 @@ station('24 Domino Joint', 'SEATED: the same idea bought in a box, edge to edge 
       'Domino mortise',
       'mortise',
       f,
-      { size: { length: 20 * MM, width: 6 * MM }, depthMode: 'blind', depth: 22 * MM },
+      { size: { length: 20 * MM, width: 6 * MM }, depthMode: 'blind', depth: 22 * MM, cornerRadius: 3 * MM },
       { x: 6 - 10 * MM, z: (0.75 - 6 * MM) / 2 }
     );
   const a = board('Domino — Board A', o, { width: 4, features: [mortise(face('front_face'))] });
@@ -1162,6 +1244,7 @@ station('24 Domino Joint', 'SEATED: the same idea bought in a box, edge to edge 
     width: 20 * MM,
     thickness: 6 * MM,
     stockId: DOMINO.id,
+    blankShape: 'domino',
     color: DOMINO.color,
     rotation: { x: 0, y: 90, z: 0 }
   });
@@ -1201,7 +1284,7 @@ station('25 Pin Joint', 'SEATED: a through pin holding a lap — a pinned joint,
 // 26 Pegged M&T — assembled, so Bore Through Assembly has a stack -------
 station(
   '26 Pegged Mortise & Tenon',
-  "SEATED, with the peg withdrawn: driven home it passes through the tenon, and the tongue's faces are not faces of the board, so Carvd cannot bore it. Try Bore Through Assembly on the leg.",
+  'SEATED: a quarter-inch peg passes through both mortise cheeks and the middle of the tenon. The tenon bore is drilled before sawing its cheeks.',
   () => {
     const o = origin();
     const leg = board('Pegged — Leg', o, {
@@ -1219,20 +1302,12 @@ station(
         ),
         // Bored through the mortise, because a peg that misses the tenon holds
         // nothing. Five inches up from the leg's middle is where the mortise is.
-        hole('Peg hole', 'front_face', 0.25, null, 5, 0)
+        hole('Peg hole', 'front_face', 0.25, null, 5, 0.375)
       ]
     });
     const rail = board('Pegged — Rail', o, {
       rotation: { x: 90, y: 0, z: 0 },
-      features: [
-        rect(
-          'Tenon',
-          'tenon',
-          face('right_end'),
-          { size: { length: 1, width: 2 }, depthMode: 'blind', depth: 0.25 },
-          { x: 0, z: 0.5 }
-        )
-      ]
+      features: [hole('Tenon peg bore — drill before cheek cuts', 'top_face', 0.25, null, 5.5, 0), ...sawnTenon(1)]
     });
     seatTenon(leg, rail, { tenonLength: 1, mortiseFromMin: 12, mortiseLength: 2 });
     // The peg goes through the leg's width, so it lies along Z at the hole.
@@ -1244,155 +1319,190 @@ station(
       color: DOWEL14.color,
       rotation: { x: 0, y: 90, z: 0 }
     });
-    // Lined up on the hole, resting against the leg, ready to be driven.
-    peg.position.x = leg.position.x;
+    // Center the peg halfway along the one-inch tenon, clear of its tip.
+    peg.position.x = rail.position.x + rail.length / 2 - 0.5;
     peg.position.y = leg.position.y + 5;
-    peg.position.z = leg.position.z + ext(leg).z + ext(peg).z;
+    peg.position.z = leg.position.z;
     return [leg, rail, peg];
   }
 );
 
-// 27 Birdsmouth — the rafter seats down over the plate ----------------
+// 27 Birdsmouth — horizontal seat and vertical heel on a 45-degree rafter.
 station(
   '27 Birdsmouth Joint',
-  'SEATED and APPROXIMATE: a square seat stands in for the seat and heel a rafter is cut at its pitch.',
+  'SEATED: a 45-degree rafter has a horizontal bearing seat and a vertical heel against the wall plate. The notch is less than one third of the rafter depth.',
   () => {
     const o = origin();
-    const PLATE = 1.5;
-    const SEAT = 0.375;
-    // A birdsmouth is a notch in the rafter's underside that drops over the
-    // wall plate. Cut square here: the real one is sawn at the roof's pitch,
-    // and Carvd's rectangular cuts are all square to the board.
+    const depth = 0.5,
+      pitch = Math.PI / 4,
+      run = depth * Math.sqrt(2);
     const rafter = board('Birdsmouth — Rafter', o, {
       length: 14,
+      width: 3,
+      thickness: 1.75,
+      rotation: { x: 0, y: 0, z: 45 },
       features: [
-        rect(
-          'Birdsmouth seat',
-          'dado',
-          face('bottom_face'),
-          { size: { length: PLATE, width: 3 }, depthMode: 'blind', depth: SEAT },
-          { x: 2, z: 0 }
+        routerPass(
+          'Seat and heel',
+          'bottom_face',
+          [
+            [-3, -1.6],
+            [-3, 1.6]
+          ],
+          1,
+          depth,
+          { profile: 'v_bit', includedAngle: 90 }
         )
       ]
     });
     const plate = board('Birdsmouth — Wall Plate', o, {
       length: 10,
-      width: PLATE,
-      thickness: PLATE,
+      width: run,
+      thickness: 1.5,
       rotation: { x: 0, y: 90, z: 0 }
     });
-    plate.position.x = rafter.position.x - ext(rafter).x + 2 + PLATE / 2;
-    plate.position.z = rafter.position.z;
-    // The plate's top sits in the seat; the rafter rides on it.
-    plate.position.y = rafter.position.y + ext(rafter).y - SEAT - ext(plate).y;
+    // The V apex becomes the right-hand heel/seat corner after the pitch rotation.
+    const x = -3,
+      y = -1.75 / 2 + depth;
+    const heelX = rafter.position.x + x * Math.cos(pitch) - y * Math.sin(pitch);
+    const seatY = rafter.position.y + x * Math.sin(pitch) + y * Math.cos(pitch);
+    plate.position = { x: heelX + run / 2, y: seatY - 0.75, z: rafter.position.z };
     return [rafter, plate];
   }
 );
 
-// 28 Scallop & dowel — the dowel sits in both bores ---------------------
-station('28 Scallop & Dowel', 'SEATED and APPROXIMATE: the scallop is a stadium, not a curve.', () => {
-  const o = origin();
-  const a = board('Scallop — Board A', o, {
-    width: 4,
-    features: [slot('Scallop', 'top_face', 2, 1, 0.25, 0, 0), hole('Dowel hole', 'top_face', 0.375, 0.375, 0, 0)]
-  });
-  const b = board('Scallop — Board B', o, {
-    width: 4,
-    features: [hole('Dowel hole', 'bottom_face', 0.375, 0.375, 0, 0)]
-  });
-  // Face to face, with the dowel standing in the bore of each.
-  b.position.z = a.position.z;
-  b.position.y = a.position.y + ext(a).y + ext(b).y;
-  const dowel = board('Scallop — Dowel', o, {
-    length: 0.75,
-    width: 0.375,
-    thickness: 0.375,
-    stockId: DOWEL38.id,
-    color: DOWEL38.color,
-    rotation: { x: 0, y: 0, z: 90 }
-  });
-  dowel.position.x = a.position.x;
-  dowel.position.z = a.position.z;
-  dowel.position.y = a.position.y + ext(a).y;
-  return [a, b, dowel];
-});
-
-// 29 Cross dowel — a bolt into a barrel nut set across the rail -------
-station('29 Cross Dowel Joint', "SEATED and APPROXIMATE: the barrel's threaded cross bore is not modelled.", () => {
-  const o = origin();
-  const T = 0.75;
-  const FROM_END = 1.5;
-  // Knock-down hardware: a bolt passes through the post and threads into a
-  // barrel nut dropped into a bore across the rail, at right angles to it.
-  const post = board('Cross Dowel — Post', o, {
-    length: 3,
-    features: [hole('Bolt clearance', 'left_end', 0.25, null, 0, 0)]
-  });
-  const rail = board('Cross Dowel — Rail', o, {
-    features: [hole('Barrel bore', 'top_face', 0.375, null, -6 + FROM_END, 0)]
-  });
-  rail.position.x = post.position.x + ext(post).x + ext(rail).x;
-  const barrel = board('Cross Dowel — Barrel', o, {
-    length: T,
-    width: 0.375,
-    thickness: 0.375,
-    stockId: DOWEL38.id,
-    color: '#8a8a8a',
-    grainSensitive: false,
-    rotation: { x: 0, y: 0, z: 90 }
-  });
-  barrel.position.x = rail.position.x - ext(rail).x + FROM_END;
-  barrel.position.z = rail.position.z;
-  barrel.position.y = rail.position.y;
-  return [post, rail, barrel];
-});
-
-// 30 Keyed mitre — the key is sawn in after assembly ------------------
+// Modern cove-and-pin construction: rounded fingers, matching circular
+// sockets, and separate dowels drilled through the assembled corner.
 station(
-  '30 Keyed Joint',
-  'SEATED and APPROXIMATE: a real key kerf is sawn square to the mitre, at 45 degrees to both boards, which Carvd cannot cut.',
+  '28 Scallop & Dowel',
+  'SEATED: three rounded fingers enter matching scalloped sockets at a right-angle corner. Separate dowels pin the fingers after assembly, following the modern cove-and-pin method.',
   () => {
-    const o = origin();
-    const KERF = 0.125;
-    const KERF_DEPTH = 0.6;
-    const FROM_END = 8;
-    const a = board('Keyed — Board A', o, {
+    const o = origin(),
+      centers = [-1.5, 0, 1.5];
+    const front = board('Scallop — Front', o, {
+      width: 4,
+      features: centers.flatMap((z, i) => [
+        hole(`Scallop socket ${i + 1}`, 'top_face', 1, 0.5, -5.5, z),
+        hole(`Pin bore ${i + 1}`, 'top_face', 0.25, null, -5.5, z)
+      ])
+    });
+    const side = board('Scallop — Side', o, {
+      width: 4,
+      thickness: 1,
+      rotation: { x: 0, y: 0, z: 90 },
       features: [
-        endCut('Mitre', 'right_end', 45, true),
-        rect(
-          'Key kerf',
-          'stopped_groove',
-          face('top_face'),
-          { size: { length: KERF, width: 3 }, depthMode: 'blind', depth: KERF_DEPTH },
-          { x: FROM_END, z: 0 }
-        )
+        ...centers.map((z, i) =>
+          routerPass(
+            `Rounded finger ${i + 1}`,
+            'left_end',
+            Array.from({ length: 33 }, (_, k) => [
+              z + 0.625 * Math.cos((k * Math.PI) / 16),
+              0.625 * Math.sin((k * Math.PI) / 16)
+            ]),
+            0.28,
+            0.502
+          )
+        ),
+        ...[1, 2.5].map((z) =>
+          rect(
+            'Between fingers',
+            'cutout',
+            face('top_face'),
+            { size: { length: 0.5, width: 0.5 }, depthMode: 'through' },
+            { x: 0, z }
+          )
+        ),
+        ...centers.map((z, i) => hole(`Pin bore ${i + 1}`, 'left_end', 0.25, 1, z, 0))
       ]
     });
-    const b = board('Keyed — Board B', o, {
-      rotation: { x: 0, y: 90, z: 0 },
-      features: [endCut('Mitre', 'right_end', 45)]
+    side.position = { x: front.position.x - 5.5, y: front.position.y + 0.375 - 0.5 + 6 + 0.005, z: front.position.z };
+    const pins = centers.map((z, i) => {
+      const pin = board(`Scallop — Pin ${i + 1}`, o, {
+        length: 1.25,
+        width: 0.25,
+        thickness: 0.25,
+        stockId: DOWEL14.id,
+        color: DOWEL14.color,
+        rotation: { x: 0, y: 0, z: 90 }
+      });
+      pin.position = { x: front.position.x - 5.5, y: front.position.y - 0.375 + 0.625, z: front.position.z + z };
+      return pin;
     });
-    mitreCorner(a, b);
-    // Standing in its kerf, proud of the face until it is pared flush. The kerf
-    // is shown across one half, clear of the corner: a real key is let into
-    // both halves at once, and that kerf is sawn square to the mitre -- 45
-    // degrees to each board -- which is not a cut Carvd can make.
-    const KEY_LENGTH = 3;
-    const key = board('Keyed — Key', o, {
-      length: KEY_LENGTH,
-      width: KERF,
-      thickness: KERF_DEPTH,
-      rotation: { x: 0, y: 90, z: 0 }
-    });
-    key.position.x = a.position.x - ext(a).x + FROM_END + KERF / 2;
-    key.position.z = a.position.z;
-    key.position.y = a.position.y + ext(a).y - ext(key).y;
-    return [a, b, key];
+    return [front, side, ...pins];
   }
 );
 
-// 32 End lap — the corner case of a half lap ---------------------------
-station('32 End Lap Joint', 'SEATED: both ends lapped, closing flush at a corner.', () => {
+// 29 Cross dowel — a bolt into a barrel nut set across the rail -------
+station(
+  '29 Cross Dowel Joint',
+  'SEATED: wood prepared for a purchased joint bolt and matching cross-dowel barrel nut. Hardware is listed for purchase and omitted from 3D. The bolt enters through the post; the barrel sits across the rail. Select matching threads and check engagement before drilling.',
+  () => {
+    const o = origin();
+    const FROM_END = 1.5;
+    // Knock-down hardware: a bolt passes through the post and threads into a
+    // barrel nut dropped into a bore across the rail, at right angles to it.
+    const post = board('Cross Dowel — Post', o, {
+      length: 3,
+      features: [hole('Bolt clearance', 'left_end', 0.25, null, 0, 0)]
+    });
+    const rail = board('Cross Dowel — Rail', o, {
+      features: [
+        hole('Barrel bore', 'top_face', 0.375, null, -6 + FROM_END, 0),
+        hole('Bolt passage', 'left_end', 0.25, FROM_END + 0.1875, 0, 0)
+      ]
+    });
+    rail.position.x = post.position.x + ext(post).x + ext(rail).x;
+    return [post, rail];
+  }
+);
+
+function keyedCorner(o, prefix, offsets) {
+  const a = board(`${prefix} — Board A`, o, { features: [endCut('Mitre', 'right_end', 45, true)] });
+  const b = board(`${prefix} — Board B`, o, {
+    rotation: { x: 0, y: 90, z: 0 },
+    features: [endCut('Mitre', 'right_end', 45)]
+  });
+  mitreCorner(a, b);
+  const depth = 0.5;
+  const length = 1.8;
+  const keys = offsets.map((offset, i) => {
+    const cx = 4.5 + offset / Math.sqrt(2),
+      cz = -offset / Math.sqrt(2);
+    const h = length / (2 * Math.sqrt(2));
+    const points = [
+      [cx - h, cz - h],
+      [cx + h, cz + h]
+    ];
+    a.features.push(routerPass(`Key kerf ${i + 1}`, 'top_face', points, 0.125, depth));
+    b.features.push(
+      routerPass(
+        `Key kerf ${i + 1}`,
+        'top_face',
+        points.map(([x, z]) => [4.5 - z, x - 4.5]),
+        0.125,
+        depth
+      )
+    );
+    const key = board(`${prefix} — Key ${i + 1}`, o, {
+      length,
+      width: 0.125,
+      thickness: depth,
+      species: 'maple',
+      rotation: { x: 0, y: -45, z: 0 }
+    });
+    key.position = { x: a.position.x + cx, y: a.position.y + 0.375 - depth / 2, z: a.position.z + cz };
+    return key;
+  });
+  return [a, b, ...keys];
+}
+station(
+  '30 Keyed Joint',
+  'SEATED: a maple key crosses the mitre at right angles in matching kerfs cut through both boards.',
+  () => keyedCorner(origin(), 'Keyed', [0])
+);
+
+// 32 End lap — two lapped ends form a flush splice ---------------------
+station('32 End Lap Joint', 'SEATED: both ends lapped, closing flush in an end-to-end splice.', () => {
   const o = origin();
   const rail = board('End Lap — Rail', o, { features: [lapCut('End lap', 'top_face', 9)] });
   const stile = board('End Lap — Stile', o, { features: [lapCut('End lap', 'bottom_face', 0)] });
@@ -1403,12 +1513,14 @@ station('32 End Lap Joint', 'SEATED: both ends lapped, closing flush at a corner
   return [rail, stile];
 });
 
-// 31 Fox wedge — tenon home, wedges shown beside ----------------------
+// 31 Fox wedge: pre-assembly view exposes the blind undercut and starting wedges.
 station(
   '31 Fox Wedge Mortise & Tenon',
-  'SEATED and APPROXIMATE: the wedges are shown beside, and the flare they open in the mortise is not modelled.',
+  'EXPLODED, before driving: an undercut blind mortise faces a kerfed tenon with 1/4-inch-wide tapered wedges started in 1/8-inch saw kerfs. Only the narrow tips enter. Driving the wider heads requires wood deformation, which is not simulated; establish wedge travel, socket relief and a shop process separately.',
   () => {
-    const o = origin();
+    const o = origin(),
+      L = 0.9375,
+      KERF = 0.125;
     const leg = board('Fox Wedge — Leg', o, {
       length: 14,
       width: 1.75,
@@ -1416,86 +1528,91 @@ station(
       rotation: { x: 0, y: 0, z: 90 },
       features: [
         rect(
-          'Flared mortise',
+          'Undercut mortise',
           'mortise',
           face('top_face'),
-          { size: { length: 2, width: 0.25 }, depthMode: 'blind', depth: 1 },
+          { size: { length: 2, width: 0.25 }, depthMode: 'blind', depth: 1, wallAngle: 5 },
           { x: 10, z: 0.75 }
         )
       ]
     });
-    // On edge, tenon on the end that meets the leg, like any mortise and tenon.
     const rail = board('Fox Wedge — Rail', o, {
       rotation: { x: 90, y: 0, z: 0 },
       features: [
-        rect(
-          'Tenon',
-          'tenon',
-          face('right_end'),
-          { size: { length: 0.9375, width: 2 }, depthMode: 'blind', depth: 0.25 },
-          { x: 0, z: 0.5 }
+        ...sawnTenon(L),
+        ...[0.95, 1.925].map((z, i) =>
+          rect(
+            `Wedge kerf ${i + 1}`,
+            'cutout',
+            face('top_face'),
+            { size: { length: 0.8, width: KERF }, depthMode: 'through' },
+            { x: 11.2, z }
+          )
         )
       ]
     });
-    seatTenon(leg, rail, { tenonLength: 0.9375, mortiseFromMin: 10, mortiseLength: 2 });
-    // The wedges go into kerfs in the tenon and spread it against the flare;
-    // neither the kerfs nor the flare is a cut Carvd can make, so they are laid
-    // out where they would be driven from.
-    const wedges = [1, 2].map((n) => {
-      const w = board(`Fox Wedge — Wedge ${n}`, o, { length: 0.9, width: 0.5, thickness: 0.09 });
-      // Resting against the rail's far end, ready to be driven.
-      w.position.x = rail.position.x - ext(rail).x - ext(w).x;
-      w.position.y = rail.position.y;
-      w.position.z = rail.position.z + (n === 1 ? -0.25 : 0.25);
+    seatTenon(leg, rail, { tenonLength: L, mortiseFromMin: 10, mortiseLength: 2 });
+    rail.position.x -= L + EXPLODE;
+    const wedges = [0.95, 1.925].map((z, i) => {
+      const w = board(`Fox Wedge — Wedge ${i + 1}`, o, {
+        length: 0.75,
+        width: 2 * KERF,
+        thickness: 0.25,
+        species: 'maple',
+        rotation: { x: 90, y: 0, z: 0 },
+        features: [endCut('Wedge taper', 'left_end', (Math.atan(0.74 / (2 * KERF)) * 180) / Math.PI)]
+      });
+      w.position = {
+        x: rail.position.x + 6 + 0.375 - 0.1875,
+        y: rail.position.y + 1.5 - z,
+        z: rail.position.z
+      };
       return w;
     });
     return [leg, rail, ...wedges];
   }
 );
 
-// 33 Splined mitre — the keys that hold a mitre shut -------------------
+// A concealed plywood spline spans the mitre in centered end-grain slots.
 station(
   '33 Splined Mitre',
-  'EXPLODED: the keys are laid where they are driven, across the corner. Their kerf is sawn through the assembled joint and so runs into the waste of both mitres at once, which Carvd checks each board against on its own and refuses.',
+  'SEATED: a concealed plywood spline bridges the mitre inside matching slots centered in the board thickness. Ghost view exposes the insert. Slot coordinates and depth use the original square end, not the mitred face; they describe geometry, not a router plunge setting. Establish an appropriate slotting process separately.',
   () => {
     const o = origin();
-    const KERF = 0.125;
-    const DEPTH = 0.55;
-    // A key crosses the glue line of a mitre and holds it shut, which is the
-    // whole of its job -- and is exactly what cannot be drawn here. Cut as
-    // one kerf across the assembled corner, it lies partly in material each
-    // board's own mitre has taken away, and a cut is checked against one
-    // board at a time. Sized to stop at the mitre instead, the two halves
-    // meet on the line where both boards run out, and the key can be seated
-    // in neither without fouling the other.
-    const a = board('Splined Mitre — Board A', o, { features: [endCut('Mitre', 'right_end', 45, true)] });
+    const groove = () =>
+      routerPass(
+        'Internal spline slot',
+        'right_end',
+        [
+          [-0.75, 0],
+          [0.75, 0]
+        ],
+        0.125,
+        2.25
+      );
+    const a = board('Splined Mitre — Board A', o, { features: [endCut('Mitre', 'right_end', 45, true), groove()] });
     const b = board('Splined Mitre — Board B', o, {
       rotation: { x: 0, y: 90, z: 0 },
-      features: [endCut('Mitre', 'right_end', 45)]
+      features: [endCut('Mitre', 'right_end', 45), groove()]
     });
     mitreCorner(a, b);
-    const keys = [4.2, 5.1].map((acrossCorner, n) => {
-      const key = board(`Splined Mitre — Key ${n + 1}`, o, {
-        length: 3,
-        width: KERF,
-        thickness: DEPTH,
-        rotation: { x: 0, y: 90, z: 0 },
-        species: 'maple'
-      });
-      key.position.x = a.position.x - ext(a).x + 6 + acrossCorner;
-      key.position.z = a.position.z;
-      // Held just above the corner, on the line each kerf would be sawn.
-      key.position.y = a.position.y + ext(a).y + EXPLODE + ext(key).y;
-      return key;
+    const spline = board('Splined Mitre — Spline', o, {
+      length: 1.5,
+      width: 1.5,
+      thickness: 0.125,
+      stockId: THIN_PLY.id,
+      color: THIN_PLY.color,
+      grainSensitive: false
     });
-    return [a, b, ...keys];
+    spline.position = { x: a.position.x + 4.5, y: a.position.y, z: a.position.z };
+    return [a, b, spline];
   }
 );
 
 // 34 Pocket hole — a screw driven in on the slant ----------------------
 station(
   '34 Pocket Hole',
-  'SEATED: a butt joint held by two screws driven in on the slant, each down a counterbored pocket.',
+  'SEATED: a butt joint prepared for two pocket screws, drilled 15 degrees above the face. Screws are shopping-list hardware, omitted from 3D.',
   () => {
     const o = origin();
     const T = 0.75;
@@ -1515,9 +1632,10 @@ station(
       parameters: {
         diameter: 5 / 32,
         depthMode: 'through',
-        tilt: 15,
+        // Tilt is measured from the face normal, not from the face.
+        tilt: 75,
         direction: 180,
-        counterbore: { diameter: 3 / 8, depth: 0.375 }
+        counterbore: { diameter: 3 / 8, depth: 0.9 }
       }
     });
     const rail = board('Pocket — Rail', o, { features: [pocket(-0.75), pocket(0.75)] });
@@ -1625,7 +1743,13 @@ station(
           'Stopped housing',
           'stopped_dado',
           face('top_face'),
-          { size: { length: T, width: 8 - STOP }, depthMode: 'blind', depth: DEPTH, cornerRadius: T / 2 },
+          {
+            size: { length: T, width: 8 - STOP },
+            stoppedSpan: true,
+            depthMode: 'blind',
+            depth: DEPTH,
+            cornerRadius: T / 2
+          },
           { x: 8, z: 0 }
         )
       ]
@@ -1640,8 +1764,8 @@ station(
         rect(
           'Notch',
           'corner_notch',
-          corner('front_right_corner'),
-          { size: { length: DEPTH, width: STOP }, depthMode: 'through' },
+          corner('front_left_corner'),
+          { size: { length: DEPTH, width: STOP + T / 2 }, depthMode: 'through' },
           { x: 0, z: 0 }
         )
       ]
@@ -1775,10 +1899,9 @@ station(
     const T = 0.75;
     const LAP = 1.5;
     const SPLAY = 10;
-    const flare = Math.tan((SPLAY * Math.PI) / 180) * LAP;
-    // The tongue is widest at its tip and the socket widest at its mouth, so
-    // the two only pass each other sideways -- pull along the boards and the
-    // slope closes on itself.
+    // The tongue and socket are widest at the tongue tip and narrow toward
+    // its shoulder. Lower the tongue into the open top of the socket;
+    // the sloping cheeks prevent withdrawal along the boards' length.
     const b = board('Dovetail Splice — Board B', o, {
       features: [
         rect(
@@ -1826,7 +1949,7 @@ station(
 // 44 Compound mitre — a corner that leans as well as turns -------------
 station(
   '44 Compound Mitre',
-  'SEATED: the corner of a canted box, where the cut has to turn and lean at once — one setting on the saw, two angles in the wood.',
+  'SEATED: matching compound cuts that turn 45 degrees and lean 15 degrees. The flat samples demonstrate the mating cut planes, rather than a complete canted box.',
   () => {
     const o = origin();
     const compound = (flip) => ({
@@ -1844,6 +1967,13 @@ station(
     const rail = board('Compound — Rail', o, { features: [compound(true)] });
     const stile = board('Compound — Stile', o, { rotation: { x: 0, y: 90, z: 0 }, features: [compound(false)] });
     mitreCorner(rail, stile);
+    // Long-point dimensions include the bevel's inset as well as the mitre.
+    // Ordinary mitre placement leaves this much daylight between the planes.
+    // Share the correction across the corner axes so the two cut-face
+    // centers coincide, rather than leaving one face shifted along the seam.
+    const halfBevelInset = (rail.thickness * Math.tan((15 * Math.PI) / 180)) / 2;
+    stile.position.x -= halfBevelInset;
+    stile.position.z -= halfBevelInset;
     return [rail, stile];
   }
 );
@@ -1851,11 +1981,11 @@ station(
 // 46 Rule joint — the drop-leaf hinge that stays closed ----------------
 station(
   '46 Rule Joint',
-  'SEATED: a drop-leaf edge. A roundover on the table and a cove on the leaf, cut to the same radius so the two stay in contact all the way down.',
+  'SEATED: complementary quarter-round drop-leaf edges, with a full-thickness roundover and matching underside cove. Drop-leaf hinges and their mounting screws are a shopping-list kit; hardware and motion are not modeled.',
   () => {
     const o = origin();
     const T = 0.75;
-    const R = 0.375;
+    const R = T;
     const profile = (label, e, kind) => ({
       id: id(),
       kind: 'edge_profile',
@@ -1869,10 +1999,10 @@ station(
     });
     const top = board('Rule — Table Top', o, {
       width: 8,
-      features: [profile('Roundover', 'top_back_edge', 'roundover')]
+      features: [profile('Roundover', 'top_front_edge', 'roundover')]
     });
-    const leaf = board('Rule — Leaf', o, { width: 8, features: [profile('Cove', 'top_front_edge', 'cove')] });
-    leaf.position.z = top.position.z + 8;
+    const leaf = board('Rule — Leaf', o, { width: 8, features: [profile('Cove', 'bottom_back_edge', 'cove')] });
+    leaf.position.z = top.position.z + 8 - R;
     return [top, leaf];
   }
 );
@@ -1880,7 +2010,7 @@ station(
 // 36 Wedged through tenon — driven right through and spread -----------
 station(
   '36 Wedged Through Tenon',
-  'SEATED: the tenon goes right through and stands proud, and two wedges driven into its kerfs spread it so it cannot come back.',
+  'SEATED, before driving: the through tenon stands proud, with the narrow tips of 1/4-inch-wide tapered wedges started in 1/8-inch saw kerfs. The wider heads remain outside. Driving them requires wood deformation, which is not simulated; establish wedge travel, socket relief and a shop process separately.',
   () => {
     const o = origin();
     const LEG = 1.75;
@@ -1896,7 +2026,7 @@ station(
           'Through mortise',
           'mortise',
           face('top_face'),
-          { size: { length: 2, width: 0.375 }, depthMode: 'through' },
+          { size: { length: 2, width: 0.375 }, depthMode: 'through', wallAngle: 3 },
           { x: 12, z: (LEG - 0.375) / 2 }
         )
       ]
@@ -1929,27 +2059,14 @@ station(
     const wedge = (n, dy) => {
       const w = board(`Wedged — Wedge ${n}`, o, {
         length: 1,
-        width: KERF,
+        width: 2 * KERF,
         thickness: 0.375,
         rotation: { x: 90, y: 0, z: 0 },
-        features: [
-          {
-            id: id(),
-            kind: 'end_cut',
-            version: 1,
-            enabled: true,
-            label: 'Taper',
-            target: face('left_end'),
-            reference: { primaryFrom: 'min' },
-            cutType: 'bevel',
-            lengthMode: 'long_point',
-            parameters: { horizontalAngle: 0, verticalAngle: 8, verticalFlip: false }
-          }
-        ]
+        features: [endCut('Wedge taper', 'left_end', (Math.atan(0.99 / (2 * KERF)) * 180) / Math.PI)]
       });
-      // Driven home, its outer end flush with the tip of the tenon.
-      w.position.x = leg.position.x + ext(leg).x + PROUD - ext(w).x;
-      w.position.y = rail.position.y + dy;
+      // Start only the narrow quarter-inch tip; the wider head stays outside.
+      w.position.x = leg.position.x + ext(leg).x + PROUD + ext(w).x - 0.25;
+      w.position.y = rail.position.y + dy + KERF / 2;
       w.position.z = rail.position.z;
       return w;
     };
@@ -1966,6 +2083,8 @@ station(
     const LEG = 2.5;
     const TENON = 1;
     const leg = board('Twin — Leg', o, {
+      stockId: OAK12.id,
+      color: OAK12.color,
       length: 16,
       width: LEG,
       thickness: LEG,
@@ -1983,6 +2102,7 @@ station(
       ]
     });
     const rail = board('Twin — Rail', o, {
+      species: 'walnut',
       width: 4,
       rotation: { x: 90, y: 0, z: 0 },
       features: [
@@ -2013,7 +2133,7 @@ station(
 // 47 Screwed cleat — countersunk, and the same hole three times -------
 station(
   '47 Screwed Cleat',
-  'SEATED: a cleat screwed to a panel, the heads countersunk flush. One hole, set out three times along the cleat.',
+  'SEATED: a cleat prepared for three countersunk screws. The holes repeat along the cleat; screws are shopping-list hardware, omitted from 3D.',
   () => {
     const o = origin();
     const panel = board('Screwed — Panel', o, { width: 8 });
@@ -2036,10 +2156,9 @@ station(
             depthMode: 'through',
             tilt: 0,
             direction: 0,
-            countersink: { majorDiameter: 3 / 8, includedAngle: 82 },
-            // A cleat is screwed at intervals, not one screw at a time.
-            pattern: { type: 'linear', count: 3, spacing: 3, direction: 0 }
-          }
+            countersink: { majorDiameter: 3 / 8, includedAngle: 82 }
+          },
+          pattern: { type: 'linear', count: 3, spacing: 3, direction: 0 }
         }
       ]
     });
@@ -2088,38 +2207,29 @@ station(
 // 49 Hinge mortise — the shallow recess a leaf sits in ---------------
 station(
   '49 Hinge Mortise',
-  'SEATED: a hinge let in flush, half its thickness into each piece, in recesses a router leaves round-cornered.',
+  'EXPLODED: matching square-cornered hinge-leaf recesses open onto the facing edges, shown face up and one leaf deep. The hinge and its mounting screws are a shopping-list kit; hardware is omitted from 3D.',
   () => {
     const o = origin();
     const LEAF = 0.09;
-    const recess = (f) => ({
-      id: id(),
-      kind: 'rounded_cut',
-      version: 1,
-      enabled: true,
-      label: 'Hinge recess',
-      cutType: 'rounded_rectangle',
-      target: face(f),
-      reference: { primaryFrom: 'center', secondaryFrom: 'center' },
-      parameters: { length: 2.5, width: 1.25, cornerRadius: 0.125, depthMode: 'blind', depth: LEAF },
-      placement: { primary: 0, secondary: 0, rotation: 0 }
-    });
-    const jamb = board('Hinge — Jamb', o, { width: 4, features: [recess('top_face')] });
-    const door = board('Hinge — Door', o, { width: 4, features: [recess('bottom_face')] });
-    door.position.y = jamb.position.y + ext(jamb).y + ext(door).y;
-    door.position.x = jamb.position.x;
-    door.position.z = jamb.position.z;
-    // The hinge itself is ironmongery, not stock, so it is not a part here.
-    // What the bench is for is the pair of recesses: routed, round-cornered,
-    // and exactly half the leaf deep in each piece so the two close flush.
+    const recess = (z) =>
+      rect(
+        'Hinge recess',
+        'cutout',
+        face('top_face'),
+        { size: { length: 2.5, width: 1.25 }, depthMode: 'blind', depth: LEAF },
+        { x: 4.75, z }
+      );
+    const jamb = board('Hinge — Jamb', o, { width: 4, features: [recess(2.75)] });
+    const door = board('Hinge — Door', o, { width: 4, features: [recess(0)] });
+    clearOf(jamb, door, 'z', 1);
     return [jamb, door];
   }
 );
 
-// 51 T-slot — a bolt head running in a routed track -------------------
+// 51 T-slot — a wooden runner in a routed track -------------------
 station(
   '51 T-Slot Joint',
-  'SEATED: a track routed with a T-slot cutter, and a bar running in the undercut that no straight bit could have made.',
+  'SEATED: a track routed with a T-slot cutter, and a shop-made wooden bar running in the undercut that no straight bit could have made. The left end is open for inserting the bar.',
   () => {
     const o = origin();
     const T = 0.75;
@@ -2139,7 +2249,7 @@ station(
           reference: { primaryFrom: 'center', secondaryFrom: 'center' },
           path: {
             points: [
-              { primary: -5, secondary: 0 },
+              { primary: -6, secondary: 0 },
               { primary: 5, secondary: 0 }
             ]
           },
@@ -2153,7 +2263,7 @@ station(
       length: 4,
       width: HEAD - 0.03,
       thickness: HEAD_HEIGHT - 0.02,
-      grainSensitive: false
+      grainSensitive: true
     });
     bar.position.x = rail.position.x;
     bar.position.z = rail.position.z;
@@ -2209,7 +2319,26 @@ station(
           { size: { length: 12, width: 0.375 }, depthMode: 'blind', depth: (T - TONGUE) / 2 },
           { x: 0, z: 0 }
         ),
-        profile('Chamfer', 'top_back_edge', 'chamfer', 0.125)
+        // The back arris of the blank has already been removed to leave
+        // the tongue. Run a V-bit at the new shoulder instead; an edge
+        // profile on the old arris would cut only air.
+        {
+          id: id(),
+          kind: 'routed_path',
+          version: 1,
+          enabled: true,
+          label: 'Shoulder chamfer',
+          target: face('top_face'),
+          reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+          path: {
+            points: [
+              { primary: -6, secondary: -1.125 },
+              { primary: 6, secondary: -1.125 }
+            ]
+          },
+          bit: { profile: 'v_bit', diameter: 0.25, includedAngle: 90 },
+          parameters: { depthMode: 'blind', depth: 0.125 }
+        }
       ]
     });
     b.position.z = a.position.z + 3 - 0.375;
@@ -2220,13 +2349,14 @@ station(
 // 53 Shelf pin holes — a grid of them, and a shelf sitting on it ------
 station(
   '53 Shelf Pin Holes',
-  'SEATED: two rows of 5mm holes set out as a grid, and a shelf resting on the pins. Adjustable, which no cut joint is.',
+  'SEATED: a cabinet-side sample with two columns of 5mm holes at 32mm vertical spacing. Two purchased pins support the shelf edge at the lowest setting; pins and the opposite cabinet side are omitted from 3D. Buy the pins from the shopping list.',
   () => {
     const o = origin();
     const T = 0.75;
     const side = board('Shelf Pins — Side', o, {
       length: 18,
       width: 8,
+      rotation: { x: 0, y: 0, z: 90 },
       features: [
         {
           id: id(),
@@ -2243,17 +2373,19 @@ station(
             depthMode: 'blind',
             depth: 0.375,
             tilt: 0,
-            direction: 0,
-            // Two rows front and back, stepped up the side at 32mm centres.
-            pattern: { type: 'grid', rows: 5, columns: 2, rowSpacing: 32 * MM, columnSpacing: 3, rotation: 0 }
-          }
+            direction: 0
+          },
+          // Local X stands vertically; local Z runs front to back.
+          pattern: { type: 'grid', rows: 2, columns: 5, rowSpacing: 3, columnSpacing: 32 * MM, rotation: 0 }
         }
       ]
     });
-    const shelf = board('Shelf Pins — Shelf', o, { length: 8, width: 8, rotation: { x: 0, y: 0, z: 90 } });
-    shelf.position.x = side.position.x - ext(side).x + 8;
+    const shelf = board('Shelf Pins — Shelf', o, { length: 8, width: 8 });
+    const faceX = side.position.x - T / 2;
+    shelf.position.x = faceX - ext(shelf).x;
     shelf.position.z = side.position.z;
-    shelf.position.y = side.position.y + ext(side).y + ext(shelf).y;
+    const pinHeight = side.position.y - 3;
+    shelf.position.y = pinHeight + (5 * MM) / 2 + ext(shelf).y;
     return [side, shelf];
   }
 );
@@ -2261,7 +2393,7 @@ station(
 // 54 Cutter sampler — every other bit and profile, on two boards ------
 station(
   '54 Cutter Sampler',
-  'EXPLODED: not a joint at all. One board carries a pass of every remaining router bit, the other every remaining edge profile, so nothing in the cutter list goes untested.',
+  'EXPLODED: not a joint at all. One board carries a pass of every remaining router bit, the other every remaining edge profile. The stopped dovetail route has a separate 1/2-inch-diameter, 3/8-inch-deep entry pocket at its start. The keyhole route includes its entry opening automatically. Establish the actual tooling and machining sequence separately.',
   () => {
     const o = origin();
     const T = 0.75;
@@ -2283,6 +2415,8 @@ station(
       parameters: { depthMode: 'blind', depth }
     });
     const bits = board('Sampler — Router Bits', o, {
+      stockId: OAK_PANEL.id,
+      color: OAK_PANEL.color,
       width: 14,
       features: [
         pass('Straight', { profile: 'straight', diameter: 0.25 }, -6.5),
@@ -2296,7 +2430,16 @@ station(
         pass('V bit', { profile: 'v_bit', diameter: 0.5, includedAngle: 90 }, 1.5),
         pass('Engraving', { profile: 'engraving', diameter: 0.125, includedAngle: 60 }, 2.5, 0.0625),
         // The two that undercut, and so cut a shape no straight bit can.
-        pass('Dovetail', { profile: 'dovetail', diameter: 0.5, shankDiameter: 0.25, includedAngle: 14 }, 3.5, 0.375),
+        // The complete tapered cutter must fit inside the plunge depth.
+        // A 1/4-inch neck with a 14-degree included angle needs over an
+        // inch of depth and is silently omitted by the geometry renderer.
+        hole('Dovetail cutter entry pocket', 'top_face', 0.5, 0.375, -5, 3.5),
+        pass(
+          'Dovetail (14° sides)',
+          { profile: 'dovetail', diameter: 0.5, shankDiameter: 0.375, includedAngle: 28 },
+          3.5,
+          0.375
+        ),
         pass('Keyhole', { profile: 'keyhole', diameter: 0.5, shankDiameter: 0.25, cutterHeight: 0.125 }, 4.5, 0.375)
       ]
     });
@@ -2332,6 +2475,7 @@ station(
       }
     };
     const profiles = board('Sampler — Edge Profiles', o, {
+      species: 'walnut',
       width: 6,
       features: [
         profile('Ogee', 'top_front_edge', 'ogee', 0.25),
@@ -2361,9 +2505,9 @@ station(
             diameter: 0.25,
             depthMode: 'through',
             tilt: 0,
-            direction: 0,
-            pattern: { type: 'circular', count: 6, radius: 1.75, startAngle: 0 }
-          }
+            direction: 0
+          },
+          pattern: { type: 'circular', count: 6, radius: 1.75, startAngle: 0 }
         }
       ]
     });
@@ -2374,7 +2518,7 @@ station(
 
 const now = new Date().toISOString();
 const file = {
-  version: 3,
+  version: 4,
   project: {
     // Stamped so the title bar says which build of the bench is open. The
     // stations change as the app does, and a stale copy is otherwise
@@ -2391,15 +2535,24 @@ const file = {
       'Overlap prevention is ON: nothing here is jammed through anything else.',
       '',
       'SEATED stations are assembled, with one piece home in a housing the app',
-      'understands. EXPLODED stations are set a little apart, because pushing',
-      'those together would be a real interpenetration rather than a joint.',
+      'understands. EXPLODED stations expose their cuts or show an assembly step.',
       '',
-      'APPROXIMATE stations carry the nearest shape Carvd can express; the note',
-      'on each part says what is standing in for what.',
+      'Use Ghost view to inspect buried tenons, pins and inserts.',
+      'Dowels and purchased inserts use their physical shapes for fit checks.',
       '',
-      'NOT MODELLED stations are plain boards only. Every rectangular cut in',
-      'Carvd is an axis-aligned prism, so no dovetail of any kind can be',
-      'expressed -- through, half-blind, sliding or mitred blind.',
+      'Through, half-blind and mitred blind dovetails use tapered cuts and',
+      'angled socket walls. The sliding dovetail has a matching flared tongue.',
+      'Fox wedges are shown started before assembly; through wedges are shown',
+      'before driving. Elastic spreading is not modeled.',
+      'Purchased metal hardware and canvas are shopping-list items, not wood stock.',
+      'They are omitted from 3D; wood cuts remain visible. Match purchased hardware',
+      'to the hole/recess dimensions before fabrication. No thread model is supplied.',
+      'Zero-priced shopping items and thin plywood are UNPRICED, not free.',
+      'Other prices are illustrative; replace them with supplier quotes.',
+      'The router sampler uses a purchased pre-glued panel, not a generated glue-up.',
+      'Thin solid-wood parts require the thickness preparation printed in the cut list.',
+      'Glue bonded joints as appropriate; keep floating panels and moving joints free.',
+      'Finish is optional for this sample bench and is not included.',
       '',
       'Carvd will not cut a mortise into an end, only into a face, so the loose',
       'tenon and Domino stations are shown edge to edge rather than rail into',
@@ -2407,7 +2560,9 @@ const file = {
       'simply not expressible.',
       '',
       'Worth trying: Fit Tenon to Mortise on 07, Fit Dado to Mating Part on 05,',
-      'Transfer Holes to Mating Part on 03, Bore Through Assembly on 26.'
+      'Transfer Holes to Mating Part on 03, Bore Through Assembly on 26.',
+      'Station 05 is fitted to the actual 23/32-inch plywood thickness.',
+      'To demonstrate Fit Dado to Mating Part, widen its housing temporarily.'
     ].join('\n'),
     stockConstraints: { constrainDimensions: true, constrainGrain: true, constrainColor: true, preventOverlap: true }
   },
@@ -2416,7 +2571,89 @@ const file = {
   groups,
   groupMembers,
   assemblies: [],
-  customShoppingItems: [],
+  customShoppingItems: [
+    {
+      id: id(),
+      name: '29 Cross Dowel — joint bolt and matching barrel nut set',
+      quantity: 1,
+      unitPrice: 0,
+      category: 'Hardware',
+      description:
+        'One complete bolt (head included) plus one matching threaded barrel nut. Demo envelope: 1/4-inch bolt clearance, 4-1/2-inch under-head reach to barrel center; barrel 3/8-inch diameter × 3/4-inch long. Select compatible threads and sufficient engagement, then adjust the demo bores to the actual hardware. Price not entered.'
+    },
+    {
+      id: id(),
+      name: '53 Shelf Pins — 5 mm shelf support pin',
+      quantity: 2,
+      unitPrice: 0,
+      category: 'Hardware',
+      description:
+        'Two pins for the one cabinet-side sample shown. Bore depth 3/8 inch; select matching insertion length and support geometry. The opposite cabinet side and its supports are omitted. Price not entered.'
+    },
+    {
+      id: id(),
+      name: '34 Pocket Hole — screws for 3/4-inch hardwood',
+      quantity: 2,
+      unitPrice: 0,
+      category: 'Hardware',
+      description:
+        'Select pocket-hole screws compatible with the actual jig, hardwood and material thickness; confirm length and head fit before drilling. Price not entered.'
+    },
+    {
+      id: id(),
+      name: '47 Screwed Cleat — countersunk wood screws',
+      quantity: 3,
+      unitPrice: 0,
+      category: 'Hardware',
+      description:
+        'Fasten a 3/4-inch cleat to the 3/4-inch panel. Select head diameter, pilot diameter and penetration to match the stock and avoid breaking through the panel. Price not entered.'
+    },
+    {
+      id: id(),
+      name: '46 Rule Joint — drop-leaf hinge kit with mounting screws',
+      quantity: 1,
+      unitPrice: 0,
+      category: 'Hardware',
+      description:
+        'One kit sufficient for the 12-inch sample leaf. Choose hinges for the actual rule-joint profile; follow the kit instructions for hinge count, pivot location, recesses and screws. No hinge motion or mounting recesses are modeled. Price not entered.'
+    },
+    {
+      id: id(),
+      name: '49 Hinge Mortise — hinge with matching mounting screws',
+      quantity: 1,
+      unitPrice: 0,
+      category: 'Hardware',
+      description:
+        'One hinge for the two mating leaf recesses shown. Match leaf dimensions and thickness to the recesses, or update the recesses to the purchased hinge; use its specified screws. Price not entered.'
+    },
+    {
+      id: id(),
+      name: '17 Tambour — canvas backing piece',
+      quantity: 1,
+      unitPrice: 0,
+      category: 'Supplies',
+      description:
+        'Cut a 3-1/4 × 5-1/2-inch piece of flexible canvas with scissors or a knife; no woodworking saw kerf or board-foot allowance. Attach to the slat undersides with a compatible flexible adhesive. Price not entered.'
+    },
+    {
+      id: id(),
+      name: '17 Tambour — flexible wood-to-canvas adhesive',
+      quantity: 1,
+      unitPrice: 0,
+      category: 'Supplies',
+      description:
+        'One container suitable for the 3-1/4 × 5-1/2-inch backing area; select a product intended for flexible tambour backing and follow its application instructions. Price not entered.'
+    },
+    {
+      id: id(),
+      name: 'Woodworking glue for bonded sample joints',
+      quantity: 1,
+      unitPrice: 0,
+      category: 'Supplies',
+      description:
+        'One container for the sample bench. Select a suitable wood adhesive and package coverage. Do not glue floating panels, moving tracks, or joints intended to be disassembled. Price not entered.'
+    }
+  ],
   cutList: null,
   thumbnail: null,
   cameraState: null

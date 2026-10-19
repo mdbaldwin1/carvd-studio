@@ -1,3 +1,4 @@
+import { MIN_DIMENSION_INCHES } from '../../constants';
 /**
  * Component to render distance indicators between selected parts and reference parts.
  * Shows edge-to-edge gaps (cyan) and edge alignment offsets (yellow).
@@ -186,8 +187,7 @@ export function ReferenceDistanceIndicators({ data }: ReferenceDistanceIndicator
           : activeSession.handle.z;
 
     if (ruler.editMode === 'resize-size') {
-      nextDimensions[axisToDimensionKey] =
-        axisToDimensionKey === 'thickness' ? Math.max(0.25, newDist) : Math.max(0.5, newDist);
+      nextDimensions[axisToDimensionKey] = Math.max(MIN_DIMENSION_INCHES, newDist);
     } else if (ruler.editMode === 'resize-gap' && sessionRelation && handleAxisValue !== 0) {
       const movement = calculateMoveDeltaForReferenceRelation(sessionRelation, newDist);
       if (!movement) {
@@ -196,8 +196,7 @@ export function ReferenceDistanceIndicators({ data }: ReferenceDistanceIndicator
       }
       const faceMovement = ruler.axis === 'x' ? movement.x : ruler.axis === 'y' ? movement.y : movement.z;
       const nextDimensionValue = activeSession.dimensions[axisToDimensionKey] + handleAxisValue * faceMovement;
-      nextDimensions[axisToDimensionKey] =
-        axisToDimensionKey === 'thickness' ? Math.max(0.25, nextDimensionValue) : Math.max(0.5, nextDimensionValue);
+      nextDimensions[axisToDimensionKey] = Math.max(MIN_DIMENSION_INCHES, nextDimensionValue);
     } else {
       setEditingId(null);
       return;

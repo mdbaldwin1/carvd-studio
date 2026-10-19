@@ -1,3 +1,4 @@
+import { normalizeSavedCutList } from './cutListVersion';
 /**
  * File format utilities for .carvd project files
  * Handles serialization, deserialization, validation, and migration
@@ -10,6 +11,7 @@ import {
   CARVD_FILE_VERSION_BASE,
   CARVD_FILE_VERSION_FEATURES,
   CARVD_FILE_VERSION_STOCK_FORMS,
+  CARVD_FILE_VERSION_JOINERY_LAYOUT,
   CarvdFile,
   CutList,
   CustomShoppingItem,
@@ -63,13 +65,25 @@ export function serializeProject(state: {
   const usesPartFeatures =
     state.parts.some(partHasFeatures) ||
     state.assemblies.some((assembly) => assembly.parts.some((part) => (part.features?.length ?? 0) > 0));
+  const requiresJoineryGeometry = (part: Pick<Part, 'blankShape' | 'features'>) =>
+    Boolean(part.blankShape) ||
+    part.features?.some(
+      (feature) =>
+        (feature.kind === 'rect_cut' && feature.parameters.stoppedSpan) ||
+        (feature.kind === 'rounded_cut' && feature.parameters.plateJoiner)
+    );
+  const usesJoineryGeometry =
+    state.parts.some(requiresJoineryGeometry) ||
+    state.assemblies.some((assembly) => assembly.parts.some(requiresJoineryGeometry));
 
   return {
     // A file declares the oldest version that can represent it: rod and insert
     // stock need 3, cuts need 2, and anything simpler stays at 1 so older
     // builds keep opening it. Older builds then warn instead of silently
     // dropping material they cannot model.
-    version: resolveFileVersion(state.stocks, usesPartFeatures),
+    version: usesJoineryGeometry
+      ? CARVD_FILE_VERSION_JOINERY_LAYOUT
+      : resolveFileVersion(state.stocks, usesPartFeatures),
     project: {
       name: state.projectName,
       createdAt: state.createdAt,
@@ -119,7 +133,7 @@ export function deserializeToProject(file: CarvdFile): Project {
     })),
     snapGuides: file.snapGuides,
     customShoppingItems: file.customShoppingItems,
-    cutList: file.cutList,
+    cutList: normalizeSavedCutList(file.cutList) ?? undefined,
     thumbnail: file.thumbnail,
     cameraState: file.cameraState
   };
@@ -181,12 +195,29 @@ export function validateCarvdFile(data: unknown): FileValidationResult {
   }
 
   let containsPartFeatures = false;
+  let containsJoineryGeometry = false;
+  const inspectJoineryGeometry = (part: Record<string, unknown>, path: string) => {
+    const shape = part.blankShape;
+    if (shape !== undefined && !['domino', 'biscuit', 'round'].includes(String(shape)))
+      errors.push(`${path}.blankShape is invalid`);
+    if (
+      shape ||
+      (Array.isArray(part.features) &&
+        part.features.some(
+          (feature) =>
+            (feature?.kind === 'rect_cut' && feature?.parameters?.stoppedSpan === true) ||
+            (feature?.kind === 'rounded_cut' && feature?.parameters?.plateJoiner === true)
+        ))
+    )
+      containsJoineryGeometry = true;
+  };
   (obj.parts as unknown[]).forEach((part, index) => {
     if (!part || typeof part !== 'object' || Array.isArray(part)) {
       errors.push(`parts[${index}] is invalid`);
       return;
     }
     const features = (part as Record<string, unknown>).features;
+    inspectJoineryGeometry(part as Record<string, unknown>, `parts[${index}]`);
     if (Array.isArray(features) && features.length > 0) containsPartFeatures = true;
     errors.push(...validateSerializedPartFeatures(features, `parts[${index}].features`));
   });
@@ -206,6 +237,7 @@ export function validateCarvdFile(data: unknown): FileValidationResult {
         return;
       }
       const features = (part as Record<string, unknown>).features;
+      inspectJoineryGeometry(part as Record<string, unknown>, `assemblies[${assemblyIndex}].parts[${partIndex}]`);
       if (Array.isArray(features) && features.length > 0) containsPartFeatures = true;
       errors.push(
         ...validateSerializedPartFeatures(features, `assemblies[${assemblyIndex}].parts[${partIndex}].features`)
@@ -223,6 +255,8 @@ export function validateCarvdFile(data: unknown): FileValidationResult {
   ) {
     errors.push('Projects containing dowel or insert stock require file version 3 or newer');
   }
+  if (containsJoineryGeometry && typeof obj.version === 'number' && obj.version < CARVD_FILE_VERSION_JOINERY_LAYOUT)
+    errors.push('Projects containing factory shapes or explicit stopped spans require file version 4 or newer');
   if (containsPartFeatures && typeof obj.version === 'number' && obj.version < 2) {
     errors.push('Projects containing part cuts require file version 2 or newer');
   }

@@ -1,7 +1,7 @@
 import { fireEvent, render, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createTestPart } from '../../../../../tests/helpers/factories';
+import { createTestPart, createTestStock } from '../../../../../tests/helpers/factories';
 import { useInteractionStore } from '../../store/interactionStore';
 import { useProjectStore } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
@@ -68,9 +68,14 @@ vi.mock('./usePartResize', () => ({
   usePartResize: () => ({ isResizing: false, handleResizeStart: vi.fn() })
 }));
 
+vi.mock('./ResizeHandle', () => ({
+  ResizeHandle: ({ handlePos }: { handlePos: { x: number; y: number; z: number } }) =>
+    createElement('button', { 'aria-label': `Resize ${handlePos.x} ${handlePos.y} ${handlePos.z}` })
+}));
+
 describe('Part render ownership', () => {
   beforeEach(() => {
-    useProjectStore.setState({ groupMembers: [] });
+    useProjectStore.setState({ groupMembers: [], stocks: [] });
     useSelectionStore.setState({
       selectedPartIds: [],
       selectedGroupIds: [],
@@ -79,6 +84,40 @@ describe('Part render ownership', () => {
     });
     useInteractionStore.setState({ activeSession: null });
     vi.spyOn(console, 'error').mockImplementation(() => {});
+  });
+
+  it.each(['board', 'rod', 'insert'] as const)('only offers supported resize handles for %s stock', (form) => {
+    const stock = createTestStock({
+      id: 'resize-stock',
+      form,
+      ...(form === 'insert' ? { insertKind: 'dowel_pin' as const } : {})
+    });
+    const part = createTestPart({ id: 'resize-part', stockId: stock.id, length: 0.75, width: 0.25, thickness: 0.25 });
+    useProjectStore.setState({ stocks: [stock], parts: [part] });
+    useSelectionStore.setState({ selectedPartIds: [part.id], hoveredPartId: part.id });
+    const view = render(createElement(Part, { part }));
+    const handles = view.queryAllByRole('button', { name: /^Resize / });
+    expect(handles).toHaveLength(form === 'rod' ? 2 : form === 'insert' ? 0 : 20);
+    if (form === 'rod') {
+      expect(view.getByRole('button', { name: 'Resize -1 0 0' })).toBeTruthy();
+      expect(view.getByRole('button', { name: 'Resize 1 0 0' })).toBeTruthy();
+    }
+  });
+
+  it('keeps round length handles reachable after the pointer leaves the pin, without changing board hover behavior', async () => {
+    const stock = createTestStock({ id: 'round-grips', form: 'rod' });
+    const pin = createTestPart({ id: 'pin-grips', stockId: stock.id, length: 0.75, width: 0.25, thickness: 0.25 });
+    useProjectStore.setState({ stocks: [stock], parts: [pin] });
+    useSelectionStore.setState({ selectedPartIds: [pin.id], hoveredPartId: null });
+    const view = render(createElement(Part, { part: pin }));
+    expect(view.getAllByRole('button', { name: /^Resize / })).toHaveLength(2);
+    fireEvent.pointerOver(view.container.querySelector('mesh')!);
+    fireEvent.pointerOut(view.container.querySelector('mesh')!);
+    await waitFor(() => expect(view.getAllByRole('button', { name: /^Resize / })).toHaveLength(2));
+    view.unmount();
+    const board = { ...pin, stockId: null };
+    const regular = render(createElement(Part, { part: board }));
+    expect(regular.queryAllByRole('button', { name: /^Resize / })).toHaveLength(0);
   });
 
   it('renders an affected group move instead of a displaced part hook preview', async () => {

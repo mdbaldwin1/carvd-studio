@@ -134,8 +134,17 @@ export function CameraController() {
     const centerY = (minY + maxY) / 2;
     const centerZ = (minZ + maxZ) / 2;
 
-    // Set the orbit controls target to the center of selected parts
+    // Frame the selected stock as well as centering it. Tiny inserts need a
+    // close view just as a full assembly needs room around its outer bounds.
     if (isOrbitControls(controls)) {
+      const direction = camera.position.clone().sub(controls.target).normalize();
+      const radius = Math.max(0.1, Math.hypot(maxX - minX, maxY - minY, maxZ - minZ) / 2);
+      if (camera instanceof THREE.PerspectiveCamera) {
+        const halfFov = THREE.MathUtils.degToRad(camera.fov) / 2;
+        const limitingAngle = Math.min(halfFov, Math.atan(Math.tan(halfFov) * camera.aspect));
+        const distance = Math.max(0.5, (radius * 1.25) / Math.sin(limitingAngle));
+        camera.position.set(centerX, centerY, centerZ).addScaledVector(direction, distance);
+      }
       controls.target.set(centerX, centerY, centerZ);
       controls.update();
     }
@@ -147,6 +156,7 @@ export function CameraController() {
     selectedGroupIds,
     groupMembers,
     parts,
+    camera,
     controls,
     clearCenterCameraRequest
   ]);

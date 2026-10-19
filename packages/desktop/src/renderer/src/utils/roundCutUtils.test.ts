@@ -36,6 +36,35 @@ function rounded(overrides: Partial<RoundedCutFeature> = {}): RoundedCutFeature 
 }
 
 describe('roundCutUtils', () => {
+  it.each(['top_face', 'bottom_face'] as const)('bores through the recessed tenon cheek from %s', (face) => {
+    const rail = createTestPart({
+      length: 12,
+      width: 3,
+      thickness: 0.75,
+      features: [
+        {
+          id: 'tenon',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'tenon',
+          target: { type: 'face', face: 'right_end' },
+          reference: { primaryFrom: 'min' },
+          parameters: { size: { length: 1, width: 2 }, depthMode: 'blind', depth: 0.25 },
+          placement: { x: 0, z: 0.5 }
+        }
+      ]
+    });
+    const bore = hole({
+      target: { type: 'face', face },
+      parameters: { diameter: 0.25, depthMode: 'through', tilt: 0, direction: 0 },
+      placement: { primary: 5.5, secondary: 0, rotation: 0 }
+    });
+    expect(validateCircularCut(bore, rail)).toBeNull();
+    expect(validateCircularCut({ ...bore, placement: { ...bore.placement, secondary: 1.25 } }, rail)).toMatch(
+      /remaining material/
+    );
+  });
   it('rejects invalid recess and rounded-profile dimensions', () => {
     const part = createTestPart({ length: 12, width: 6, thickness: 1 });
     expect(

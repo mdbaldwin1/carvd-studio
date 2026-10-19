@@ -1,4 +1,6 @@
-import type { Part, RectCutFeature } from '../types';
+import { isRoundStock } from '../../../shared/stock';
+import type { Part, RectCutFeature, Stock } from '../types';
+import { getEdgeTongues, getEndTongues } from './edgeTongues';
 
 /** Local mirror of the snap engine's vector shape, which it keeps private. */
 type Vec3 = { x: number; y: number; z: number };
@@ -32,6 +34,7 @@ export interface HousingFitPlan {
   /** What it is now, for saying whether anything changed. */
   currentWidth: number;
   changed: boolean;
+  usesTongue?: boolean;
 }
 
 function dot(a: Vec3, b: Vec3): number {
@@ -114,8 +117,21 @@ function chooseHousing(
 }
 
 /** What cutting this housing to this piece would do, without doing it. */
-export function planHousingFit(shelfPart: Part, housingPart: Part): HousingFitPlan | null {
+export function planHousingFit(
+  shelfPart: Part,
+  housingPart: Part,
+  stocks: readonly Stock[] = []
+): HousingFitPlan | null {
   if (shelfPart.id === housingPart.id) return null;
+  // This recipe sizes a board housing to another board, not to a fastener
+  // which happens to be nearby. Pins and purchased inserts need sockets.
+  if (
+    [shelfPart, housingPart].some((part) => {
+      const stock = stocks.find((candidate) => candidate.id === part.stockId);
+      return Boolean(part.blankShape || stock?.form === 'insert' || (stock && isRoundStock(stock)));
+    })
+  )
+    return null;
 
   const shelfObb = getPartOBB(shelfPart, shelfPart.position);
   const chosen = chooseHousing(shelfObb, housingPart);
@@ -128,7 +144,23 @@ export function planHousingFit(shelfPart: Part, housingPart: Part): HousingFitPl
   // dimension that is depends on how the piece is turned, which is the whole
   // reason the facing direction matters rather than just the proximity.
   const axis = channel.tangent === 1 ? chosen.socket.tangent1 : chosen.socket.tangent2;
-  const width = extentAlong(shelfObb, axis);
+  const tongues = getEdgeTongues(shelfPart);
+  const usesTongue =
+    tongues.length === 1 &&
+    chosen.feature.cutType === 'groove' &&
+    chosen.feature.target.type === 'face' &&
+    ['front_face', 'back_face'].includes(chosen.feature.target.face);
+  const endTongues = getEndTongues(shelfPart);
+  const dot = (a: Vec3, b: Vec3) => a.x * b.x + a.y * b.y + a.z * b.z;
+  const usesEndTongue =
+    endTongues.length === 1 &&
+    dot(shelfObb.axes[0], chosen.socket.openingNormal) * (endTongues[0].face === 'left_end' ? -1 : 1) < -1 + 1e-6 &&
+    Math.abs(dot(shelfObb.axes[1], axis)) > 1 - 1e-6;
+  const width = usesEndTongue
+    ? endTongues[0].thickness
+    : usesTongue
+      ? tongues[0].thickness
+      : extentAlong(shelfObb, axis);
   const currentWidth = chosen.feature.parameters.size[channel.field];
 
   return {
@@ -138,6 +170,7 @@ export function planHousingFit(shelfPart: Part, housingPart: Part): HousingFitPl
     field: channel.field,
     width,
     currentWidth,
+    usesTongue: usesTongue || usesEndTongue,
     changed: Math.abs(width - currentWidth) > 1e-9
   };
 }
@@ -149,9 +182,13 @@ export function planHousingFit(shelfPart: Part, housingPart: Part): HousingFitPl
  * two shelves crossing, say -- the one whose channel the other actually faces
  * is the housing.
  */
-export function resolveHousingRoles(first: Part, second: Part): { shelfPart: Part; housingPart: Part } | null {
-  const firstHouses = planHousingFit(second, first) !== null;
-  const secondHouses = planHousingFit(first, second) !== null;
+export function resolveHousingRoles(
+  first: Part,
+  second: Part,
+  stocks: readonly Stock[] = []
+): { shelfPart: Part; housingPart: Part } | null {
+  const firstHouses = planHousingFit(second, first, stocks) !== null;
+  const secondHouses = planHousingFit(first, second, stocks) !== null;
   if (firstHouses && !secondHouses) return { shelfPart: second, housingPart: first };
   if (secondHouses && !firstHouses) return { shelfPart: first, housingPart: second };
   return null;

@@ -7,12 +7,17 @@ import type { ElectronApplication } from 'playwright';
 import { closeElectronApp, launchElectronApp, type RunningElectronApp } from '../../tests/e2e/helpers/electron-app';
 import { createTestElectronRuntime, removeTestElectronRuntime } from '../../tests/e2e/helpers/electron-runtime';
 
-const { launch } = vi.hoisted(() => ({ launch: vi.fn() }));
+const { launch, sample } = vi.hoisted(() => ({ launch: vi.fn(), sample: vi.fn() }));
 vi.mock('@playwright/test', () => ({ expect: {}, _electron: { launch } }));
+vi.mock('node:child_process', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:child_process')>()),
+  execFile: sample
+}));
 
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
 });
 
 function fakeRunning(exitDelay = 0) {
@@ -21,7 +26,7 @@ function fakeRunning(exitDelay = 0) {
     exitCode: null as number | null,
     signalCode: null as string | null,
     pid: 123,
-    kill: vi.fn(() => {
+    kill: vi.fn((_signal?: string) => {
       calls.push('kill');
       return true;
     })
@@ -143,3 +148,80 @@ test('the isolated runtime keeps framework resources and helper identities insid
     await removeTestElectronRuntime(runtime);
   }
 });
+
+test.each([true, false])('opt-in cleanup requires both shutdown milestones: %s', async (bothObserved) => {
+  vi.useFakeTimers();
+  vi.stubEnv('CARVD_E2E_ALLOW_POST_QUIT_CLEANUP', '1');
+  const { running, proc } = fakeRunning(60000);
+  const runtimeDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'carvd-cleanup-unit-runtime-'));
+  running.runtime = {
+    directory: runtimeDirectory,
+    executablePath: path.join(runtimeDirectory, 'Electron'),
+    loaderPath: 'test',
+    bundleId: 'com.carvd-studio.e2e.unit'
+  };
+  Object.assign(proc, { spawnfile: running.runtime.executablePath });
+  running.quitEvidence = { quit: true, nodeExit: bothObserved };
+  proc.kill.mockImplementation(() => {
+    proc.signalCode = 'SIGKILL';
+    proc.emit('exit', null, 'SIGKILL');
+    return true;
+  });
+  const closing = closeElectronApp(running);
+  if (process.platform === 'darwin' && bothObserved) {
+    await vi.advanceTimersByTimeAsync(30001);
+    await closing;
+    expect(proc.kill).toHaveBeenCalledWith('SIGKILL');
+  } else {
+    const assertion = expect(closing).rejects.toThrow('no force-kill performed');
+    await vi.advanceTimersByTimeAsync(30001);
+    await assertion;
+    expect(proc.kill).not.toHaveBeenCalled();
+  }
+  fs.rmSync(running.userDataDir, { recursive: true, force: true });
+  fs.rmSync(runtimeDirectory, { recursive: true, force: true });
+});
+
+test.runIf(process.platform === 'darwin').each(['missing', 'empty', 'stack'] as const)(
+  'slow-quit diagnostics distinguish command success from a captured %s report',
+  async (report) => {
+    vi.useFakeTimers();
+    vi.stubEnv('CARVD_E2E_TRACE_QUIT', '1');
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const { running, proc } = fakeRunning(20000);
+    const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'carvd-sample-unit-runtime-'));
+    running.runtime = {
+      directory,
+      executablePath: path.join(directory, 'Electron'),
+      loaderPath: 'test',
+      bundleId: 'com.carvd-studio.e2e.sample-unit'
+    };
+    Object.assign(proc, { spawnfile: running.runtime.executablePath });
+    let samplePath: string | undefined;
+    sample.mockImplementationOnce(
+      (_command: string, args: string[], _options: unknown, callback: (error: Error | null) => void) => {
+        samplePath = args[args.length - 1];
+        if (report !== 'missing') fs.writeFileSync(samplePath, report === 'stack' ? 'Call graph:\nThread main\n' : '');
+        callback(null);
+      }
+    );
+    try {
+      const closing = closeElectronApp(running);
+      await vi.advanceTimersByTimeAsync(15001);
+      const receipt = warning.mock.calls.find(([label]) => label === 'SLOW_QUIT_SAMPLE');
+      expect(receipt).toBeDefined();
+      expect(JSON.parse(String(receipt![1]))).toMatchObject({
+        commandSucceeded: true,
+        captured: report === 'stack'
+      });
+      expect(proc.kill).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(5000);
+      await closing;
+      expect(proc.exitCode).toBe(0);
+    } finally {
+      if (samplePath) fs.rmSync(samplePath, { force: true });
+      fs.rmSync(running.userDataDir, { recursive: true, force: true });
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+  }
+);

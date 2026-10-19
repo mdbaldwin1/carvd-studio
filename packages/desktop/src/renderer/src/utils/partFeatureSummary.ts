@@ -1,5 +1,8 @@
 import { CornerTarget, EdgeTarget, FaceTarget, PartFeature } from '@renderer/types';
-import { formatFabricationMeasurement as formatMeasurementWithUnit } from '@renderer/utils/fractions';
+import {
+  formatReadableMeasurement as formatMeasurementWithUnit,
+  formatFabricationMeasurement
+} from '@renderer/utils/fractions';
 
 export const FACE_LABELS: Record<FaceTarget, string> = {
   left_end: 'Left End',
@@ -80,6 +83,30 @@ function getEndCutHighPointLabel(feature: Extract<PartFeature, { kind: 'end_cut'
 }
 
 export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'metric'): string {
+  const summary = getFeatureSummaryText(feature, units);
+  if (feature.kind === 'end_cut' && feature.parameters.band) {
+    const { from, to } = feature.parameters.band;
+    return `${summary} · Cut band ${formatFabricationMeasurement(from, units)} to ${formatFabricationMeasurement(to, units)} from Bottom`;
+  }
+  if (feature.kind !== 'rect_cut') return summary;
+  const taper = feature.parameters.taperAngle;
+  const sideWalls = feature.parameters.sideWallAngle;
+  const endWalls = feature.parameters.wallAngle;
+  const angles = [
+    taper ? `${Math.abs(taper)}° taper in the face, ${taper > 0 ? 'widening' : 'narrowing'} toward Right` : '',
+    sideWalls ? `${Math.abs(sideWalls)}° side walls, ${sideWalls > 0 ? 'widening' : 'narrowing'} with depth` : '',
+    endWalls && feature.cutType !== 'dado'
+      ? `${Math.abs(endWalls)}° end walls, ${endWalls > 0 ? 'widening' : 'narrowing'} with depth`
+      : ''
+  ]
+    .filter(Boolean)
+    .map((angle) => ` · ${angle}`)
+    .join('');
+
+  return summary + angles;
+}
+
+function getFeatureSummaryText(feature: PartFeature, units: 'imperial' | 'metric'): string {
   if (feature.kind === 'end_cut' && (feature.target.face === 'front_face' || feature.target.face === 'back_face')) {
     const angle = feature.parameters.verticalAngle ?? 0;
     const edgeLabel = feature.target.face === 'front_face' ? 'Front Edge' : 'Back Edge';
@@ -119,7 +146,9 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
         ? 'Through'
         : `${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
     const angle =
-      feature.parameters.tilt > 0 ? ` · ${feature.parameters.tilt}° tilt toward ${feature.parameters.direction}°` : '';
+      feature.parameters.tilt > 0
+        ? ` · ${90 - feature.parameters.tilt}° from face toward ${feature.parameters.direction}°`
+        : '';
     if (feature.pattern) {
       const count =
         feature.pattern.type === 'grid' ? feature.pattern.rows * feature.pattern.columns : feature.pattern.count;
@@ -151,6 +180,11 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
 
   if (feature.kind === 'rounded_cut') {
     const target = getFeatureTargetLabel(feature);
+    if (feature.parameters.plateJoiner && feature.parameters.depth) {
+      const depth = feature.parameters.depth;
+      const bladeDiameter = feature.parameters.length ** 2 / (4 * depth) + depth;
+      return `Plate-joiner slot on ${target} · ${formatMeasurementWithUnit(bladeDiameter, 'metric')} blade · ${formatMeasurementWithUnit(feature.parameters.width, 'metric')} kerf × ${formatMeasurementWithUnit(depth, 'metric')} plunge`;
+    }
     const size = `${formatMeasurementWithUnit(feature.parameters.length, units)} × ${formatMeasurementWithUnit(feature.parameters.width, units)}`;
     const termination =
       feature.parameters.depthMode === 'through'
@@ -160,7 +194,7 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
       feature.cutType === 'rounded_rectangle'
         ? ` · ${formatMeasurementWithUnit(feature.parameters.cornerRadius, units)} radius`
         : '';
-    return `${toTitleCase(feature.cutType)} on ${target} · ${size}${radius} × ${termination}`.replace(
+    return `${feature.parameters.plateJoiner ? 'Plate-joiner slot' : toTitleCase(feature.cutType)} on ${target} · ${size}${radius} × ${termination}`.replace(
       ` × Through`,
       ` · Through`
     );
@@ -172,7 +206,7 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
       feature.bit.profile === 'v_bit'
         ? `V-Bit ${feature.bit.includedAngle}°`
         : feature.bit.profile === 'dovetail'
-          ? `Dovetail ${feature.bit.includedAngle}° · ${formatMeasurementWithUnit(feature.bit.shankDiameter, units)} shank`
+          ? `Dovetail ${feature.bit.includedAngle / 2}° slope · ${formatMeasurementWithUnit(feature.bit.shankDiameter, units)} shank`
           : feature.bit.profile === 't_slot' || feature.bit.profile === 'keyhole'
             ? `${toTitleCase(feature.bit.profile)} · ${formatMeasurementWithUnit(feature.bit.shankDiameter, units)} shank × ${formatMeasurementWithUnit(feature.bit.cutterHeight, units)} cutter height`
             : feature.bit.profile === 'straight'
@@ -223,7 +257,17 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
   }
 
   if (feature.cutType === 'dado') {
+    if (feature.parameters.wallAngle) {
+      return `Dovetail Housing on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} mouth × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep · ${feature.parameters.wallAngle}° walls`;
+    }
     return `Dado on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} wide × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
+  }
+
+  if (feature.cutType === 'stopped_dado' && feature.parameters.stoppedSpan) {
+    const corners = feature.parameters.cornerRadius
+      ? `${formatMeasurementWithUnit(feature.parameters.cornerRadius, units)} radius at stopped ends`
+      : 'square ends';
+    return `Stopped Dado on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} wide × ${formatMeasurementWithUnit(feature.parameters.size.width, units)} across × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep · ${corners}`;
   }
 
   if (feature.cutType === 'stopped_dado') {
@@ -254,7 +298,11 @@ export function getFeatureSummary(feature: PartFeature, units: 'imperial' | 'met
       cornerRadius > 0
         ? ` · routed, ${formatMeasurementWithUnit(cornerRadius, units)} radius corners`
         : ' · square corners';
-    return `Mortise on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} × ${formatMeasurementWithUnit(feature.parameters.size.width, units)} × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep${corners}`;
+    const termination =
+      feature.parameters.depthMode === 'through'
+        ? ' · Through'
+        : ` × ${formatMeasurementWithUnit(feature.parameters.depth ?? 0, units)} deep`;
+    return `Mortise on ${getFeatureTargetLabel(feature)} · ${formatMeasurementWithUnit(feature.parameters.size.length, units)} × ${formatMeasurementWithUnit(feature.parameters.size.width, units)}${termination}${corners}`;
   }
 
   const size = `${formatMeasurementWithUnit(feature.parameters.size.length, units)} × ${formatMeasurementWithUnit(feature.parameters.size.width, units)}`;
@@ -270,7 +318,11 @@ export function getAuthoredFeatureCount(features?: PartFeature[]): number {
   return features?.length ?? 0;
 }
 
-export function getFeaturePlacementSummary(feature: PartFeature, units: 'imperial' | 'metric'): string | null {
+export function getFeaturePlacementSummary(
+  feature: PartFeature,
+  units: 'imperial' | 'metric',
+  partWidth?: number
+): string | null {
   const measure = (value: number) => formatMeasurementWithUnit(value, units);
   if (feature.kind === 'end_cut') return null;
   if (feature.kind === 'routed_path') {
@@ -281,22 +333,31 @@ export function getFeaturePlacementSummary(feature: PartFeature, units: 'imperia
   }
   if (feature.kind === 'edge_profile') return 'Full run along the selected edge';
   if (feature.kind === 'rect_cut') {
+    if (feature.cutType === 'dado' && feature.parameters.wallAngle)
+      return `Center ${measure(feature.placement.x + feature.parameters.size.length / 2)} from Left; full width`;
     if (feature.cutType === 'rabbet') return 'Full run along the selected edge';
     if (feature.target.type === 'edge') {
       const alongLength = feature.target.edge.includes('front') || feature.target.edge.includes('back');
-      return `${measure(alongLength ? feature.placement.x : feature.placement.z)} from ${alongLength ? 'Left' : 'Front'} along the selected edge`;
+      return `${measure(alongLength ? feature.placement.x : feature.placement.z)} from ${alongLength ? 'Left' : 'Back'} along the selected edge`;
     }
     if (feature.cutType === 'corner_notch')
       return feature.parameters.depthMode === 'blind' ? 'Enter from Top Face at the selected corner' : null;
     if (feature.cutType === 'tenon')
       return `Tongue starts ${measure(feature.placement.z)} from Front; centered through thickness`;
+    if (feature.cutType === 'stopped_dado' && feature.parameters.stoppedSpan && partWidth !== undefined) {
+      const back = feature.placement.z;
+      const front = partWidth - back - feature.parameters.size.width;
+      return `${measure(feature.placement.x)} from Left · ${back > 1e-9 ? `Stop ${measure(back)} from Back` : 'Open at Back'} · ${front > 1e-9 ? `Stop ${measure(front)} from Front` : 'Open at Front'}`;
+    }
+    if (feature.cutType === 'stopped_dado' && feature.parameters.stoppedSpan)
+      return `${measure(feature.placement.x)} from Left · ${measure(feature.placement.z)} from Back · ${measure(feature.parameters.size.width)} across`;
     if (feature.cutType === 'dado' || feature.cutType === 'stopped_dado' || feature.cutType === 'half_lap')
       return `${measure(feature.placement.x)} from Left; full width`;
-    if (feature.cutType === 'groove') return `${measure(feature.placement.z)} from Front; full length`;
     const secondaryEdge =
       feature.target.type === 'face' && (feature.target.face === 'front_face' || feature.target.face === 'back_face')
         ? 'Bottom'
-        : 'Front';
+        : 'Back';
+    if (feature.cutType === 'groove') return `${measure(feature.placement.z)} from ${secondaryEdge}; full length`;
     return `${measure(feature.placement.x)} from Left · ${measure(feature.placement.z)} from ${secondaryEdge}`;
   }
   const face = feature.target.face;

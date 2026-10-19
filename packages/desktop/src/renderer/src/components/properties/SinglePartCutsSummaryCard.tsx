@@ -1,3 +1,4 @@
+import { DocsLink } from '../common/library/DocsLink';
 import { Button } from '@renderer/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
 import { Part } from '@renderer/types';
@@ -59,6 +60,7 @@ export function SinglePartCutsSummaryCard({ selectedPart, units, onEditCuts }: S
         <Button size="sm" className="w-full" onClick={onEditCuts}>
           Edit Part Cuts
         </Button>
+        <DocsLink section="part-cuts">Part Cuts guide</DocsLink>
       </CardContent>
     </Card>
   );

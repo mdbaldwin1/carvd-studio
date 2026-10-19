@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Part, SnapGuide } from '../types';
 import paulDeckFixture from '../../../../tests/fixtures/paul-deck-snap-regression.json';
+import { partsOverlap } from './overlapPolicy';
 import { createDowelJoint } from './dowelJointUtils';
 import {
   calculateGroupReferenceDistances,
@@ -13,6 +14,8 @@ import {
   createOriginSnapLine,
   detectDimensionSnaps,
   detectFaceSnaps,
+  detectSurfaceAnchorSnaps,
+  detectFractionalFaceSnaps,
   detectFeatureMateSnaps,
   detectFeatureSnaps,
   detectGuideSnaps,
@@ -1413,6 +1416,20 @@ describe('snapToPartsUtil', () => {
       expect(line.type).toBe('center');
     });
   });
+
+  it.each([detectFaceSnaps, detectSurfaceAnchorSnaps, detectFractionalFaceSnaps])(
+    'keeps face clearance outside the target when approaching from either side of its plane',
+    (detect) => {
+      const moving = createTestPart({ id: 'moving' });
+      const target = createTestPart({ id: 'target', position: { x: 10, y: 0, z: 0 } });
+      for (const x of [-0.1, 0.1]) {
+        const result = detect(moving, { x, y: 0, z: 0 }, [target], [moving.id], 0.5);
+        expect(result.snappedX).toBe(true);
+        expect(result.adjustedPosition.x).toBeCloseTo(-0.0001, 8);
+        expect(partsOverlap({ ...moving, position: result.adjustedPosition }, target)).toBe(false);
+      }
+    }
+  );
 
   describe('detectFaceSnaps', () => {
     const endCut = (

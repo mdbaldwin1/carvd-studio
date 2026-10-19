@@ -1,5 +1,5 @@
 import { cn } from '@renderer/lib/utils';
-import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { formatFabricationMeasurement as formatMeasurementWithUnit } from '../../utils/fractions';
 import { CutPlacement, StockBoard } from '../../types';
 
 function getReadableTextColor(backgroundHex: string): string {

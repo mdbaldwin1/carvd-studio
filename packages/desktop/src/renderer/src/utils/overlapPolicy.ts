@@ -2,6 +2,7 @@ import { Part } from '../types';
 import { getPartEdgeBevelProfiles, getPartEndCutProfiles } from './endCutUtils';
 import {
   hasRenderablePartFeatures,
+  createPartTranslationMaterialTest,
   partsOverlapOnYAxis,
   partsOverlapInPlan,
   partsOverlapInMaterial
@@ -19,6 +20,7 @@ import {
 import { dragDebug } from './dragDebug';
 import type { GeometryCache } from '../interaction/geometry/cache';
 import { isHousingCut } from './rectCutTraits';
+import { isTopTarget, isBottomTarget } from './rectCutUtils';
 
 const OBB_EPSILON = 1e-6;
 /**
@@ -104,6 +106,7 @@ export function overlapCheckEnabled(a: Part, b: Part): boolean {
  * cannot touch, and the boards slide through one another.
  */
 function needsMaterialOverlapTest(part: Part): boolean {
+  if (part.blankShape) return true;
   return (
     part.features?.some(
       (feature) =>
@@ -562,4 +565,234 @@ export function resolveSafeTranslationDelta(
     proposedDelta
   });
   return null;
+}
+
+/** Continuous broad phase for fixed-orientation translation. Separating-axis
+ * time intervals reject paths whose whole blank boxes never meet; this is only
+ * rejection, so the material test still decides every potentially touching pair. */
+function translatedBlankBoxesMayMeet(a: PartOBB, b: PartOBB, delta: TranslationDelta): boolean {
+  const dot = (u: TranslationDelta, v: TranslationDelta) => u.x * v.x + u.y * v.y + u.z * v.z;
+  const axes = [...a.axes, ...b.axes];
+  for (const first of a.axes)
+    for (const second of b.axes) {
+      const cross = {
+        x: first.y * second.z - first.z * second.y,
+        y: first.z * second.x - first.x * second.z,
+        z: first.x * second.y - first.y * second.x
+      };
+      const length = Math.hypot(cross.x, cross.y, cross.z);
+      if (length > 1e-8) axes.push({ x: cross.x / length, y: cross.y / length, z: cross.z / length });
+    }
+  const relative = { x: b.center.x - a.center.x, y: b.center.y - a.center.y, z: b.center.z - a.center.z };
+  let firstContact = 0,
+    lastContact = 1;
+  for (const axis of axes) {
+    // Inflate by numerical tolerance: tangency must reach the material test.
+    const radius =
+      a.axes.reduce((sum, local, i) => sum + Math.abs(dot(local, axis)) * a.halfExtents[i], 0) +
+      b.axes.reduce((sum, local, i) => sum + Math.abs(dot(local, axis)) * b.halfExtents[i], 0) +
+      OBB_EPSILON;
+    const separation = dot(relative, axis),
+      velocity = dot(delta, axis);
+    if (Math.abs(velocity) < 1e-12) {
+      if (Math.abs(separation) > radius) return false;
+      continue;
+    }
+    const near = (separation - radius) / velocity,
+      far = (separation + radius) / velocity;
+    firstContact = Math.max(firstContact, Math.min(near, far));
+    lastContact = Math.min(lastContact, Math.max(near, far));
+    if (firstContact > lastContact) return false;
+  }
+  return true;
+}
+
+/** Exact convex cells only; never use the approximate splayed/curved slabs
+ * from the broader fitting decomposition to decide a continuous path. */
+function nudgeMaterialCells(part: Part): Part[] | null {
+  const features = (part.features ?? []).filter((feature) => feature.enabled);
+  if (!features.length) return !part.blankShape || part.blankShape === 'round' ? [part] : null;
+  if (
+    part.blankShape ||
+    !features.every(
+      (feature) =>
+        feature.kind === 'rect_cut' &&
+        ['cutout', 'rabbet', 'notch', 'dado', 'groove'].includes(feature.cutType) &&
+        (isTopTarget(feature) || isBottomTarget(feature)) &&
+        !feature.parameters.wallAngle &&
+        !feature.parameters.sideWallAngle &&
+        !feature.parameters.taperAngle &&
+        !feature.parameters.cornerRadius
+    )
+  )
+    return null;
+  return getPartMaterialOBBs(part).map((cell) => ({
+    ...part,
+    features: [],
+    position: cell.center,
+    length: cell.halfExtents[0] * 2,
+    thickness: cell.halfExtents[1] * 2,
+    width: cell.halfExtents[2] * 2
+  }));
+}
+
+/** Keyboard nudges move through space, not directly to a destination. Test the
+ * exact swept solids of convex blanks or straight rectangular material cells
+ * against the actual host cuts. Other featured parts sweep their actual mesh
+ * boundary triangles, never a whole-blank hull that fills their openings.
+ * Numeric placement is unaffected.
+ */
+export function resolveSafeNudgeTranslationDelta(
+  parts: Part[],
+  movingIds: Set<string>,
+  proposedDelta: TranslationDelta,
+  insertionNormal?: TranslationDelta
+): TranslationDelta | null {
+  if (Math.hypot(proposedDelta.x, proposedDelta.y, proposedDelta.z) < 1e-10) return proposedDelta;
+  if (insertionNormal) {
+    // Semantic seating aligns across the opening before inserting. A diagonal
+    // shortcut clips the rim even though both stages are physically clear.
+    const depth =
+      proposedDelta.x * insertionNormal.x + proposedDelta.y * insertionNormal.y + proposedDelta.z * insertionNormal.z;
+    const insertion = { x: depth * insertionNormal.x, y: depth * insertionNormal.y, z: depth * insertionNormal.z };
+    const alignment = {
+      x: proposedDelta.x - insertion.x,
+      y: proposedDelta.y - insertion.y,
+      z: proposedDelta.z - insertion.z
+    };
+    const safeAlignment = resolveSafeNudgeTranslationDelta(parts, movingIds, alignment);
+    if (!safeAlignment) return null;
+    if (Math.hypot(safeAlignment.x - alignment.x, safeAlignment.y - alignment.y, safeAlignment.z - alignment.z) > 1e-6)
+      return safeAlignment;
+    const alignedParts = parts.map((part) =>
+      movingIds.has(part.id)
+        ? {
+            ...part,
+            position: {
+              x: part.position.x + alignment.x,
+              y: part.position.y + alignment.y,
+              z: part.position.z + alignment.z
+            }
+          }
+        : part
+    );
+    const safeInsertion = resolveSafeNudgeTranslationDelta(alignedParts, movingIds, insertion);
+    return {
+      x: alignment.x + (safeInsertion?.x ?? 0),
+      y: alignment.y + (safeInsertion?.y ?? 0),
+      z: alignment.z + (safeInsertion?.z ?? 0)
+    };
+  }
+  const endpointSafe = resolveSafeTranslationDelta(parts, movingIds, proposedDelta);
+  if (!endpointSafe) return null;
+  const pairs: Array<{
+    moving: Part;
+    fixed: Part;
+    general: boolean;
+    sweep?: ReturnType<typeof createPartTranslationMaterialTest>;
+  }> = [];
+  for (const moving of parts) {
+    if (!movingIds.has(moving.id)) continue;
+    let cells: Part[] | null | undefined;
+    for (const fixed of parts) {
+      if (movingIds.has(fixed.id) || !overlapCheckEnabled(moving, fixed)) continue;
+      // Cheap conservative swept-sphere rejection keeps distant scene parts
+      // out of the material/BVH test without filling any nearby cavities.
+      const distanceSquared = endpointSafe.x ** 2 + endpointSafe.y ** 2 + endpointSafe.z ** 2;
+      const relative = {
+        x: fixed.position.x - moving.position.x,
+        y: fixed.position.y - moving.position.y,
+        z: fixed.position.z - moving.position.z
+      };
+      const fraction =
+        distanceSquared > 0
+          ? Math.max(
+              0,
+              Math.min(
+                1,
+                (relative.x * endpointSafe.x + relative.y * endpointSafe.y + relative.z * endpointSafe.z) /
+                  distanceSquared
+              )
+            )
+          : 0;
+      const radius =
+        Math.hypot(moving.length, moving.width, moving.thickness) / 2 +
+        Math.hypot(fixed.length, fixed.width, fixed.thickness) / 2;
+      if (
+        Math.hypot(
+          relative.x - endpointSafe.x * fraction,
+          relative.y - endpointSafe.y * fraction,
+          relative.z - endpointSafe.z * fraction
+        ) > radius
+      )
+        continue;
+      if (!translatedBlankBoxesMayMeet(getPartOBB(moving), getPartOBB(fixed), endpointSafe)) continue;
+      // Keep the established recovery behavior for imported overlapping parts.
+      if (partsOverlap(moving, fixed)) continue;
+      cells ??= nudgeMaterialCells(moving);
+      if (cells) for (const cell of cells) pairs.push({ moving: cell, fixed, general: false });
+      else pairs.push({ moving, fixed, general: true });
+    }
+  }
+  const blocked = (fraction: number) =>
+    pairs.some((pair) => {
+      const delta = { x: endpointSafe.x * fraction, y: endpointSafe.y * fraction, z: endpointSafe.z * fraction };
+      if (!pair.general) return partsOverlapInMaterial(pair.moving, pair.fixed, 1e-6, delta);
+      pair.sweep ??= createPartTranslationMaterialTest(pair.moving, pair.fixed);
+      return pair.sweep.overlaps(delta);
+    });
+  try {
+    if (!blocked(1)) return endpointSafe;
+    // The exact swept volume grows monotonically. If it already hits before
+    // the minimum accepted motion, further bisection cannot produce a move.
+    if (blocked(MIN_DIRECTIONAL_FRACTION)) return null;
+    let low = 0,
+      high = 1;
+    for (let i = 0; i < SAFE_SEARCH_STEPS; i++) {
+      const mid = (low + high) / 2;
+      if (blocked(mid)) high = mid;
+      else low = mid;
+    }
+    return low >= MIN_DIRECTIONAL_FRACTION
+      ? { x: endpointSafe.x * low, y: endpointSafe.y * low, z: endpointSafe.z * low }
+      : null;
+  } finally {
+    for (const pair of pairs) pair.sweep?.dispose();
+  }
+}
+
+/** Preserve the existing board seating path while testing pins and seated
+ * rectangular inserts along the entire drag. An insert may be clear of the destination yet lock the start;
+ * endpoint-only collision would let a large pointer move tunnel through it.
+ */
+export function resolveSafeDragTranslationDelta(
+  parts: Part[],
+  movingIds: Set<string>,
+  proposedDelta: TranslationDelta,
+  geometryCache?: GeometryCache,
+  mateHostPartId?: string
+): TranslationDelta | null {
+  const endpoint = resolveSafeTranslationDelta(parts, movingIds, proposedDelta, geometryCache, mateHostPartId);
+  if (!endpoint) return null;
+  const movingParts = parts.filter((part) => movingIds.has(part.id));
+  return resolveSafeNudgeTranslationDelta(
+    parts.filter((part) => {
+      if (movingIds.has(part.id)) return true;
+      if (part.id === mateHostPartId) return false;
+      if (part.blankShape === 'round') return true;
+      // A plain insert already occupying a cut in a moving board must not be
+      // skipped just because a large pointer step ends beyond it. Keep normal
+      // board-to-board approach/seating on the existing endpoint path.
+      return (
+        !hasRenderablePartFeatures(part) &&
+        movingParts.some(
+          (moving) =>
+            hasRenderablePartFeatures(moving) &&
+            obbsOverlap(getPartOBB(moving), getPartOBB(part), OBB_EPSILON, OBB_SEPARATION_TOLERANCE, false)
+        )
+      );
+    }),
+    movingIds,
+    endpoint
+  );
 }

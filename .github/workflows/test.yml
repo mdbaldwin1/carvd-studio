@@ -5,6 +5,7 @@ on:
     branches: [main, develop]
   pull_request:
     branches: [main, develop]
+  workflow_call: # Reused by release so validation gates publication
   workflow_dispatch: # Allows manual triggering
 
 jobs:
@@ -61,9 +62,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Install lightningcss native binary
-        run: npm install lightningcss --no-save
 
       - name: Install Playwright system deps
         if: runner.os == 'Linux'
@@ -144,26 +142,13 @@ jobs:
       - name: Build desktop app
         run: npm run build --workspace=@carvd/desktop
 
-      - name: Disable workspace detection for packaging
-        shell: bash
-        run: |
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
-            delete pkg.workspaces;
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
-
-      - name: Install desktop runtime dependencies locally
-        working-directory: packages/desktop
-        run: npm run prepare:runtime-deps
-
+      # Package the dependencies installed by npm ci; do not resolve a second, unlocked tree.
       - name: Package and verify Linux artifacts
         working-directory: packages/desktop
         env:
           CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
         run: |
-          npx electron-builder@26.7.0 --linux AppImage deb --x64 --publish never
+          npx --no-install electron-builder --linux AppImage deb --x64 --publish never
 
           VERSION=$(node -p "require('./package.json').version")
           APPIMAGE="dist/Carvd.Studio-${VERSION}-x86_64.AppImage"
@@ -202,6 +187,9 @@ jobs:
 
       - name: Check formatting (desktop)
         run: npm run format:check --workspace=@carvd/desktop
+
+      - name: Run ESLint (website)
+        run: npm run lint --workspace=@carvd/website
 
       - name: Run TypeScript type check (website)
         run: npm run typecheck --workspace=@carvd/website

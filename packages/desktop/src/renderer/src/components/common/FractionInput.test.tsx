@@ -4,6 +4,18 @@ import { FractionInput } from './FractionInput';
 import { useProjectStore } from '../../store/projectStore';
 
 describe('FractionInput', () => {
+  it.each([false, true])('rejects values beyond the maximum on blur or unmount (%s)', (unmount) => {
+    useProjectStore.setState({ units: 'imperial' });
+    const onChange = vi.fn();
+    const view = render(<FractionInput value={1} min={0} max={2} onChange={onChange} />);
+    const input = screen.getByRole('textbox');
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: '3' } });
+    if (unmount) view.unmount();
+    else fireEvent.blur(input);
+    expect(onChange).not.toHaveBeenCalled();
+  });
+
   it.each(['imperial', 'metric'] as const)('UX announces the active measurement unit in %s', (units) => {
     useProjectStore.setState({ units });
     render(<FractionInput ariaLabel="Cut depth" value={0.755} onChange={vi.fn()} />);

@@ -254,6 +254,8 @@ export function validateSerializedPartFeatures(value: unknown, path: string): st
       if (!isRecord(parameters)) {
         errors.push(`${featurePath}.parameters are invalid`);
       } else {
+        if (parameters.plateJoiner !== undefined && typeof parameters.plateJoiner !== 'boolean')
+          errors.push(`${featurePath}.parameters.plateJoiner is invalid`);
         if (!isPositiveFiniteNumber(parameters.length)) errors.push(`${featurePath}.parameters.length is invalid`);
         if (!isPositiveFiniteNumber(parameters.width)) errors.push(`${featurePath}.parameters.width is invalid`);
         if (
@@ -484,6 +486,8 @@ export function validateSerializedPartFeatures(value: unknown, path: string): st
       // editor conflict instead of an import error.
       if (candidate.parameters.depthMode === 'blind' && !isPositiveFiniteNumber(candidate.parameters.depth))
         errors.push(`${featurePath}.parameters.depth is invalid`);
+      if (candidate.parameters.stoppedSpan !== undefined && typeof candidate.parameters.stoppedSpan !== 'boolean')
+        errors.push(`${featurePath}.parameters.stoppedSpan is invalid`);
       // Absent means square corners, which is what a chisel leaves.
       if (
         candidate.parameters.cornerRadius !== undefined &&
@@ -635,6 +639,29 @@ export function clonePartFeaturesForCopy(
   return features.map((feature) => {
     const cloned = clonePartFeature(feature);
     cloned.id = uuidv4();
+    const layout = cloned.metadata?.jointLayout as { firstPartId?: string; secondPartId?: string } | undefined;
+    if (layout) {
+      const first = layout.firstPartId && partIdMap.get(layout.firstPartId);
+      const second = layout.secondPartId && partIdMap.get(layout.secondPartId);
+      const metadata = { ...cloned.metadata };
+      if (first && second)
+        metadata.jointLayout = {
+          ...layout,
+          firstPartId: first,
+          secondPartId: second,
+          key: `joint-layout:${[first, second].sort().join(':')}`
+        };
+      else delete metadata.jointLayout;
+      cloned.metadata = Object.keys(metadata).length ? metadata : undefined;
+    }
+    const socket = cloned.metadata?.insertSocket as { insertPartId?: string } | undefined;
+    if (socket) {
+      const insertPartId = socket.insertPartId && partIdMap.get(socket.insertPartId);
+      const metadata = { ...cloned.metadata };
+      if (insertPartId) metadata.insertSocket = { ...socket, insertPartId };
+      else delete metadata.insertSocket;
+      cloned.metadata = Object.keys(metadata).length ? metadata : undefined;
+    }
     const dowel = cloned.metadata?.dowelJoint;
     if (!dowel) return cloned;
 

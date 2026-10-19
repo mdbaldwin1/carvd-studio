@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createTestPart } from '../../../../tests/helpers/factories';
+import { createTestPart, createTestStock } from '../../../../tests/helpers/factories';
 import type { Part, RectCutFeature } from '../types';
 import { getHousings, planHousingFit, resolveHousingRoles } from './fitHousing';
 import { useProjectStore } from '../store/projectStore';
@@ -132,5 +132,27 @@ describe('fitting a housing from the store', () => {
     useProjectStore.setState({ parts: [shelf(0.5), shelf(0.75, { id: 'other' })] });
     expect(useProjectStore.getState().fitHousingToPart('shelf', 'other')).toBe(false);
     expect(useUIStore.getState().toast?.message).toMatch(/dado or groove/i);
+  });
+});
+
+describe('housing-fit applicability', () => {
+  it.each(['rod', 'insert'] as const)('does not cut a half lap to a %s mate', (form) => {
+    const host = side([{ ...dado(), cutType: 'half_lap' }]);
+    const pin = shelf(0.375, { stockId: 'pin-stock' });
+    const stocks = [createTestStock({ id: 'pin-stock', form, length: 1, width: 0.375, thickness: 0.375 })];
+    expect(planHousingFit(pin, host, stocks)).toBeNull();
+    expect(resolveHousingRoles(pin, host, stocks)).toBeNull();
+    expect(resolveHousingRoles(host, pin, stocks)).toBeNull();
+    useProjectStore.setState({ parts: [host, pin], stocks });
+    expect(useProjectStore.getState().fitHousingToPart(pin.id, host.id)).toBe(false);
+    expect(useProjectStore.getState().parts[0]).toEqual(host);
+  });
+  it('rejects explicit insert shapes even if stock has been unassigned', () => {
+    const host = side([dado()]);
+    expect(planHousingFit(shelf(0.375, { blankShape: 'round' }), host)).toBeNull();
+  });
+  it('still offers the half-lap recipe for two boards', () => {
+    const host = side([{ ...dado(), cutType: 'half_lap' }]);
+    expect(resolveHousingRoles(shelf(0.375), host)).not.toBeNull();
   });
 });

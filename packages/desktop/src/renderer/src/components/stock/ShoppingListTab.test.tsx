@@ -137,9 +137,9 @@ describe('ShoppingListTab', () => {
       expect(screen.getByText('Plywood')).toBeInTheDocument();
     });
 
-    it('renders quantity with board label', () => {
+    it('renders quantity with sheet label', () => {
       render(<ShoppingListTab {...defaultProps} />);
-      expect(screen.getByText(/Buy: 2 boards/)).toBeInTheDocument();
+      expect(screen.getByText(/Buy: 2 sheets/)).toBeInTheDocument();
     });
 
     it('renders price per unit', () => {
@@ -384,7 +384,7 @@ describe('ShoppingListTab', () => {
       expect(screen.getByText(/2 stock types/)).toBeInTheDocument();
     });
 
-    it('uses singular board for quantity 1', () => {
+    it('uses singular sheet for quantity 1', () => {
       const cutList = createCutList({
         statistics: {
           ...createCutList().statistics,
@@ -392,7 +392,7 @@ describe('ShoppingListTab', () => {
         }
       });
       render(<ShoppingListTab {...defaultProps} cutList={cutList} />);
-      expect(screen.getByText(/Buy: 1 board$/)).toBeInTheDocument();
+      expect(screen.getByText(/Buy: 1 sheet$/)).toBeInTheDocument();
     });
   });
 });

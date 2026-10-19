@@ -1,5 +1,5 @@
-import { ThreeEvent } from '@react-three/fiber';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync, ThreeEvent } from '@react-three/fiber';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { Part as PartType } from '../../types';
 import { useAppSettingsStore } from '../../store/appSettingsStore';
@@ -15,16 +15,21 @@ import {
   detectGroupFeatureMateSnaps,
   type SnapResult
 } from '../../utils/snapToPartsUtil';
-import { resolveSafeTranslationDelta } from '../../utils/overlapPolicy';
+import { guideRuleJointDrag } from '../../utils/ruleJoint';
+import { guideRoundPinDrag } from '../../utils/roundPinDrag';
+import { guideCrossedSlotDrag } from '../../utils/crossedSlotDrag';
+import { resolveSafeDragTranslationDelta } from '../../utils/overlapPolicy';
 import { LiveDimensions, resolveLiveGridReleasePosition, snapToGrid } from './partTypes';
 import {
   bindWindowPointerSession,
   createPointerRafQueue,
+  getPlaneSnapAxes,
   pauseOrbitControls,
   resumeOrbitControls
 } from './workspaceUtils';
 import { calculateWorldHalfHeightFromDegrees } from '../../utils/mathPool';
 import { createGeometryCache } from '../../interaction/geometry/cache';
+import { startsBelowGround } from '../../interaction/constraints/groundConstraint';
 import {
   createMoveCommitPreview,
   createMoveCommitState,
@@ -280,8 +285,8 @@ export function usePartDrag(
         normal: _tempNormal.current,
         basisU: _tempBasisU.current,
         basisV: _tempBasisV.current,
-        // Plane constraints are encoded in basis vectors; allow world-axis updates from projected result.
-        axes: { x: true, y: true, z: true }
+        // Snap corrections must respect the same plane as pointer movement.
+        axes: getPlaneSnapAxes(_tempNormal.current)
       };
     },
     [camera, rotationQuaternion]
@@ -314,7 +319,7 @@ export function usePartDrag(
   // watch for drag movement.
   // Uses a threshold to distinguish clicks from drags and attaches window listeners
   // synchronously to avoid race conditions with quick clicks.
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!dragIntentForPart || isDragging) return;
     const dragIntent = dragIntentForPart;
 
@@ -437,8 +442,9 @@ export function usePartDrag(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dragIntentForPart, part.id]);
 
-  // Attach/detach window listeners when dragging
-  useEffect(() => {
+  // Install release listeners before paint. A passive effect can miss pointer-up
+  // on a quick drag, leaving the next click to commit at an unrelated location.
+  useLayoutEffect(() => {
     if (!isDragging) return;
 
     // Clean up mount effect's intent listeners now that the drag is fully active
@@ -492,13 +498,15 @@ export function usePartDrag(
         // constraint pipeline and the snap solver see the same value —
         // feature-aware, so a beveled/mitred part doesn't hover at box
         // height while a snap is active.
-        const worldHalfHeight = calculateWorldHalfHeightFromDegrees(
-          part.rotation,
-          liveDims.length,
-          liveDims.thickness,
-          liveDims.width,
-          part.features
-        );
+        const worldHalfHeight = startsBelowGround(part, geometryCacheRef.current)
+          ? -Infinity
+          : calculateWorldHalfHeightFromDegrees(
+              part.rotation,
+              liveDims.length,
+              liveDims.thickness,
+              liveDims.width,
+              part.features
+            );
 
         // ADR-006: ground clamp through the constraint pipeline. Uses the
         // current `liveDims` (which may differ from `part.length/width/
@@ -699,7 +707,25 @@ export function usePartDrag(
 
         // Check overlap prevention
         const stockConstraints = useProjectStore.getState().stockConstraints;
-        const proposedDelta = { ...previewDelta };
+        const guidedDelta =
+          stockConstraints.preventOverlap && effectiveDraggingIds.length === 1 && !evt.shiftKey
+            ? (guideRuleJointDrag(part, allParts, projectedDelta) ??
+              guideCrossedSlotDrag(part, allParts, projectedDelta) ??
+              guideRoundPinDrag(part, allParts, projectedDelta))
+            : null;
+        const proposedDelta = guidedDelta ?? { ...previewDelta };
+        if (guidedDelta) {
+          // Keep the fitted alignment on release, including non-world-aligned slots.
+          wasSnappedByParts.current = { x: true, y: true, z: true };
+          mateHostPartIdRef.current = null;
+          if (dragStart.current.partPos.y + proposedDelta.y < worldHalfHeight) {
+            const fraction =
+              proposedDelta.y < 0 ? Math.max(0, (worldHalfHeight - dragStart.current.partPos.y) / proposedDelta.y) : 0;
+            proposedDelta.x *= fraction;
+            proposedDelta.y *= fraction;
+            proposedDelta.z *= fraction;
+          }
+        }
 
         if (stockConstraints.preventOverlap) {
           dragDebug('partDrag:move:collisionInput', {
@@ -711,7 +737,7 @@ export function usePartDrag(
               z: dragStart.current.partPos.z + proposedDelta.z
             }
           });
-          const safeDelta = resolveSafeTranslationDelta(
+          const safeDelta = resolveSafeDragTranslationDelta(
             allParts,
             new Set(effectiveDraggingIds),
             proposedDelta,
@@ -802,12 +828,14 @@ export function usePartDrag(
       pointerRafQueue.schedule(e);
     };
 
-    const handleWindowPointerUp = () => {
+    const handleWindowPointerUp = (event?: unknown) => {
       if (!isActiveMoveInteractionOwner('part')) {
         pointerRafQueue.cancel();
         finishDragState(false, () => clearTransformInteractionPreviewKeepingReferenceDistances('part'));
         return;
       }
+      if (event instanceof PointerEvent && event.type === 'pointerup') pointerRafQueue.schedule(event);
+      pointerRafQueue.flush();
       if (isDragging && dragStart.current && lastDragPosition.current) {
         const dragDistanceSq =
           (lastDragPosition.current.x - dragStart.current.partOriginalPos.x) ** 2 +
@@ -818,21 +846,15 @@ export function usePartDrag(
         const rawY = lastDragPosition.current.y;
         const rawZ = lastDragPosition.current.z;
 
-        const resolvedGridReleasePosition = resolveLiveGridReleasePosition(
+        // Quantize only coordinates exposed by the drag plane. Otherwise a
+        // release can move non-grid-sized stock into an adjacent part.
+        const gridReleasePosition = resolveLiveGridReleasePosition(
           { x: rawX, y: rawY, z: rawZ },
           wasSnappedByParts.current,
           liveGridSnap,
-          useProjectStore.getState().gridSize
+          useProjectStore.getState().gridSize,
+          getDragPlaneInfo(dragStart.current.partPos, dragStart.current.planeMode).axes
         );
-        const gridReleasePosition = {
-          ...resolvedGridReleasePosition,
-          // Ground-plane drags do not include Y, so it must not be quantized
-          // on release. On stock that is not a multiple
-          // of the grid (18mm = 0.7087") that nudges the part into the one
-          // below, and the collision search then scales the whole delta down,
-          // discarding most of the horizontal move the user actually made.
-          y: dragStart.current.planeMode === 'ground' ? rawY : resolvedGridReleasePosition.y
-        };
         let newX = gridReleasePosition.x;
         let newY = gridReleasePosition.y;
         let newZ = gridReleasePosition.z;
@@ -1026,7 +1048,8 @@ export function usePartDrag(
 
     const unbindPointerSession = bindWindowPointerSession(window, {
       onMove: handleWindowPointerMove,
-      onEnd: handleWindowPointerUp
+      onEnd: handleWindowPointerUp,
+      endOptions: { capture: true }
     });
     return () => {
       unbindPointerSession();
@@ -1145,7 +1168,6 @@ export function usePartDrag(
     const startPoint = getWorldPoint(e.nativeEvent);
     const partOriginalPos = new THREE.Vector3(part.position.x, part.position.y, part.position.z);
     if (startPoint) {
-      setIsDragging(true);
       // A drag moves the part once per frame; collapse the lot into one undo.
       useProjectStore.getState().beginHistoryStep();
       beginMoveInteractionSession({
@@ -1168,6 +1190,10 @@ export function usePartDrag(
         partOriginalPos: { x: partOriginalPos.x, y: partOriginalPos.y, z: partOriginalPos.z }
       });
       pauseOrbitControls(controls);
+      // The Canvas uses a separate concurrent React root. Install the drag's
+      // release listeners before returning from pointerdown, even for a click
+      // whose pointerup arrives before the next render.
+      flushSync(() => setIsDragging(true));
     }
   };
 

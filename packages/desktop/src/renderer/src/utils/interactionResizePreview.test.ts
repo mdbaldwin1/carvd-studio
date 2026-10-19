@@ -44,6 +44,29 @@ const settings: AppSettings = {
 };
 
 describe('interactionResizePreview', () => {
+  it('resizes a blank to the small T-slot runner without inflating its section', () => {
+    const resizingPart = part();
+    const preview = solveResizePreview({
+      part: resizingPart,
+      handlePos: { x: 1, y: 1, z: 1, type: 'corner' },
+      localDelta: { x: -6, y: -0.8325, z: -3.53 },
+      partPosition: resizingPart.position,
+      startingDimensions: { length: 10, width: 4, thickness: 1 },
+      constrainDimensions: false,
+      rotationQuaternion: new THREE.Quaternion(),
+      referenceParts: [resizingPart],
+      referencePartIds: [],
+      groupMembers: [],
+      snapToPartsEnabled: false,
+      appSettings: settings,
+      units: 'imperial',
+      cameraDistance: 20
+    });
+    expect(preview.dimensions.length).toBeCloseTo(4);
+    expect(preview.dimensions.width).toBeCloseTo(0.47);
+    expect(preview.dimensions.thickness).toBeCloseTo(0.1675);
+  });
+
   it('solves raw resize preview and shifts the center to keep the opposite side fixed', () => {
     const resizingPart = part();
 
@@ -145,8 +168,8 @@ describe('interactionResizePreview', () => {
     });
 
     expect(preview.dimensions.length).toBe(12);
-    expect(preview.dimensions.thickness).toBe(0.25); // clamped floor
-    expect(preview.dimensions.width).toBe(0.5); // clamped floor
+    expect(preview.dimensions.thickness).toBe(0.001); // positive geometry floor
+    expect(preview.dimensions.width).toBe(0.001); // positive geometry floor
     expect(preview.resizingDimensions).toEqual({ length: true, width: true, thickness: true });
   });
 

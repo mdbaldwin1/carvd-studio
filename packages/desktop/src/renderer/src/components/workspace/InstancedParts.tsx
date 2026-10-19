@@ -312,6 +312,8 @@ export function InstancedParts({ parts, totalPartCount }: InstancedPartsProps) {
   const handleClick = useCallback(
     (e: ThreeEvent<MouseEvent>) => {
       e.stopPropagation();
+      // Releasing a drag over a part behind the moved part is not a selection click.
+      if (e.delta > 3) return;
       if (e.instanceId === undefined) return;
 
       const partId = partIdByIndex[e.instanceId];

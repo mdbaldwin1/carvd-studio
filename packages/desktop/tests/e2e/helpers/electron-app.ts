@@ -4,6 +4,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { randomUUID } from 'node:crypto';
+import { execFile } from 'node:child_process';
 import { createTestElectronRuntime, removeTestElectronRuntime, type TestElectronRuntime } from './electron-runtime';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -63,6 +65,7 @@ export interface RunningElectronApp {
   consoleMessages: string[];
   runtime?: TestElectronRuntime;
   processHandle?: ReturnType<ElectronApplication['process']>;
+  quitEvidence?: { quit: boolean; nodeExit: boolean };
 }
 
 export interface LaunchElectronAppOptions {
@@ -70,6 +73,7 @@ export interface LaunchElectronAppOptions {
   analyticsConsent?: 'unknown' | 'granted' | 'denied';
   hasCompletedWelcome?: boolean;
   userDataDir?: string;
+  projectPaths?: string[];
 }
 
 export type ProjectSnapshot = {
@@ -145,6 +149,7 @@ export async function launchElectronApp(options: LaunchElectronAppOptions = {}):
     );
   }
   const args = [appPath, '--test-mode', '--analytics-e2e-control', `--user-data-dir=${userDataDir}`];
+  args.push(...(options.projectPaths ?? []));
   if (process.env.CI) {
     args.unshift('--no-sandbox');
   }
@@ -154,6 +159,7 @@ export async function launchElectronApp(options: LaunchElectronAppOptions = {}):
   let electronApp: ElectronApplication | undefined;
   let processHandle: ReturnType<ElectronApplication['process']> | undefined;
   const consoleMessages: string[] = [];
+  const quitEvidence = { quit: false, nodeExit: false };
   try {
     electronApp = await electron.launch({
       args,
@@ -174,6 +180,19 @@ export async function launchElectronApp(options: LaunchElectronAppOptions = {}):
     await page.setViewportSize({ width: 1400, height: 900 });
     await waitForAutomationHooks(page);
 
+    if (process.env.CARVD_E2E_ALLOW_POST_QUIT_CLEANUP === '1' || process.env.CARVD_E2E_TRACE_QUIT === '1') {
+      const marker = `CARVD_TEST_QUIT_${randomUUID()}`;
+      let output = '';
+      processHandle.stderr?.on('data', (chunk: Buffer) => {
+        output = (output + chunk.toString()).slice(-8192);
+        quitEvidence.quit ||= output.includes(`${marker}:QUIT`);
+        quitEvidence.nodeExit ||= output.includes(`${marker}:NODE_EXIT:0`);
+      });
+      await electronApp.evaluate(({ app }, marker) => {
+        app.once('quit', () => process.stderr.write(`${marker}:QUIT\n`));
+        process.once('exit', (code) => process.stderr.write(`${marker}:NODE_EXIT:${code}\n`));
+      }, marker);
+    }
     page.on('console', (msg) => {
       const text = `[${msg.type()}] ${msg.text()}`;
       consoleMessages.push(text);
@@ -187,10 +206,10 @@ export async function launchElectronApp(options: LaunchElectronAppOptions = {}):
       console.log(`[E2E] ${text}`);
     });
 
-    return { electronApp, window: page, userDataDir, consoleMessages, runtime, processHandle };
+    return { electronApp, window: page, userDataDir, consoleMessages, runtime, processHandle, quitEvidence };
   } catch (error) {
     try {
-      await closeElectronProcess(electronApp, processHandle);
+      await closeElectronProcess(electronApp, processHandle, runtime, quitEvidence);
     } catch (cleanupError) {
       throw new AggregateError(
         [error, cleanupError],
@@ -228,7 +247,7 @@ export async function closeElectronApp(
   options: { removeUserData?: boolean } = {}
 ): Promise<void> {
   if (!running) return;
-  await closeElectronProcess(running.electronApp, running.processHandle);
+  await closeElectronProcess(running.electronApp, running.processHandle, running.runtime, running.quitEvidence);
   await removeTestElectronRuntime(running.runtime);
   if (options.removeUserData === false) return;
   try {
@@ -246,7 +265,9 @@ export async function closeElectronApp(
 
 async function closeElectronProcess(
   electronApp: ElectronApplication | undefined,
-  processHandle?: ReturnType<ElectronApplication['process']>
+  processHandle?: ReturnType<ElectronApplication['process']>,
+  runtime?: TestElectronRuntime,
+  quitEvidence?: RunningElectronApp['quitEvidence']
 ): Promise<void> {
   if (!electronApp) return;
   // app.quit can dispose Playwright's channel before afterEach. Its original
@@ -254,6 +275,16 @@ async function closeElectronProcess(
   const proc = processHandle ?? electronApp.process();
   if (proc.exitCode !== null || proc.signalCode !== null) return;
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let diagnosticTimer: ReturnType<typeof setTimeout> | undefined;
+  let shutdownDeadlineReached = false;
+  // Opt-in functional testing only: this host independently reproduces Electron's
+  // post-quit native hang without Carvd or Playwright. Never relax the default gate.
+  const allowPostQuitCleanup =
+    process.env.CARVD_E2E_ALLOW_POST_QUIT_CLEANUP === '1' &&
+    process.platform === 'darwin' &&
+    !!runtime &&
+    runtime.bundleId.startsWith('com.carvd-studio.e2e.') &&
+    proc.spawnfile === runtime.executablePath;
   const exited = new Promise<void>((resolve) => {
     // The process can exit between the check above and this listener.
     if (proc.exitCode !== null || proc.signalCode !== null) {
@@ -262,6 +293,42 @@ async function closeElectronProcess(
     }
     proc.once('exit', () => resolve());
   });
+  if (
+    process.env.CARVD_E2E_TRACE_QUIT === '1' &&
+    process.platform === 'darwin' &&
+    runtime?.bundleId.startsWith('com.carvd-studio.e2e.') &&
+    proc.spawnfile === runtime.executablePath
+  ) {
+    // Capture before the strict deadline: runner teardown can remove a hung
+    // process before a human-triggered sample reaches it. This only observes
+    // our owned test process and never changes the shutdown/cleanup policy.
+    // Symbolication can take longer than the two-second sampling interval;
+    // begin early enough to preserve the report before the 30-second deadline.
+    diagnosticTimer = setTimeout(() => {
+      if (!proc.pid || proc.exitCode !== null || proc.signalCode !== null) return;
+      const samplePath = path.join(os.tmpdir(), `carvd-shutdown-${proc.pid}-${Date.now()}.sample.txt`);
+      console.warn('SLOW_QUIT_DIAGNOSTIC', JSON.stringify({ pid: proc.pid, samplePath, ...quitEvidence }));
+      execFile(
+        '/usr/bin/sample',
+        [String(proc.pid), '2', '1', '-mayDie', '-file', samplePath],
+        { timeout: 14000 },
+        (error) => {
+          // sample -mayDie can exit successfully without writing a report when
+          // the process exits during attachment. Only claim an actual stack.
+          let captured = false;
+          try {
+            captured = fs.readFileSync(samplePath, 'utf8').includes('Call graph:');
+          } catch {
+            // A missing report is diagnostic information, not a teardown error.
+          }
+          console.warn(
+            'SLOW_QUIT_SAMPLE',
+            JSON.stringify({ samplePath, captured, commandSucceeded: !error, error: error?.message })
+          );
+        }
+      );
+    }, 15000);
+  }
   try {
     await Promise.race([
       (async () => {
@@ -294,19 +361,57 @@ async function closeElectronProcess(
         await exited;
       })(),
       new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () =>
-            reject(
-              new Error(
-                `Test Electron PID ${proc.pid} did not quit gracefully within 30s; process and profile preserved. Stop further launches and investigate; no force-kill performed.`
-              )
-            ),
-          30000
-        );
+        timer = setTimeout(() => {
+          shutdownDeadlineReached = true;
+          reject(
+            new Error(
+              `Test Electron PID ${proc.pid} did not quit gracefully within 30s; process and profile preserved. Stop further launches and investigate; no force-kill performed.`
+            )
+          );
+        }, 30000);
       })
     ]);
+  } catch (error) {
+    if (
+      !allowPostQuitCleanup ||
+      !shutdownDeadlineReached ||
+      !quitEvidence?.quit ||
+      !quitEvidence?.nodeExit ||
+      proc.exitCode !== null ||
+      proc.signalCode !== null
+    )
+      throw error;
+    // ChildProcess.kill targets the original owned process handle, never a name,
+    // PID search or unrelated app. Both JS shutdown milestones already completed.
+    console.warn(
+      'POST_QUIT_PLATFORM_CLEANUP',
+      JSON.stringify({
+        pid: proc.pid,
+        bundleId: runtime!.bundleId,
+        observedQuit: true,
+        observedNodeExit: 0,
+        gracefulShutdownPassed: false,
+        reason: 'Native process remained after the 30s strict shutdown deadline'
+      })
+    );
+    if (!proc.kill('SIGKILL')) throw error;
+    let cleanupTimer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        exited,
+        new Promise<never>((_, reject) => {
+          cleanupTimer = setTimeout(
+            () => reject(new Error(`Owned post-quit process ${proc.pid} did not exit after cleanup`)),
+            5000
+          );
+        })
+      ]);
+    } finally {
+      if (cleanupTimer) clearTimeout(cleanupTimer);
+    }
   } finally {
     if (timer) clearTimeout(timer);
+    if (diagnosticTimer) clearTimeout(diagnosticTimer);
   }
 }
 
@@ -421,6 +526,8 @@ export async function waitForAppReady(page: Page): Promise<'start-screen' | 'edi
 export async function createBlankProject(page: Page, name = 'E2E Project'): Promise<void> {
   const state = await waitForAppReady(page);
   const startScreenVisible = await isElementVisible(page, '.start-screen');
+  const usesStockDialog =
+    state === 'start-screen' || startScreenVisible || (await page.locator('.new-project-dialog').isVisible());
 
   if (state === 'start-screen' || startScreenVisible) {
     await expect(page.locator('.blank-template')).toBeVisible({ timeout: 10000 });
@@ -440,19 +547,30 @@ export async function createBlankProject(page: Page, name = 'E2E Project'): Prom
         { timeout: 20000, message: 'blank template click never opened the new project dialog' }
       )
       .toBe(true);
+  } else if (!(await page.locator('.new-project-dialog').isVisible())) {
+    // Skipping the first-run tutorial can leave its demo project open. The
+    // editor is ready, but a new project still has to be requested explicitly.
+    await page.keyboard.press(process.platform === 'darwin' ? 'Meta+n' : 'Control+n');
   }
 
-  await expect(page.locator('.new-project-dialog')).toBeVisible({ timeout: 10000 });
-  // The dialog only chooses starting stock; it has no name field. Its first
-  // input is a stock checkbox, so naming happens through the header below.
-  await page.evaluate(() => {
-    const dialog = document.querySelector('.new-project-dialog');
-    const buttons = Array.from(dialog?.querySelectorAll('button') ?? []);
-    const createButton = buttons.find((button) => button.textContent?.trim() === 'Create Project') as
-      | HTMLButtonElement
-      | undefined;
-    createButton?.click();
-  });
+  if (usesStockDialog) {
+    await expect(page.locator('.new-project-dialog')).toBeVisible({ timeout: 10000 });
+    // The dialog only chooses starting stock; it has no name field. Its first
+    // input is a stock checkbox, so naming happens through the header below.
+    await page.evaluate(() => {
+      const dialog = document.querySelector('.new-project-dialog');
+      const buttons = Array.from(dialog?.querySelectorAll('button') ?? []);
+      const createButton = buttons.find((button) => button.textContent?.trim() === 'Create Project') as
+        | HTMLButtonElement
+        | undefined;
+      createButton?.click();
+    });
+  } else {
+    // Cmd+N creates an empty editor directly; only the start-screen tile
+    // opens the stock chooser. Wait for the new project, not a nonexistent dialog.
+    await expect(page.getByRole('button', { name: 'Untitled Project', exact: true })).toBeVisible();
+    await expect(page.getByText('No parts yet. Click + to add one.', { exact: true })).toBeVisible();
+  }
 
   await expect(page.locator('.app-header')).toBeVisible({ timeout: 15000 });
   await expect(page.locator('.sidebar')).toBeVisible();
@@ -801,7 +919,7 @@ export async function openSelectionContextMenu(page: Page, point = { x: 500, y: 
  * renders its own "Save Part"/"Back to Project" pair.
  */
 export async function savePartCutsFromHeader(page: Page): Promise<void> {
-  await page.getByTitle('Save (Cmd+S)', { exact: true }).click();
+  await page.getByTitle('Apply cuts to project (Cmd+S)', { exact: true }).click();
 }
 
 /** Skip the library import prompt when a project write raises it. */

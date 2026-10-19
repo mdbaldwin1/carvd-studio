@@ -266,18 +266,29 @@ async function editFirstMitreAngle(window: Page, partId: string, angle: number):
   await window.waitForFunction(() => typeof window.__carvdE2E?.getDowelVisualizations === 'function');
 }
 
-async function createDefaultDowelJoint(window: Page, firstPartId: string): Promise<void> {
-  await openSelectedPartCuts(window, firstPartId);
-  await window.locator('button[title="Add Cut"]').click();
-  await window.getByRole('button', { name: /^Create Dowel Joint\b/ }).click();
-  await window.getByRole('button', { name: 'Next' }).click();
-  await window.getByRole('button', { name: 'Next' }).click();
-  await expect(window.getByLabel('Dowel Diameter', { exact: true })).toHaveValue('3/8');
-  await expect(window.getByLabel('Dowel Count', { exact: true })).toHaveValue('2');
-  await window.getByRole('button', { name: 'Next' }).click();
-  await expect(window.getByText('All holes fit within both boards.')).toBeVisible();
-  await window.getByRole('button', { name: 'Create Dowel Joint' }).click();
-  await exitPartCutsFromHeader(window);
+// These cases qualify backward compatibility for saved metadata joints. New
+// dowels are ordinary parts and are covered separately through the stock UI.
+async function seedLegacyDowelJoint(window: Page, firstPartId: string): Promise<void> {
+  await window.evaluate((firstPartId) => {
+    const state = window.useProjectStore.getState();
+    const second = state.parts.find((part) => part.id !== firstPartId);
+    if (!second) throw new Error('Missing second board');
+    const id = state.addDowelJoint({
+      firstPartId,
+      secondPartId: second.id,
+      firstFace: 'top_face',
+      secondFace: 'bottom_face',
+      diameter: 0.375,
+      dowelLength: 0.75,
+      firstEmbedmentDepth: 0.375,
+      secondEmbedmentDepth: 0.375,
+      count: 2,
+      spacing: 2,
+      firstPrimary: -4,
+      firstSecondary: 0
+    });
+    if (!id) throw new Error('Legacy fixture failed');
+  }, firstPartId);
   await window.waitForFunction(() => typeof window.__carvdE2E?.getDowelVisualizations === 'function');
 }
 
@@ -604,6 +615,14 @@ test.describe.serial('custom cuts assembly qualification', () => {
     await setCamera(running.window, 'front');
     const hostLeftEdge = await getResizeHandleCanvasPoint(running.window, { x: -1, y: 0, z: 0 });
     await dragCanvas(running.window, { x: hostLeftEdge.x + 40, y: hostLeftEdge.y }, { x: 260, y: 0 });
+    // The seated divider blocks motion across the dado walls. Independence
+    // means the parts are not linked, not that the host may tunnel through it.
+    const blocked = await selectedTransform(running.window);
+    expect(Math.abs(blocked.position.x - before.hostPosition.x)).toBeLessThan(0.02);
+    // Withdraw along the open dado instead; the divider must stay put.
+    await setCamera(running.window, 'top');
+    const topLeftEdge = await getResizeHandleCanvasPoint(running.window, { x: -1, y: 0, z: 0 });
+    await dragCanvas(running.window, { x: topLeftEdge.x + 40, y: topLeftEdge.y }, { x: 0, y: 260 });
     const after = await running.window.evaluate(() => {
       const parts = window.useProjectStore.getState().parts;
       const host = parts.find((part: { id: string }) => part.id === 'dado-host');
@@ -614,7 +633,7 @@ test.describe.serial('custom cuts assembly qualification', () => {
         dividerTransform: JSON.stringify({ position: divider.position, rotation: divider.rotation })
       };
     });
-    expect(Math.abs(after.hostPosition.x - before.hostPosition.x)).toBeGreaterThan(10);
+    expect(Math.abs(after.hostPosition.z - before.hostPosition.z)).toBeGreaterThan(10);
     expect(after.hostFeatures).toBe(before.hostFeatures);
     expect(after.dividerTransform).toBe(before.dividerTransform);
   });
@@ -1203,7 +1222,7 @@ test.describe.serial('custom cuts assembly qualification', () => {
     }
   });
 
-  test('authors a paired 3/8 inch dowel joint, diagnoses movement, and rejects a 1/4 to 1/2 mismatch', async () => {
+  test('loads a legacy paired 3/8 inch dowel joint, diagnoses movement, and rejects a 1/4 to 1/2 mismatch', async () => {
     await seedFixture(
       running.window,
       [
@@ -1226,7 +1245,7 @@ test.describe.serial('custom cuts assembly qualification', () => {
       ],
       'dowel-lower'
     );
-    await createDefaultDowelJoint(running.window, 'dowel-lower');
+    await seedLegacyDowelJoint(running.window, 'dowel-lower');
 
     const authored = await running.window.evaluate(() => {
       const parts = window.useProjectStore.getState().parts;
@@ -1326,7 +1345,7 @@ test.describe.serial('custom cuts assembly qualification', () => {
     ).toBe(false);
   });
 
-  test('blocks dowel creation until a dirty add, edit, delete, disable, and reorder draft is resolved', async () => {
+  test('keeps dirty cut edits isolated and omits the removed dowel wizard', async () => {
     await seedFixture(
       running.window,
       [
@@ -1396,10 +1415,7 @@ test.describe.serial('custom cuts assembly qualification', () => {
 
     await running.window.locator('button[title="Add Cut"]').click();
     const createJoint = running.window.getByRole('button', { name: /^Create Dowel Joint/ });
-    await expect(createJoint).toBeDisabled();
-    await expect(running.window.getByText('Save or discard part changes first')).toBeVisible();
-    await createJoint.click({ force: true });
-    await expect(running.window.getByRole('dialog', { name: 'Create Dowel Joint' })).toHaveCount(0);
+    await expect(createJoint).toHaveCount(0);
 
     // Choosing a cut type is a dialog now, so it is dismissed the way dialogs
     // are rather than by a panel button.
@@ -1468,7 +1484,7 @@ test.describe.serial('custom cuts assembly qualification', () => {
       ],
       'duplicate-dowel-lower'
     );
-    await createDefaultDowelJoint(running.window, 'duplicate-dowel-lower');
+    await seedLegacyDowelJoint(running.window, 'duplicate-dowel-lower');
     const original = await running.window.evaluate(() => {
       const originals = window.useProjectStore
         .getState()
@@ -1556,7 +1572,7 @@ test.describe.serial('custom cuts assembly qualification', () => {
       ],
       'copy-dowel-lower'
     );
-    await createDefaultDowelJoint(running.window, 'copy-dowel-lower');
+    await seedLegacyDowelJoint(running.window, 'copy-dowel-lower');
     const original = await running.window.evaluate(() => {
       const parts = window.useProjectStore.getState().parts;
       return {

@@ -54,6 +54,18 @@ describe('StockFormFields', () => {
     expect(onChange).toHaveBeenCalledWith({ ...walnut, [key]: 3.5 });
   });
 
+  it.each([
+    ['length', 0, 4],
+    ['width', 1, 0.47],
+    ['thickness', 2, 0.1675]
+  ] as const)('accepts prepared runner stock %s', (key, index, value) => {
+    const onChange = renderFields();
+    const input = screen.getByText('Dimensions (L × W × T)').closest('div')!.querySelectorAll('input')[index];
+    fireEvent.change(input, { target: { value: String(value) } });
+    fireEvent.blur(input);
+    expect(onChange).toHaveBeenCalledWith({ ...walnut, [key]: value });
+  });
+
   it.each(['length', 'width', 'none'] as const)('sets the grain running %s', (grainDirection) => {
     const onChange = renderFields({ grainDirection: grainDirection === 'length' ? 'width' : 'length' });
     fireEvent.change(field('Grain Direction'), { target: { value: grainDirection } });
@@ -215,4 +227,21 @@ describe('StockFormFields inserts', () => {
     expect(next.insertKind).toBe('dowel_pin');
     expect(next.packSize).toBeGreaterThan(1);
   });
+});
+
+it('offers a loose tenon with editable actual stock dimensions', () => {
+  const onChange = vi.fn();
+  render(
+    <StockFormFields
+      formData={{ ...walnut, form: 'insert', insertKind: 'loose_tenon', length: 2, width: 0.75, thickness: 0.25 }}
+      onChange={onChange}
+    />
+  );
+  expect(screen.getByLabelText('Insert Type')).toHaveValue('loose_tenon');
+  expect(screen.getByRole('textbox', { name: 'Tenon thickness' })).toHaveValue('1/4');
+  const length = screen.getByRole('textbox', { name: 'Tenon length' });
+  fireEvent.focus(length);
+  fireEvent.change(length, { target: { value: '40mm' } });
+  fireEvent.blur(length);
+  expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ length: 40 / 25.4, insertKind: 'loose_tenon' }));
 });

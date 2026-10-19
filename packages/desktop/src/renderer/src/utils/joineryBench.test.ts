@@ -4,6 +4,15 @@ import { tmpdir } from 'os';
 import { join } from 'path';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 import { validateCarvdFile } from './fileFormat';
+import { validatePartsForCutList } from '../store/projectStore';
+import { getJointFitIssues } from './jointFit';
+import { partsOverlap } from './overlapPolicy';
+import { expandCircularCut } from './roundCutUtils';
+import { getPartMaterialVolume, getPartRenderGeometry } from './partFeatureGeometry';
+import { getResolvedRectCutFeature } from './rectCutUtils';
+import { getPartStockPlanes } from './endCutUtils';
+import { DoubleSide, Euler, Mesh, MeshBasicMaterial, Quaternion, Raycaster, Vector3 } from 'three';
+import type { Part, Stock } from '../types';
 
 vi.unmock('three');
 
@@ -24,10 +33,264 @@ afterAll(() => {
 });
 
 describe('the generated joinery bench', () => {
+  const generate = () => {
+    execFileSync(process.execPath, ['scripts/make-joinery-test-project.cjs', bench], { stdio: 'pipe' });
+    return JSON.parse(readFileSync(bench, 'utf-8')) as { parts: Part[]; stocks: Stock[] };
+  };
+
   it('is a file the app will open', () => {
     execFileSync(process.execPath, ['scripts/make-joinery-test-project.cjs', bench], { stdio: 'pipe' });
     const result = validateCarvdFile(JSON.parse(readFileSync(bench, 'utf-8')));
     expect(result.errors).toEqual([]);
     expect(result.valid).toBe(true);
   });
+
+  it('has no project errors or fit warnings', () => {
+    const file = generate();
+    const issues = validatePartsForCutList(file.parts, file.stocks);
+    expect(issues).toEqual([]);
+  });
+
+  it.each([15, 30, 45])('preserves scallop-and-pin fit when the whole joint turns %s degrees', (angle) => {
+    const rotation = new Quaternion().setFromEuler(new Euler(0, (angle * Math.PI) / 180, 0));
+    const parts = generate().parts.filter((part) => part.name.startsWith('Scallop —'));
+    const rotated = parts.map((part) => {
+      const position = new Vector3(part.position.x, part.position.y, part.position.z).applyQuaternion(rotation);
+      const original = new Quaternion().setFromEuler(
+        new Euler(
+          ...([part.rotation.x, part.rotation.y, part.rotation.z].map((a) => (a * Math.PI) / 180) as [
+            number,
+            number,
+            number
+          ])
+        )
+      );
+      const pose = new Euler().setFromQuaternion(rotation.clone().multiply(original));
+      return {
+        ...part,
+        position: { x: position.x, y: position.y, z: position.z },
+        rotation: { x: (pose.x * 180) / Math.PI, y: (pose.y * 180) / Math.PI, z: (pose.z * 180) / Math.PI }
+      };
+    });
+    expect(getJointFitIssues(rotated)).toEqual([]);
+    // Spinning a cylindrical peg about its own axis cannot change its fit.
+    const spunPins = rotated.map((part) => {
+      if (part.blankShape !== 'round') return part;
+      const orientation = new Quaternion().setFromEuler(
+        new Euler(
+          (part.rotation.x * Math.PI) / 180,
+          (part.rotation.y * Math.PI) / 180,
+          (part.rotation.z * Math.PI) / 180
+        )
+      );
+      const pose = new Euler().setFromQuaternion(
+        orientation.multiply(new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), (37 * Math.PI) / 180))
+      );
+      return {
+        ...part,
+        rotation: { x: (pose.x * 180) / Math.PI, y: (pose.y * 180) / Math.PI, z: (pose.z * 180) / Math.PI }
+      };
+    });
+    expect(getJointFitIssues(spunPins)).toEqual([]);
+    const oversized = rotated.map((part) =>
+      part.name === 'Scallop — Pin 2' ? { ...part, width: 0.3, thickness: 0.3 } : part
+    );
+    expect(getJointFitIssues(oversized)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          matePartId: oversized.find((part) => part.name === 'Scallop — Pin 2')!.id,
+          problem: 'tight'
+        })
+      ])
+    );
+  });
+
+  it('still detects an oversized sliding tongue and a wrong-size barrel', () => {
+    const { parts } = generate();
+    const side = parts.find((p) => p.name === 'Sliding DT — Side')!;
+    const shelf = parts.find((p) => p.name === 'Sliding DT — Shelf')!;
+    expect(getJointFitIssues([side, shelf])).toEqual([]);
+    expect(getJointFitIssues([side, { ...shelf, features: [] }])).toEqual([
+      expect.objectContaining({ matePartId: shelf.id, problem: 'tight' })
+    ]);
+    const rail = parts.find((p) => p.name === 'Cross Dowel — Rail')!;
+    // A test-only gauge checks bore fit; purchased hardware is not fabricated
+    // as stock parts in the example project.
+    const barrel: Part = {
+      ...rail,
+      id: 'barrel-gauge',
+      name: 'Barrel fit gauge',
+      stockId: null,
+      length: 0.75,
+      width: 0.375,
+      thickness: 0.375,
+      blankShape: 'round',
+      rotation: { x: 0, y: 0, z: 90 },
+      position: { ...rail.position, x: rail.position.x - rail.length / 2 + 1.5 },
+      features: []
+    };
+    expect(getJointFitIssues([rail, barrel])).toEqual([]);
+    expect(getJointFitIssues([rail, { ...barrel, width: 0.45, thickness: 0.45, features: [] }])).toEqual([
+      expect.objectContaining({ matePartId: barrel.id, problem: 'tight' })
+    ]);
+  });
+
+  it('expands every advertised hole pattern', () => {
+    const { parts } = generate();
+    for (const [name, count] of [
+      ['Screwed — Cleat', 3],
+      ['Shelf Pins — Side', 10],
+      ['Sampler — Edge Profiles', 6]
+    ] as const) {
+      const part = parts.find((part) => part.name === name)!;
+      const feature = part.features!.find((feature) => feature.kind === 'circular_cut')!;
+      if (feature.kind !== 'circular_cut') throw new Error('Missing hole pattern');
+      expect(expandCircularCut(feature, part), name).toHaveLength(count);
+    }
+  });
+
+  it('admits the wider cutter heads at the starts of stopped undercut sampler routes', () => {
+    const sampler = generate().parts.find((part) => part.name === 'Sampler — Router Bits')!;
+    const board = { ...sampler, position: { x: 0, y: 0, z: 0 }, rotation: { x: 0, y: 0, z: 0 } };
+    for (const z of [3.5, 4.5]) {
+      const head: Part = {
+        ...board,
+        id: `entry-gauge-${z}`,
+        name: 'Cutter head entry gauge',
+        stockId: null,
+        features: [],
+        blankShape: 'round',
+        length: 0.375,
+        width: 0.49,
+        thickness: 0.49,
+        position: { x: -5, y: 0.1875, z },
+        rotation: { x: 0, y: 0, z: 90 }
+      };
+      expect(partsOverlap(board, head), `Cutter cannot enter at ${z}`).toBe(false);
+      const withoutEntries = {
+        ...board,
+        features: board.features!.filter((feature) => !feature.label?.includes('cutter entry pocket'))
+      };
+      // Keyhole routes already model their plunge opening; dovetail routes do not.
+      expect(partsOverlap(withoutEntries, head), `Entry behavior at ${z}`).toBe(z === 3.5);
+    }
+  });
+
+  it('drills pocket screws through the joint end rather than the underside', () => {
+    const rail = generate().parts.find((part) => part.name === 'Pocket — Rail')!;
+    for (const feature of rail.features!) {
+      if (feature.kind !== 'circular_cut') throw new Error('Missing pocket');
+      const { entryPoint, axis } = expandCircularCut(feature, rail)[0];
+      const travel = (-rail.length / 2 - entryPoint.x) / axis.x;
+      const exitHeight = entryPoint.y + travel * axis.y;
+      expect(travel).toBeGreaterThan(feature.parameters.counterbore!.depth);
+      expect(Math.abs(exitHeight)).toBeLessThan(rail.thickness / 2);
+    }
+  });
+
+  it('preserves the stopped housing and fills the rule-joint seam', () => {
+    const { parts } = generate();
+    const side = parts.find((part) => part.name === 'Stopped Dado — Side')!;
+    const housing = side.features![0];
+    if (housing.kind !== 'rect_cut') throw new Error('Missing housing');
+    const resolved = getResolvedRectCutFeature(housing, side);
+    expect(resolved.placement.z + resolved.parameters.size.width).toBeLessThan(side.width);
+
+    const top = parts.find((part) => part.name === 'Rule — Table Top')!;
+    const leaf = parts.find((part) => part.name === 'Rule — Leaf')!;
+    const combinedWidth = leaf.position.z - top.position.z + (top.width + leaf.width) / 2;
+    // Complementary convex/concave profiles fill their shared rectangular
+    // envelope. Outside-edge cuts or a gap at the seam lose this volume.
+    expect(getPartMaterialVolume(top) + getPartMaterialVolume(leaf)).toBeCloseTo(
+      combinedWidth * top.length * top.thickness,
+      3
+    );
+  });
+
+  it('keeps every station consistent with its seated or exploded description', () => {
+    generate();
+    expect(() => execFileSync(process.execPath, ['scripts/audit-joinery-bench.cjs', bench])).not.toThrow();
+  });
+
+  it('cuts visible material with each demonstrated router pass and edge profile', () => {
+    const ineffective: string[] = [];
+    for (const part of generate().parts) {
+      for (const feature of part.features ?? []) {
+        if (feature.kind !== 'edge_profile' && feature.kind !== 'routed_path') continue;
+        const without = { ...part, features: part.features!.filter((candidate) => candidate.id !== feature.id) };
+        if (getPartMaterialVolume(without) - getPartMaterialVolume(part) < 0.0001) {
+          ineffective.push(
+            `${part.name}: ${feature.label} (${getPartMaterialVolume(without) - getPartMaterialVolume(part)})`
+          );
+        }
+      }
+    }
+    expect(ineffective).toEqual([]);
+  }, 60000);
+
+  it('closes the compound-mitre planes without a bevel-sized gap', () => {
+    const parts = generate().parts.filter((part) => part.name.startsWith('Compound —'));
+    const planes = parts.map((part) => {
+      const plane = getPartStockPlanes(part)[1];
+      const normal = new Vector3(plane.normal.x, plane.normal.y, plane.normal.z);
+      const length = normal.length();
+      const radians = Math.PI / 180;
+      normal
+        .normalize()
+        .applyEuler(new Euler(part.rotation.x * radians, part.rotation.y * radians, part.rotation.z * radians));
+      return {
+        normal,
+        offset: plane.limit / length + normal.dot(new Vector3(part.position.x, part.position.y, part.position.z))
+      };
+    });
+    expect(planes[0].normal.dot(planes[1].normal)).toBeCloseTo(-1, 8);
+    expect(planes[0].offset + planes[1].offset).toBeCloseTo(0, 8);
+  });
+
+  it('rounds the bought-in Domino cross-section to fit its routed mortises', () => {
+    const file = generate();
+    const domino = file.parts.find((part) => part.name === 'Domino — 6 × 20 × 40')!;
+    const geometry = getPartRenderGeometry(domino);
+    const material = new MeshBasicMaterial({ side: DoubleSide });
+    const mesh = new Mesh(geometry, material);
+    mesh.updateMatrixWorld(true);
+    const hit = (y: number, z: number) =>
+      new Raycaster(new Vector3(-2, y, z), new Vector3(1, 0, 0)).intersectObject(mesh);
+    expect(hit(0, domino.width * 0.45).length).toBeGreaterThan(0);
+    expect(hit(domino.thickness * 0.45, domino.width * 0.45)).toHaveLength(0);
+    material.dispose();
+    geometry.dispose();
+  });
+
+  it.each(['Fox Wedge', 'Wedged'])(
+    '%s wedges can spread their kerfs but start without material interference',
+    (prefix) => {
+      const { parts } = generate();
+      const rail = parts.find((part) => part.name === `${prefix} — Rail`)!;
+      const wedges = parts.filter((part) => part.name.startsWith(`${prefix} — Wedge `));
+      expect(wedges).toHaveLength(2);
+      for (const wedge of wedges) {
+        expect(wedge.width).toBeGreaterThan(0.125);
+        expect(wedge.position.x + wedge.length / 2).toBeGreaterThan(rail.position.x + rail.length / 2);
+        expect(wedge.position.x - wedge.length / 2).toBeLessThan(rail.position.x + rail.length / 2);
+        expect(partsOverlap(rail, wedge)).toBe(false);
+        const driven = { ...wedge, position: { ...wedge.position, x: wedge.position.x - wedge.length * 0.75 } };
+        // The wider portion requires wood deformation: never portray it as a
+        // collision-free rigid insertion into the original straight saw kerf.
+        expect(partsOverlap(rail, driven)).toBe(true);
+      }
+    }
+  );
+
+  it('does not interpenetrate wood or hardware material in any station', () => {
+    const file = generate();
+    const parts = file.parts;
+    const collisions: string[] = [];
+    for (let i = 0; i < parts.length; i++) {
+      for (let j = i + 1; j < parts.length; j++) {
+        if (partsOverlap(parts[i], parts[j])) collisions.push(`${parts[i].name} / ${parts[j].name}`);
+      }
+    }
+    expect(collisions).toEqual([]);
+  }, 60000);
 });

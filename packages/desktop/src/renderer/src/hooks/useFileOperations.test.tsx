@@ -1399,7 +1399,7 @@ describe('useFileOperations', () => {
       expect(dialogProps.isOpen).toBe(false);
     });
 
-    it('handleDialogSave shows error and cancels close on save failure during close', async () => {
+    it('handleDialogSave preserves the guarded close intent for retry after a save failure', async () => {
       (hasUnsavedChanges as ReturnType<typeof vi.fn>).mockReturnValue(true);
       (saveProject as ReturnType<typeof vi.fn>).mockResolvedValue({
         success: false,
@@ -1426,7 +1426,9 @@ describe('useFileOperations', () => {
       });
 
       expect(showToast).toHaveBeenCalledWith('Error saving: Save failed', 'error');
-      expect(window.electronAPI.cancelClose).toHaveBeenCalled();
+      expect(window.electronAPI.cancelClose).toHaveBeenCalledWith('save-failed');
+      expect(getDialogProps().isOpen).toBe(true);
+      expect(window.electronAPI.confirmClose).not.toHaveBeenCalled();
     });
 
     it('handleDialogSave cancels close when save is canceled during close', async () => {
@@ -1448,7 +1450,7 @@ describe('useFileOperations', () => {
         await dialogProps.onSave();
       });
 
-      expect(window.electronAPI.cancelClose).toHaveBeenCalled();
+      expect(window.electronAPI.cancelClose).toHaveBeenCalledWith();
     });
 
     it('handleDialogDiscard executes pending action without saving', async () => {
@@ -1471,6 +1473,61 @@ describe('useFileOperations', () => {
 
       expect(saveProject).not.toHaveBeenCalled();
       expect(newProject).toHaveBeenCalled();
+    });
+
+    it.each([false, true])('awaits recovery cleanup before close (dirty=%s)', async (dirty) => {
+      vi.mocked(hasUnsavedChanges).mockReturnValue(dirty);
+      let finishCleanup!: () => void;
+      const prepareRecoveryForClose = vi.fn(
+        () =>
+          new Promise<void>((resolve) => {
+            finishCleanup = resolve;
+          })
+      );
+      renderWithDialogs({ prepareRecoveryForClose });
+      let closing!: Promise<void>;
+      await act(async () => {
+        const request = onBeforeCloseCallback!();
+        if (!dirty) closing = request as unknown as Promise<void>;
+      });
+      if (dirty)
+        act(() => {
+          closing = getDialogProps().onDiscard();
+        });
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(prepareRecoveryForClose).toHaveBeenCalledOnce();
+      expect(window.electronAPI.confirmClose).not.toHaveBeenCalled();
+      await act(async () => {
+        finishCleanup();
+        await closing;
+      });
+      expect(window.electronAPI.confirmClose).toHaveBeenCalledOnce();
+    });
+
+    it('preserves new edits made while clean-close recovery cleanup is pending', async () => {
+      vi.mocked(hasUnsavedChanges).mockReturnValue(false);
+      let finishCleanup!: (resume: () => void) => void;
+      const resumeRecovery = vi.fn();
+      renderWithDialogs({
+        prepareRecoveryForClose: () =>
+          new Promise((resolve) => {
+            finishCleanup = resolve;
+          })
+      });
+      let closing!: unknown;
+      act(() => {
+        closing = onBeforeCloseCallback!();
+      });
+      vi.mocked(hasUnsavedChanges).mockReturnValue(true);
+      await act(async () => {
+        finishCleanup(resumeRecovery);
+        await closing;
+      });
+      expect(window.electronAPI.confirmClose).not.toHaveBeenCalled();
+      expect(resumeRecovery).toHaveBeenCalledOnce();
+      expect(getDialogProps().isOpen).toBe(true);
     });
 
     it('handleDialogDiscard during close calls confirmClose', async () => {
@@ -1528,7 +1585,7 @@ describe('useFileOperations', () => {
         await dialogProps.onCancel();
       });
 
-      expect(window.electronAPI.cancelClose).toHaveBeenCalled();
+      expect(window.electronAPI.cancelClose).toHaveBeenCalledWith();
     });
 
     it('handleDialogSave does not execute pending action when save fails (non-close)', async () => {
@@ -1560,13 +1617,15 @@ describe('useFileOperations', () => {
   });
 
   describe('onBeforeClose event', () => {
-    it('proceeds with close when no unsaved changes', () => {
+    it('proceeds with close when no unsaved changes', async () => {
       (hasUnsavedChanges as ReturnType<typeof vi.fn>).mockReturnValue(false);
 
       renderHook(() => useFileOperations());
 
       expect(onBeforeCloseCallback).not.toBeNull();
-      onBeforeCloseCallback!();
+      await act(async () => {
+        await onBeforeCloseCallback!();
+      });
 
       expect(window.electronAPI.confirmClose).toHaveBeenCalled();
     });

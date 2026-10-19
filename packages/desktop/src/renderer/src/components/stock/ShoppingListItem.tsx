@@ -1,5 +1,5 @@
 import { Checkbox } from '@renderer/components/ui/checkbox';
-import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { formatReadableMeasurement } from '../../utils/fractions';
 import { StockSummary } from '../../types';
 
 interface ShoppingListItemProps {
@@ -15,10 +15,10 @@ export function ShoppingListItem({ summary, units, checked, onToggle }: Shopping
   const perPack = summary.packSize && summary.packSize > 1 ? summary.packSize : null;
 
   const dimensions = isInsert
-    ? `${formatMeasurementWithUnit(summary.stockLength, units)} × ${formatMeasurementWithUnit(summary.stockWidth, units)} × ${formatMeasurementWithUnit(summary.stockThickness, units)}`
+    ? `${formatReadableMeasurement(summary.stockLength, 'metric')} × ${formatReadableMeasurement(summary.stockWidth, 'metric')} × ${formatReadableMeasurement(summary.stockThickness, 'metric')}`
     : summary.form === 'rod'
-      ? `${formatMeasurementWithUnit(summary.stockWidth, units)} dia × ${formatMeasurementWithUnit(summary.stockLength, units)}`
-      : `${formatMeasurementWithUnit(summary.stockLength, units)} × ${formatMeasurementWithUnit(summary.stockWidth, units)} × ${formatMeasurementWithUnit(summary.stockThickness, units)}`;
+      ? `${formatReadableMeasurement(summary.stockWidth, units)} dia × ${formatReadableMeasurement(summary.stockLength, units)}`
+      : `${formatReadableMeasurement(summary.stockLength, units)} × ${formatReadableMeasurement(summary.stockWidth, units)} × ${formatReadableMeasurement(summary.stockThickness, units)}`;
 
   // You buy dowel by the rod and biscuits by the box, not by the board.
   const qtyLabel = isInsert
@@ -33,9 +33,13 @@ export function ShoppingListItem({ summary, units, checked, onToggle }: Shopping
       ? summary.boardsNeeded === 1
         ? 'rod'
         : 'rods'
-      : summary.boardsNeeded === 1
-        ? 'board'
-        : 'boards';
+      : summary.form === 'sheet'
+        ? summary.boardsNeeded === 1
+          ? 'sheet'
+          : 'sheets'
+        : summary.boardsNeeded === 1
+          ? 'board'
+          : 'boards';
   const hasOverage = summary.boardsNeeded > summary.actualBoardsUsed;
   // Linear feet is the honest measure of a rod, so show it however it is priced.
   const showLinearFeet = !isInsert && (isRod || summary.pricingUnit === 'board_foot') && summary.linearFeet > 0;
@@ -46,7 +50,7 @@ export function ShoppingListItem({ summary, units, checked, onToggle }: Shopping
       ? `$${summary.pricePerUnit.toFixed(2)}/rod`
       : summary.pricingUnit === 'board_foot'
         ? `$${summary.pricePerUnit.toFixed(2)}/bf`
-        : `$${summary.pricePerUnit.toFixed(2)}/sheet`;
+        : `$${summary.pricePerUnit.toFixed(2)}/${summary.form === 'board' ? 'board' : 'sheet'}`;
 
   return (
     <div

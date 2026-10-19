@@ -62,7 +62,7 @@ test.describe('round 6 active cut inspector lifecycle', () => {
       // does for template and assembly editing. Writing the project is a
       // second, ordinary Save once the workspace has closed.
       const save = async () => {
-        if (route === 'header') await window.getByTitle('Save (Cmd+S)', { exact: true }).click();
+        if (route === 'header') await window.getByTitle('Apply cuts to project (Cmd+S)', { exact: true }).click();
         else if (route === 'shortcut')
           await window.keyboard.press(`${process.platform === 'darwin' ? 'Meta' : 'Control'}+S`);
         else await sendNativeMenuCommand(running, 'save-project');
@@ -81,7 +81,16 @@ test.describe('round 6 active cut inspector lifecycle', () => {
         await saveProjectFile();
         await expect.poll(() => fs.existsSync(file)).toBe(true);
         await expect
-          .poll(() => JSON.parse(fs.readFileSync(file, 'utf8')).parts[0].features[0])
+          .poll(() => {
+            // Existence precedes completion of the asynchronous file write.
+            // Poll through a temporarily empty or partial JSON document.
+            try {
+              return JSON.parse(fs.readFileSync(file, 'utf8')).parts[0].features[0];
+            } catch (error) {
+              if (error instanceof SyntaxError) return null;
+              throw error;
+            }
+          })
           .toMatchObject({
             label: 'Renamed hole',
             reference: { primaryFrom: 'min', secondaryFrom: 'max' },

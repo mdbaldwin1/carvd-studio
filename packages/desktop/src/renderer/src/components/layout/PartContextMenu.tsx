@@ -40,6 +40,7 @@ interface PartContextMenuProps {
 export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps) {
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const parts = useProjectStore((s) => s.parts);
+  const stocks = useProjectStore((s) => s.stocks);
   const copySelectedParts = useClipboardStore((s) => s.copySelectedParts);
   const copyPartCuts = useClipboardStore((s) => s.copyPartCuts);
   const pastePartCutsToParts = useClipboardStore((s) => s.pastePartCutsToParts);
@@ -113,10 +114,10 @@ export function PartContextMenu({ menuRef, x, y, onClose }: PartContextMenuProps
       ? (() => {
           const first = parts.find((part) => part.id === selectedPartIds[0]);
           const second = parts.find((part) => part.id === selectedPartIds[1]);
-          return first && second ? resolveHousingRoles(first, second) : null;
+          return first && second ? resolveHousingRoles(first, second, stocks) : null;
         })()
       : null;
-  const housingPlan = housingPair ? planHousingFit(housingPair.shelfPart, housingPair.housingPart) : null;
+  const housingPlan = housingPair ? planHousingFit(housingPair.shelfPart, housingPair.housingPart, stocks) : null;
 
   // Check if any selected part has a stock assigned
   const selectedParts = parts.filter((p) => effectiveSelectedPartIds.includes(p.id));

@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { pathToFileURL } from 'node:url';
 import {
   addPartFromSidebar,
   closeElectronApp,
@@ -76,6 +77,31 @@ test.describe('window and app behavior', () => {
     await expect(window.locator('.error-boundary')).toHaveCount(0);
     expect(consoleMessages.filter((message) => message.includes('[pageerror]'))).toEqual([]);
   });
+
+  for (const transport of ['path', 'file-url'] as const) {
+    test(`startup opens a launcher project ${transport} containing spaces`, async () => {
+      const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'carvd-launch-project-'));
+      const projectPath = path.join(directory, 'Launch project.carvd');
+      try {
+        await createBlankProject(running.window, 'Launcher project');
+        await addPartFromSidebar(running.window);
+        await queueSavePath(running.window, projectPath);
+        await pressShortcut(running.window, 's');
+        await expect.poll(() => fs.existsSync(projectPath)).toBe(true);
+        await closeElectronApp(running);
+        running = await launchElectronApp({
+          projectPaths: [transport === 'file-url' ? pathToFileURL(projectPath).href : projectPath]
+        });
+        const opened = await waitForProjectWindow(running, projectPath);
+        await expect.poll(async () => (await getProjectSnapshot(opened)).parts.length).toBe(1);
+        await expect
+          .poll(async () => opened.evaluate(() => window.electronAPI.getRecentProjects()))
+          .toEqual(expect.arrayContaining([projectPath]));
+      } finally {
+        fs.rmSync(directory, { recursive: true, force: true });
+      }
+    });
+  }
 
   test('open-file handoff opens project in an application window when feasible', async () => {
     const { window, userDataDir } = running;

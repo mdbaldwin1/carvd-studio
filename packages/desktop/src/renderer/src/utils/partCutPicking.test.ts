@@ -54,7 +54,7 @@ describe('partCutPicking', () => {
     expect(isTargetValidForDraft({ type: 'face', face: 'top_face' }, draft)).toBe(false);
   });
 
-  it('limits cutouts to top and bottom faces', () => {
+  it('offers broad and long-edge faces for cutouts', () => {
     const draft = buildDraftFromPreset('cutout');
     const part = createTestPart();
 
@@ -62,7 +62,9 @@ describe('partCutPicking', () => {
 
     expect(targets.map((target) => getPartFeatureTargetKey(target.target))).toEqual([
       'face:top_face',
-      'face:bottom_face'
+      'face:bottom_face',
+      'face:front_face',
+      'face:back_face'
     ]);
   });
 });

@@ -863,6 +863,22 @@ describe('useKeyboardShortcuts', () => {
   });
 
   describe('Input focus', () => {
+    it.each([
+      ['checkbox', true],
+      ['text', false],
+      ['number', false]
+    ] as const)('handles focus shortcut from %s controls appropriately', (type, shouldFocus) => {
+      const requestCenterCamera = vi.fn();
+      useCameraStore.setState({ requestCenterCamera });
+      useSelectionStore.setState({ selectedPartIds: ['p1'] });
+      renderHook(() => useKeyboardShortcuts());
+      const input = document.createElement('input');
+      input.type = type;
+      document.body.appendChild(input);
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', bubbles: true }));
+      expect(requestCenterCamera).toHaveBeenCalledTimes(shouldFocus ? 1 : 0);
+      input.remove();
+    });
     it('ignores keyboard events when input is focused', () => {
       const addPart = vi.fn();
       useProjectStore.setState({ addPart });

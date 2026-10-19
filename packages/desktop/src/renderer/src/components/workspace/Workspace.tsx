@@ -1,5 +1,5 @@
 import { Grid, OrbitControls } from '@react-three/drei';
-import { ThreeEvent, useThree } from '@react-three/fiber';
+import { flushSync, ThreeEvent, useThree } from '@react-three/fiber';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { useProjectStore } from '../../store/projectStore';
@@ -620,6 +620,9 @@ export function Workspace() {
         }
       },
       onClick: (action) => {
+        // An instanced part may mount after this click has already ended.
+        // Do not leave its pointerdown intent armed for the next mouse move.
+        useSelectionStore.getState().clearDragIntent();
         resumeOrbitControls(controls);
         // Mirror the legacy native-mouseup fallback: skip additive (the per-mesh
         // R3F handler already toggled selection; re-toggling would net zero).
@@ -740,14 +743,20 @@ export function Workspace() {
           return;
         }
         debugSelection('session:dragstart:part-fallback', { partId: action.hit.partId });
-        selectFromPartHit(action.hit.partId, false);
-        setSelectedSidebarStockId(null);
-        setDragIntent({
-          partId: action.hit.partId,
-          screenX: action.downAt.clientX,
-          screenY: action.downAt.clientY,
-          worldPoint: action.hit.worldPoint,
-          startImmediately: true
+        // The mesh handler installs its release listeners synchronously. Do
+        // the same when the canvas fallback owns the gesture: otherwise a
+        // quick release can clear the intent before the Canvas root mounts it.
+        const hit = action.hit;
+        flushSync(() => {
+          selectFromPartHit(hit.partId, false);
+          setSelectedSidebarStockId(null);
+          setDragIntent({
+            partId: hit.partId,
+            screenX: action.downAt.clientX,
+            screenY: action.downAt.clientY,
+            worldPoint: hit.worldPoint,
+            startImmediately: true
+          });
         });
         pauseOrbitControls(controls);
       },

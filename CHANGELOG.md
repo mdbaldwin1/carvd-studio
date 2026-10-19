@@ -7,6 +7,151 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- Release publication now waits for the full validation workflow and required credentials. macOS release builds require signing and notarization, and reused version tags must match the validated commit.
+- Electron CI validation fails when a test passes only on retry, so an intermittent shutdown failure cannot silently satisfy the release gate.
+
+### Fixed
+
+- Include Windows installer blockmaps in releases so automatic updates can download changed data instead of the full installer.
+
+- Complete unsaved-project and cut-edit checks before starting an update installer, so canceling or retrying a restart does not start installation or register native update callbacks prematurely.
+- Open projects passed by Windows and Linux file associations, including file URLs and paths containing spaces, instead of opening an empty start screen.
+- Package the tested, locked workspace dependencies without resolving a separate runtime dependency tree.
+- Keep the bundled direct-dependency license inventory synchronized with the lockfile and reject stale inventories during builds.
+- Use valid Linux executable and Debian package names, associate Linux windows with the desktop launcher, and register `.carvd` project files with the Linux MIME database.
+- Display Carvd Studio in native macOS Hide and Quit menu items.
+
+- Update the desktop runtime to official Electron 43.7.9 while retaining macOS 12 compatibility.
+
+- Always show feedback after a manual update check when the release feed contains an older or ineligible version, and distinguish unavailable checks from a successful result.
+
+- Preserve fabrication dimensions in on-screen cutting diagrams and selected-part details instead of rounding narrow parts to the nearest sixteenth of an inch.
+
+- Make cutter-sampler, stopped-housing and specialized lap recipes discoverable through documentation search.
+
+- Keep joint recipes within the mobile reading column while allowing wide machining tables to scroll independently.
+
+- Add a complete cutter-sampler recipe with every pass, custom profile boundary, drilling pattern and a real native-app screenshot, distinguishing geometric profiles from physical tooling.
+
+- Keep hole-fit warnings stable when rotating an assembled joint or spinning an uncut wooden dowel around its axis; genuinely oversized pins still report interference.
+
+- Document the dovetailed lap splice's complete cut layout and lift-in assembly direction, verified in the native editor at level and 30-degree orientations.
+
+- Preserve mortise end-wall angles and their widening or narrowing direction in part summaries and fabrication exports, including fox-wedge sockets.
+
+- Give the fox-wedge and wedged-through-tenon examples wider wedge heads than their kerfs, with only the narrow tips started; document the rigid model's limits when representing wood spreading.
+
+- Keep modification timestamps out of document undo history so bookkeeping updates do not consume an Undo step.
+
+- Prevent large mouse drags from pulling a cut board through a seated rectangular key, preserving legitimate key withdrawal and board movement after removing the key.
+
+- Add a cutter-head entry pocket to the example sampler’s stopped dovetail route, and document the keyhole route’s existing automatic entry opening.
+
+- Restrict material-collision surface sampling to the shared bounds of the two parts, avoiding unrelated faces in heavily drilled boards while retaining the inward contact tolerance.
+
+- Flag end-face routes following an angled end cut as modeled dimensions requiring a separate shop setup, instead of presenting blank-referenced depth as a router plunge setting.
+
+- Put the pegged-tenon example’s drilling operation before its cheek cuts, matching the stated fabrication order; document the tested recipe with a real app screenshot.
+
+- Allow bored tenons to slide through matching mortises at compound angles by distinguishing Boolean-seam ray misses from actual material collisions. Inserted round pegs now also block large mouse drags that previously passed through them.
+
+- Speed up collision-safe keyboard movement of profiled parts by rejecting paths whose stock envelopes cannot meet, while retaining detailed material checks for possible contact.
+
+- Recognize matching full-thickness built-in roundover and cove profiles as rule-joint assembly references, with guided seating for an engaged pair. Custom profiles, unequal radii, and hinge motion remain outside this helper.
+- Include partial-height mitre and bevel cut bands, measured from the board bottom, in feature summaries and shop instructions.
+
+- Check the material crossed during keyboard movement of round pins and profiled parts, preventing thin-obstacle tunneling while preserving movement through existing cavities.
+
+- Keep machine setup groups distinct for saved router contours and tool geometry, corner radii, end versus side wall angles, rabbet shoulders, and partial-height end-cut bands.
+
+- Keep rectangular runners captive beneath routed lips during keyboard nudges, and check the material crossed while moving into position.
+- Recognize long-edge tongues made with paired face cutouts when assembling and fitting beaded boards.
+- Preserve precise part and stock dimensions in the sidebar and shopping list; label per-board prices correctly and keep router setups distinct by cutter angle, shank diameter, and cutter height.
+
+- Save recovery snapshots on a steady cadence during continuous editing instead of restarting the timer after every edit or camera movement.
+
+- Allow small splines, keys, and wooden T-slot runners to be entered, assigned prepared stock, and resized without inflating their dimensions.
+
+- Keep the opposite end fixed while resizing parts on a coarse grid, preserving pin alignment inside drilled holes.
+
+- Deliberately discarded work no longer reappears as recovery after closing; pending recovery writes finish before cleanup.
+
+- Guide engaged wooden pins along matching drilled holes during dragging, and keep cutting-diagram PDF headings clear of utilization labels. Show only length resize handles on round stock and preserve diameter when resizing its length. Recognize end-rebate tongues when seating and fitting rabbeted dado joints.
+
+- Preserve full mating-face contact for compound mitres and guide interlocked crossed-slot dividers along their withdrawal axis.
+- Track unsaved changes correctly when Undo or Redo crosses the latest savepoint.
+- Use drilling angles measured from the board face consistently and separate machine setups by angle and recess tooling.
+- Wrap long stock names and purchased-hardware descriptions within PDF columns, with repeated headers across page breaks.
+
+- Prevented obsolete reports becoming current through Undo, hidden notifications blocking editor clicks, and housing-fit recipes treating dowels or purchased inserts as mating boards.
+- Restored packaged-app branding and PDF watermark assets, and rendered printable checklist headers without unsupported font glyphs.
+- Invalidated cutting reports after Reset to Stock and retained validation warnings in fabrication reports and exports.
+- Preserved machining on purchased inserts, included post-glue-up operations in setup grouping, and distinguished oversized blanks from finished modeled dimensions and reference edges.
+- Blocked purchased-insert size/shape mismatches and rod-diameter mismatches and invalid imported routes from fabrication reports; corrected constrained grain assignment, material-specific movement assumptions, and small joint-interference warnings.
+
+### Security
+
+- Updated Electron, the updater, packaging tools, website routing, and affected dependencies within their existing major versions. Release packaging now uses the checked-in toolchain instead of an older hardcoded packager.
+
+### Documentation
+
+- Documented router profile and physical-tool workflows, SVG import, library version updates, feasibility findings, and matching-layout measurements, with a native edge-profile screenshot.
+
+- Corrected drag-modifier guidance and expanded cut actions, hole patterns, cut-editor shortcuts, plain joints, and the documentation learning path, including a native shelf-pin pattern screenshot.
+- Expanded joinery documentation with Part Cuts and joint recipe guides, real app screenshots, and contextual desktop help links for matching layouts, assembly placement, and insert sockets.
+- Added real-app screenshots of groove, dowel-socket, and scarf examples, with worked clearance calculations and guidance on cut targets and insert shapes.
+
+### Changed
+
+- Corrected joinery-bench purchasing: hardware and canvas use shopping items, the plywood spline uses actual 1/8-inch stock, factory inserts use their shapes, and the wooden T-slot runner preserves grain. Added missing hardware and adhesive requirements and identified unpriced sample purchases.
+- Cut lists now describe preparation when solid-wood parts are thinner than their stock; validation rejects thin sheet parts assigned to thicker sheet stock.
+- Removed the Top / Front / Side / Isometric dropdown from the editor toolbar.
+- Preserve joint alignment during arbitrary and compound rotations: solve mating constraints in joint directions, reject tilted inserts, retain precise calculated angles, and lift rotated selections as one rigid assembly.
+
+- Keep workspace shortcuts, including F to frame the selection, available after selecting parts with checkboxes.
+
+- Assemble loose splines by their long edges with half-width insertion, keeping an already-seated spline fixed while adding the second board.
+- Align complementary shiplap rabbets by their recessed seating faces.
+- Avoid false material-interference warnings on rotated, touching joinery faces.
+
+- Correct face-groove help and rectangular-cut fabrication notes to measure offsets from the actual back edge.
+
+- Fabrication notes measure front/back edge grooves from the bottom of the board, matching the cut editor.
+
+- Tongues formed by matching edge rabbets assemble at their shoulders, preserving glue space; groove fitting uses the tongue thickness instead of the full board thickness.
+
+- Deleting an open cut with the keyboard no longer lets its properties panel recreate the removed operation.
+
+- Bridle joints suggest their open mortise end for assembly; through-mortise instructions no longer report a zero cutting depth.
+- Outdated cut lists must be regenerated before export. Blocking validation errors remain visible and outdated project-report exports are disabled.
+
+- Added previewed matching layouts for box joints, through, half-blind, mitred blind, and sliding dovetails, mortise-and-tenon, twin tenons, and haunched tenons. Both boards update in one undo step; reference-based assembly seats the pieces without changing their dimensions.
+- Dovetail fabrication notes include face tapers and socket-wall slopes with their widening or narrowing direction.
+- Sliding dovetails use a center mark for layout and retain solid wood behind their shoulders. Corrected generated tongue geometry, snapping recognition, and cutter-angle descriptions.
+- Stopped dados now stop at either or both cross-board edges, with correctly rounded routed ends and full-width open mouths. Assembly defaults align the board edges and preserve underside orientation. Fabrication notes distinguish open edges, stopped ends, and router radius. Existing full-width cuts retain their original geometry. Corrected the reference edge for off-center tenons.
+- Matching half laps assemble by their recessed seating faces, keeping cross laps, T-laps, and end-lap splices flush.
+- Rabbet ledges are selectable assembly references, with the correct receiving board, orientation, and seating depth suggested automatically.
+- Deliberately placed underside assemblies can be withdrawn and reseated below the work plane without a second ground correction undoing the drag.
+- New Domino and biscuit parts use their factory outlines and purchased dimensions. Stock selectors retain their actual metric sizes. Explicit factory shapes and stopped spans save as file version 4; existing rectangular inserts remain unchanged on load.
+
+- Creating stock from part properties now supports all insert types, including prepared loose tenons, and preserves insert dimensions, packaging, and zero prices.
+- Added matching socket layout for dowel, Domino, biscuit, and loose-tenon parts, including insertion depth, clearance, and glue space. Insert snaps preserve the specified depth instead of bottoming out in the glue space. Biscuit pockets follow the plate-joiner blade arc; rounded edge mortises and round bores fit their inserts consistently.
+- Added explicit part-selection checkboxes. Second insert sockets use the exposed end and let the receiving board move onto the existing assembly.
+- Selected faces are highlighted in assembly previews; insert layouts use physical edge measurements. Small-part handles and dimensions are easier to read, purchased inserts retain fixed sizes, and router profile controls use inset/depth labels.
+- Plate-joiner fabrication notes describe blade diameter, kerf, and plunge. Purchased-insert shopping lists preserve actual metric sizes; operation notes use readable precision while setup grouping retains exact settings.
+- Clarified applying cuts versus saving the project, preserved numeric precision through rounded displays, and removed internal triangulation edges from stock outlines.
+
+- Improved joint authoring with exact dado/groove placement, underside half laps, through edge mortises, editable dovetail angles and correctly measured mitred lips, and visible joint-fit actions. Fixed signed coordinates, mixed-unit entry, shallow hinge recesses, decimal profile entry, and drilling through recessed tenon cheeks. New parts start clear of existing stock.
+- Added a circle jig for routed paths and sped up multi-span flat-bottom routing. Corrected the test bench's Domino mortises and insert to use matching rounded cross-sections.
+
+- Improved joint snapping for through and twin tenons, opposed cheeks, sliding dovetails, cross dividers and mixed mitre cuts. Corrected face clearance, conflicting connector constraints, quick-drag release, and drag-plane alignment; dragging over another part no longer selects it on release. Position fields accept negative coordinates, permit valid socket fits consistently with dragging, and Select All respects focused text inputs.
+
+- Removed the obsolete Dowels toolbar toggle. Dowel parts use normal part visibility; older projects still display their legacy dowel joints.
+
+- Corrected the joinery test-bench generator: pocket-hole angles, stopped-dado relief, compound-mitre seating, mating rule-joint profiles, repeated hole patterns, shelf pins, stock assignments, and ineffective router cuts. Hinge recesses open onto the mating edges, the T-slot has an insertion opening, the peg passes through its tenon, and rebuilt sliding dovetail, tambour, birdsmouth, cove-and-pin, cross-dowel, keyed-mitre and wedged-tenon examples include their mating cuts and hardware.
+
+- Corrected shallow V-bit geometry and fit checks for routed dovetail tongues and transverse barrel nuts.
+
 - Added Fit Dado to Mating Part, and the same for grooves, stopped runs and half laps. Select the piece and the part it goes into, and the channel is cut to the piece rather than to a typed number. This quietly fixes the oldest trap in sheet goods: nominal 3/4" plywood is nearer 23/32", so a dado cut to a typed 3/4" is loose every time, while one cut to the actual part is not.
 
 - The cut list now also groups operations by setup. Nobody works part by part: you set the dado stack to three quarters, run every piece that takes that dado, and only then change it. Cuts that need the same machine setting are gathered together, and where a cut sits along a board no longer separates them, because an offset is not a machine setting.

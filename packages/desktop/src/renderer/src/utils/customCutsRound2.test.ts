@@ -317,7 +317,7 @@ describe('independent review round 2', () => {
           h * (2 * (maxZ - minZ) - (orientation * (maxZ ** 2 - minZ ** 2)) / 2)
         );
       };
-      const markerVolume = layered ? 8 * 0.125 ** 2 * Math.sin(Math.PI / 8) * 0.125 : 0;
+      const markerVolume = layered ? 32 * 0.125 ** 2 * Math.sin(Math.PI / 32) * 0.125 : 0;
       expect(volume(part)).toBeCloseTo((area(-0.5) + 4 * area(0) + area(0.5)) / 6 - markerVolume, 5);
     }
   );

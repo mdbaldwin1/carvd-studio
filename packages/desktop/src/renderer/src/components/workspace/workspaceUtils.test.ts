@@ -13,7 +13,8 @@ import {
   setWorkspaceCursor,
   getPartAABB,
   bindWindowPointerSession,
-  createPointerRafQueue
+  createPointerRafQueue,
+  getPlaneSnapAxes
 } from './workspaceUtils';
 import { createGeometryCache } from '../../interaction/geometry/cache';
 import { createTestPart } from '../../../../../tests/helpers/factories';
@@ -23,6 +24,12 @@ import { createTestPart } from '../../../../../tests/helpers/factories';
 // ============================================================
 
 describe('workspaceUtils', () => {
+  it('keeps snaps in the visible plane for straight-on views', () => {
+    expect(getPlaneSnapAxes({ x: 0, y: -1, z: 0 })).toEqual({ x: true, y: false, z: true });
+    expect(getPlaneSnapAxes({ x: 1, y: 0, z: 0 })).toEqual({ x: false, y: true, z: true });
+    expect(getPlaneSnapAxes({ x: 0, y: 0, z: -1 })).toEqual({ x: true, y: true, z: false });
+    expect(getPlaneSnapAxes({ x: 0.6, y: 0.8, z: 0 })).toEqual({ x: true, y: true, z: true });
+  });
   describe('LIGHTING_PRESETS', () => {
     it('defines all four lighting modes', () => {
       expect(LIGHTING_PRESETS.default).toBeDefined();
@@ -195,6 +202,31 @@ describe('workspaceUtils', () => {
       expect(frames.has(2)).toBe(false);
       expect(onFrame).not.toHaveBeenCalledWith(canceledEvent);
     });
+  });
+
+  it('flushes the last pointer sample before release even when no animation frame ran', () => {
+    let callback: (() => void) | undefined;
+    const target = {
+      requestAnimationFrame: vi.fn((cb: () => void) => {
+        callback = cb;
+        return 1;
+      }),
+      cancelAnimationFrame: vi.fn()
+    };
+    const apply = vi.fn();
+    const queue = createPointerRafQueue(target, apply);
+    queue.schedule({ clientX: 10 } as PointerEvent);
+    queue.schedule({ clientX: 90 } as PointerEvent);
+    queue.flush();
+    expect(apply).toHaveBeenCalledExactlyOnceWith({ clientX: 90 });
+    expect(target.cancelAnimationFrame).toHaveBeenCalledWith(1);
+    callback?.();
+    queue.flush();
+    expect(apply).toHaveBeenCalledTimes(1);
+    queue.schedule({ clientX: 100 } as PointerEvent);
+    queue.cancel();
+    queue.flush();
+    expect(apply).toHaveBeenCalledTimes(1);
   });
 
   // Right-click target globals were removed in Phase 3b cleanup — context

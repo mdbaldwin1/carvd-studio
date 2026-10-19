@@ -58,6 +58,12 @@ export const HANDLE_POSITIONS: HandlePosition[] = [
   { x: 1, y: 1, z: 0, type: 'edge-z' }
 ];
 
+/** Round blanks can be cut to length, but their diameter is fixed by stock. */
+export const LENGTH_HANDLE_POSITIONS: HandlePosition[] = [
+  { x: -1, y: 0, z: 0, type: 'edge-y' },
+  { x: 1, y: 0, z: 0, type: 'edge-y' }
+];
+
 export const HANDLE_SIZE = 0.45; // Slightly larger for better visibility
 
 // Resize handle colors aligned to Twilight Studio theme tokens
@@ -102,9 +108,10 @@ export const resolveLiveGridReleasePosition = (
   position: { x: number; y: number; z: number },
   snappedAxes: { x: boolean; y: boolean; z: boolean },
   liveGridSnap: boolean,
-  gridSize: number = GRID_SIZE
+  gridSize: number = GRID_SIZE,
+  activeAxes = { x: true, y: true, z: true }
 ): { x: number; y: number; z: number } => ({
-  x: snappedAxes.x || !liveGridSnap ? position.x : snapToGrid(position.x, gridSize),
-  y: snappedAxes.y || !liveGridSnap ? position.y : snapToGrid(position.y, gridSize),
-  z: snappedAxes.z || !liveGridSnap ? position.z : snapToGrid(position.z, gridSize)
+  x: !activeAxes.x || snappedAxes.x || !liveGridSnap ? position.x : snapToGrid(position.x, gridSize),
+  y: !activeAxes.y || snappedAxes.y || !liveGridSnap ? position.y : snapToGrid(position.y, gridSize),
+  z: !activeAxes.z || snappedAxes.z || !liveGridSnap ? position.z : snapToGrid(position.z, gridSize)
 });

@@ -137,11 +137,34 @@ describe('HierarchicalPartsList', () => {
   });
 
   describe('rendering', () => {
+    it('preserves fitted decimal dimensions in the part tooltip', () => {
+      useProjectStore.setState({
+        parts: [
+          { ...mockParts[0], name: 'Wooden T-slot runner', length: 4, width: 0.47, thickness: 0.1675, features: [] }
+        ]
+      });
+      render(<HierarchicalPartsList {...defaultProps} />);
+      expect(screen.getByTitle(/Wooden T-slot runner/)).toHaveAttribute(
+        'title',
+        'Wooden T-slot runner\n4" × 0.47" × 0.1675"'
+      );
+    });
+
     it('renders parts list', () => {
       render(<HierarchicalPartsList {...defaultProps} />);
 
       expect(screen.getByText('Side Panel')).toBeInTheDocument();
       expect(screen.getByText('Top Panel')).toBeInTheDocument();
+    });
+
+    it('selects two separate pieces without modifier keys and removes only the unchecked piece', () => {
+      render(<HierarchicalPartsList {...defaultProps} />);
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Select Side Panel' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Select Top Panel' }));
+      expect(useSelectionStore.getState().selectedPartIds).toEqual(['part-1', 'part-2']);
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Select Side Panel' }));
+      expect(useSelectionStore.getState().selectedPartIds).toEqual(['part-2']);
+      expect(defaultProps.onPartClick).not.toHaveBeenCalled();
     });
 
     it('shows empty message when no parts', () => {

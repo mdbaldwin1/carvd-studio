@@ -407,66 +407,74 @@ describe('drag snap flow integration', () => {
     expect(preview.position.y).not.toBeCloseTo(2.375);
   });
 
-  it('mates a selected group through its real member features and accepts the snapped release', () => {
-    const host = createPart({
-      id: 'selected-group-dado-host',
-      length: 12,
-      width: 6,
-      thickness: 0.75,
-      position: { x: 0, y: 0.375, z: 0 },
-      features: [
-        {
-          id: 'selected-group-dado-socket',
-          kind: 'rect_cut',
-          version: 1 as const,
-          enabled: true,
-          cutType: 'dado',
-          target: { type: 'face', face: 'top_face' },
-          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
-          placement: { x: 5.6225, z: 0 },
-          parameters: { size: { length: 0.755, width: 6 }, depthMode: 'blind', depth: 0.375 }
-        }
-      ]
-    });
-    const groupedDivider = createPart({
-      id: 'selected-group-divider',
-      length: 0.75,
-      width: 6,
-      thickness: 4,
-      position: { x: 2, y: 2.8, z: 0 },
-      rotation: { x: 0, y: 0, z: 0 }
-    });
-    const groupMembers: GroupMember[] = [
-      { id: 'selected-group-member', groupId: 'selected-group', memberType: 'part', memberId: groupedDivider.id }
-    ];
-    const selection = { selectedPartIds: [], selectedGroupIds: ['selected-group'], editingGroupId: null };
-    const parts = [host, groupedDivider];
-    const moveSelection = resolveMoveSelection(selection, parts, groupMembers);
-    const preview = solveGroupMoveSnapPreview({
-      initialBounds: getCombinedBounds(moveSelection.affectedParts),
-      anchorPosition: moveSelection.anchorPosition,
-      delta: { x: -1.99, y: 0, z: 0 },
-      axes: { x: true, y: false, z: false },
-      referenceParts: parts,
-      movingPartIds: moveSelection.affectedPartIds,
-      movingParts: moveSelection.affectedParts,
-      snapGuides: [],
-      settings: socketSettings,
-      snapThreshold: 0.5
-    });
-    const release = resolveGroupReleaseMove({
-      parts,
-      groupMembers,
-      selection,
-      proposedDelta: preview.delta,
-      fallbackDeltaOnOverlap: preview.delta,
-      preventOverlap: true
-    });
-    expect(moveSelection.affectedPartIds).toEqual([groupedDivider.id]);
-    expect(groupedDivider.position.y + preview.delta.y).toBeCloseTo(2.375);
-    expect(release.constrained.delta).toEqual(preview.delta);
-    expect(release.constrained.overlapBlocked).toBe(false);
-  });
+  it.each([false, true])(
+    'mates a selected group with competing snaps enabled=%s and accepts its release',
+    (competingSnaps) => {
+      const host = createPart({
+        id: 'selected-group-dado-host',
+        length: 12,
+        width: 6,
+        thickness: 0.75,
+        position: { x: 0, y: 0.375, z: 0 },
+        features: [
+          {
+            id: 'selected-group-dado-socket',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            cutType: 'dado',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            placement: { x: 5.6225, z: 0 },
+            parameters: { size: { length: 0.755, width: 6 }, depthMode: 'blind', depth: 0.375 }
+          }
+        ]
+      });
+      const groupedDivider = createPart({
+        id: 'selected-group-divider',
+        length: 0.75,
+        width: 6,
+        thickness: 4,
+        position: { x: 2, y: 2.8, z: 0 },
+        rotation: { x: 0, y: 0, z: 0 }
+      });
+      const groupMembers: GroupMember[] = [
+        { id: 'selected-group-member', groupId: 'selected-group', memberType: 'part', memberId: groupedDivider.id }
+      ];
+      const selection = { selectedPartIds: [], selectedGroupIds: ['selected-group'], editingGroupId: null };
+      const parts = [host, groupedDivider];
+      const moveSelection = resolveMoveSelection(selection, parts, groupMembers);
+      const preview = solveGroupMoveSnapPreview({
+        initialBounds: getCombinedBounds(moveSelection.affectedParts),
+        anchorPosition: moveSelection.anchorPosition,
+        delta: { x: -1.99, y: 0, z: 0 },
+        axes: { x: true, y: false, z: false },
+        referenceParts: parts,
+        movingPartIds: moveSelection.affectedPartIds,
+        movingParts: moveSelection.affectedParts,
+        snapGuides: [],
+        settings: {
+          ...socketSettings,
+          snapToOrigin: competingSnaps,
+          enableSurfaceAnchors: competingSnaps,
+          enableFractionalAnchors: competingSnaps
+        },
+        snapThreshold: 0.5
+      });
+      const release = resolveGroupReleaseMove({
+        parts,
+        groupMembers,
+        selection,
+        proposedDelta: preview.delta,
+        fallbackDeltaOnOverlap: preview.delta,
+        preventOverlap: true
+      });
+      expect(moveSelection.affectedPartIds).toEqual([groupedDivider.id]);
+      expect(groupedDivider.position.y + preview.delta.y).toBeCloseTo(2.375);
+      expect(release.constrained.delta).toEqual(preview.delta);
+      expect(release.constrained.overlapBlocked).toBe(false);
+    }
+  );
 
   it('centers a holistic mortise mate across locked axes and axes that return to the drag origin', () => {
     const host = createPart({

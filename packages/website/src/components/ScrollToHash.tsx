@@ -4,37 +4,46 @@ import { docPages } from "../pages/docs/docsNavConfig";
 
 const docSlugs = new Set(docPages.map((p) => p.slug));
 
-/**
- * Component that scrolls to hash elements when navigating.
- * Handles both initial page load and navigation within the app.
- * Also redirects old /docs#section URLs to /docs/section.
- */
+/** Supports legacy docs URLs and anchors in lazily loaded route content. */
 export default function ScrollToHash() {
   const { hash, pathname } = useLocation();
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (hash) {
-      const slug = hash.slice(1); // remove the '#'
-
-      // Redirect old /docs#slug URLs to /docs/slug
-      if (pathname === "/docs" && docSlugs.has(slug)) {
-        navigate(`/docs/${slug}`, { replace: true });
-        return;
-      }
-
-      // Small delay to ensure the DOM is ready
-      const timeoutId = setTimeout(() => {
-        const element = document.querySelector(hash);
-        if (element) {
-          element.scrollIntoView({ behavior: "smooth" });
-        }
-      }, 100);
-      return () => clearTimeout(timeoutId);
-    } else {
-      // Scroll to top when navigating to a new page without hash
+    if (!hash) {
       window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
     }
+
+    let slug: string;
+    try {
+      slug = decodeURIComponent(hash.slice(1));
+    } catch {
+      return;
+    }
+    if (pathname === "/docs" && docSlugs.has(slug)) {
+      navigate(`/docs/${slug}`, { replace: true });
+      return;
+    }
+
+    const scrollToTarget = () => {
+      const element = document.getElementById(slug);
+      if (!element) return false;
+      element.scrollIntoView({ behavior: "smooth" });
+      return true;
+    };
+    if (scrollToTarget()) return;
+
+    // A cold desktop help link can arrive before the lazy docs page is ready.
+    const observer = new window.MutationObserver(() => {
+      if (scrollToTarget()) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    const timeout = window.setTimeout(() => observer.disconnect(), 10000);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(timeout);
+    };
   }, [hash, pathname, navigate]);
 
   return null;
