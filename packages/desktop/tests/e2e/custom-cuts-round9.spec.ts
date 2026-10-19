@@ -300,20 +300,31 @@ test.describe('round 9 file transaction ownership and quit', () => {
       }
     });
 
-  test('N4 rejected validation clears Quit intent before a later ordinary window discard', async () => {
-    await editInspector();
-    await running.window.getByRole('textbox', { name: /Hole Diameter/ }).fill('20');
-    const proc = running.electronApp.process();
-    await running.electronApp.evaluate(({ app }) => {
-      app.quit();
+  for (const choice of ["Don't Save", 'Cancel'] as const)
+    test(`N4 rejected validation preserves Quit until the user chooses ${choice}`, async () => {
+      await editInspector();
+      await running.window.getByRole('textbox', { name: /Hole Diameter/ }).fill('20');
+      const proc = running.electronApp.process();
+      await running.electronApp.evaluate(({ app }) => {
+        app.quit();
+      });
+      const dialog = running.window.getByRole('alertdialog');
+      await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+      await expect(dialog.getByRole('alert')).toContainText('Hole profile extends beyond the selected face.');
+      await dialog.getByRole('button', { name: choice, exact: true }).click();
+      if (choice === 'Cancel') {
+        await expect(dialog).not.toBeVisible();
+        expect(running.window.isClosed()).toBe(false);
+        await closeWindow();
+        await dialog.getByRole('button', { name: "Don't Save", exact: true }).click();
+      }
+      await expect.poll(() => running.window.isClosed()).toBe(true);
+      if (choice === 'Cancel' && process.platform === 'darwin') {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        expect(proc.exitCode).toBeNull();
+      } else {
+        await expect.poll(() => proc.exitCode).toBe(0);
+        expect(proc.signalCode).toBeNull();
+      }
     });
-    const dialog = running.window.getByRole('alertdialog');
-    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(dialog.getByRole('alert')).toContainText('Hole profile extends beyond the selected face.');
-    await dialog.getByRole('button', { name: "Don't Save" }).click();
-    await expect.poll(() => running.window.isClosed()).toBe(true);
-    await new Promise((resolve) => setTimeout(resolve, 200));
-    if (process.platform === 'darwin') expect(proc.exitCode).toBeNull();
-    else await expect.poll(() => proc.exitCode).toBe(0);
-  });
 });
