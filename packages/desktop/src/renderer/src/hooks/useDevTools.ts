@@ -4,6 +4,8 @@
  */
 
 import { useEffect } from 'react';
+import { usePartCutsEditingStore } from '../store/partCutsEditingStore';
+import { useAppSettingsStore } from '../store/appSettingsStore';
 import { useProjectStore } from '../store/projectStore';
 import { useSelectionStore } from '../store/selectionStore';
 import { useUIStore } from '../store/uiStore';
@@ -59,6 +61,10 @@ export function useDevTools() {
       (window as unknown as Record<string, unknown>).useCameraStore = useCameraStore;
       (window as unknown as Record<string, unknown>).useLicenseStore = useLicenseStore;
       (window as unknown as Record<string, unknown>).useAssemblyEditingStore = useAssemblyEditingStore;
+      (window as unknown as Record<string, unknown>).usePartCutsEditingStore = usePartCutsEditingStore;
+      // Settings change behaviour -- grid snapping, anchors, sensitivity -- so
+      // automation has to be able to read and set them like any other store.
+      (window as unknown as Record<string, unknown>).useAppSettingsStore = useAppSettingsStore;
       window.carvdDev = {
         /**
          * Load the seed project (Simple Writing Desk)
@@ -343,6 +349,7 @@ export function useDevTools() {
       if (shouldExposeTools) {
         delete window.carvdDev;
         delete (window as unknown as Record<string, unknown>).useProjectStore;
+        delete (window as unknown as Record<string, unknown>).usePartCutsEditingStore;
         delete (window as unknown as Record<string, unknown>).useSelectionStore;
         delete (window as unknown as Record<string, unknown>).useUIStore;
         delete (window as unknown as Record<string, unknown>).useInteractionStore;

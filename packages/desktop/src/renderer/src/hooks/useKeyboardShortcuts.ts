@@ -5,15 +5,67 @@ import { useWorkspaceSceneGraph } from '../interaction/useWorkspaceSceneGraph';
 import { useClipboardStore } from '../store/clipboardStore';
 import { useSelectionStore } from '../store/selectionStore';
 import { useSnapStore } from '../store/snapStore';
+import { getRectHandleAxes } from '@renderer/components/part-cuts/PartCutsPreviewCanvas';
+import { usePartCutsEditingStore } from '../store/partCutsEditingStore';
 import { useUIStore } from '../store/uiStore';
 import { useCameraStore } from '../store/cameraStore';
 import { getContainingGroupId } from '../utils/interactionSelection';
-import { Rotation3D } from '../types';
+import { PartFeature, Rotation3D } from '../types';
 import { rotationTool } from '../interaction/tools/rotationTool';
-import { applyCommitInstructions } from '../interaction/tools/toolSolver';
 import { resolveRotateBatchGrounding } from '../utils/interactionMovement';
 
+/**
+ * Shift a cut along the blank's length, leaving every other axis alone.
+ *
+ * Rect cuts carry `placement.x`; round and rounded cuts carry
+ * `placement.primary`. End cuts have no along-length placement to move.
+ * Offsets never go negative, matching the inspector's own bound.
+ */
+/**
+ * Step a cut along one of the two axes of the face it sits on.
+ *
+ * `horizontal` asks for the length axis and vertical for the width axis, but a
+ * channel pinned across one of them takes every step on the axis it does leave
+ * free -- which is what the preview's Move controls already do. Without that a
+ * groove, whose only free axis is the width, could not be nudged at all.
+ *
+ * Offsets measured from an edge cannot go negative; one measured from the
+ * centre can, so it is only clamped when its reference is an edge.
+ */
+function nudgeFeature(feature: PartFeature, horizontal: boolean, step: number): PartFeature {
+  if (feature.kind === 'rect_cut') {
+    const axes = getRectHandleAxes(feature.cutType);
+    const freeX = axes ? axes.moveX : true;
+    const freeZ = axes ? axes.moveZ : true;
+    const useX = horizontal ? freeX || !freeZ : !freeZ && freeX;
+    return useX
+      ? { ...feature, placement: { ...feature.placement, x: Math.max(0, feature.placement.x + step) } }
+      : { ...feature, placement: { ...feature.placement, z: Math.max(0, feature.placement.z + step) } };
+  }
+  if (feature.kind === 'circular_cut' || feature.kind === 'rounded_cut') {
+    const clampAt = (value: number, from: 'min' | 'center' | 'max' | undefined) =>
+      from === 'center' ? value : Math.max(0, value);
+    return horizontal
+      ? {
+          ...feature,
+          placement: {
+            ...feature.placement,
+            primary: clampAt(feature.placement.primary + step, feature.reference.primaryFrom)
+          }
+        }
+      : {
+          ...feature,
+          placement: {
+            ...feature.placement,
+            secondary: clampAt(feature.placement.secondary + step, feature.reference.secondaryFrom)
+          }
+        };
+  }
+  return feature;
+}
+
 export function useKeyboardShortcuts() {
+  const isEditingPartCuts = usePartCutsEditingStore((s) => s.isEditingPartCuts);
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const parts = useProjectStore((s) => s.parts);
   const gridSize = useProjectStore((s) => s.gridSize);
@@ -44,9 +96,107 @@ export function useKeyboardShortcuts() {
   const addPart = useProjectStore((s) => s.addPart);
 
   useEffect(() => {
+    /**
+     * The cuts-mode half of the same shortcut vocabulary.
+     *
+     * Every key here maps onto the cut draft. Nothing in it can reach the
+     * project, which is what lets the caller route to it and return rather
+     * than disabling shortcuts wholesale in this mode.
+     */
+    const handlePartCutsKeyDown = (e: KeyboardEvent) => {
+      // A dialog owns the keyboard while it is up. Radix closes on keydown and
+      // calls preventDefault, and it does so before this window-level handler
+      // runs -- so checking the DOM for an open dialog is too late and Escape
+      // would both dismiss the dialog and step the editor back. Trust the
+      // event instead, and still skip anything left standing.
+      if (e.defaultPrevented) return;
+      if (document.querySelector('[role="dialog"][data-state="open"],[role="alertdialog"][data-state="open"]')) {
+        return;
+      }
+
+      const cuts = usePartCutsEditingStore.getState();
+      const key = e.key.toLowerCase();
+      const isMod = e.metaKey || e.ctrlKey;
+
+      if (isMod) {
+        if (key === 'z' && e.shiftKey) {
+          e.preventDefault();
+          cuts.redoDraft();
+        } else if (key === 'z') {
+          e.preventDefault();
+          cuts.undoDraft();
+        } else if (key === 'y') {
+          e.preventDefault();
+          cuts.redoDraft();
+        }
+        return;
+      }
+
+      const selected = cuts.draftFeatures.find((feature) => feature.id === cuts.selectedFeatureId) ?? null;
+
+      switch (key) {
+        case 'escape':
+          // Step back one level rather than leaving outright: a selected cut
+          // deselects first, and only an already-empty selection asks to exit.
+          e.preventDefault();
+          if (cuts.selectedFeatureId) cuts.selectFeature(null);
+          else cuts.requestExit();
+          break;
+
+        case 'f':
+        case 'home':
+          // Same keys the project canvas uses; the preview re-frames the part.
+          e.preventDefault();
+          useCameraStore.getState().requestCenterCamera();
+          break;
+
+        case 'delete':
+        case 'backspace':
+          if (selected) {
+            e.preventDefault();
+            cuts.setDraftFeatures(cuts.draftFeatures.filter((feature) => feature.id !== selected.id));
+            cuts.selectFeature(null);
+          }
+          break;
+
+        case 'arrowleft':
+        case 'arrowright':
+        case 'arrowup':
+        case 'arrowdown': {
+          // Both axes, matching the preview's Move controls. Only the
+          // horizontal pair used to be handled, so the width axis was
+          // unreachable from the keyboard and a groove could not move at all.
+          if (!selected) break;
+          e.preventDefault();
+          const horizontal = key === 'arrowleft' || key === 'arrowright';
+          const step = (e.shiftKey ? 1 : 0.25) * (key === 'arrowright' || key === 'arrowup' ? 1 : -1);
+          cuts.setDraftFeatures(
+            cuts.draftFeatures.map((f) => (f.id === selected.id ? nudgeFeature(f, horizontal, step) : f))
+          );
+          break;
+        }
+
+        default:
+          break;
+      }
+    };
+
     const handleKeyDown = (e: KeyboardEvent) => {
       // Ignore if typing in an input
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
+      if (
+        (e.target instanceof HTMLInputElement && e.target.type !== 'checkbox') ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      // Part Cuts mode owns its own editing surface. The source part stays
+      // selected behind the workspace, so every project-level shortcut below
+      // (rotate, duplicate, delete, copy/paste, nudge) would silently edit it.
+      // Route the same keys onto the cut draft instead and return, so none of
+      // them can reach the part. Returning here is what keeps that guarantee.
+      if (isEditingPartCuts) {
+        handlePartCutsKeyDown(e);
         return;
       }
 
@@ -82,8 +232,16 @@ export function useKeyboardShortcuts() {
           const input = { part, axis, degrees: 90, space: 'world' as const };
           const state = rotationTool.begin(input);
           const { preview } = rotationTool.update(input, state);
-
-          applyCommitInstructions(rotationTool.commit(state, preview), { updatePart });
+          const grounded = resolveRotateBatchGrounding({
+            startingParts: [part],
+            projectParts: parts,
+            groupMembers,
+            updates: [{ partId: part.id, position: part.position, rotation: preview.rotation }]
+          });
+          const update = grounded.updates[0];
+          if (update) {
+            updatePart(part.id, { position: update.position, rotation: update.rotation });
+          }
           return;
         }
 
@@ -367,6 +525,7 @@ export function useKeyboardShortcuts() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [
+    isEditingPartCuts,
     selectedPartIds,
     parts,
     gridSize,

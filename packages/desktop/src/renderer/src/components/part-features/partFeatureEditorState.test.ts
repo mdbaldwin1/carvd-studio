@@ -1,0 +1,897 @@
+import { describe, expect, it } from 'vitest';
+import type { EndCutFeature, PartFeature, RectCutFeature } from '@renderer/types';
+import {
+  applyTargetToFeatureDraft,
+  buildDraftFromFeature,
+  normalizeEndCutDraft,
+  buildDraftFromPreset,
+  buildFeatureFromDraft,
+  duplicateFeature,
+  edgeNotchSideToTarget,
+  edgeTargetToSide,
+  generateFeatureId,
+  getFeatureDraftTarget,
+  getPresetHint,
+  getPresetLabel,
+  normalizeRectCutDraft,
+  type FeatureDraft,
+  type OperationPreset
+} from './partFeatureEditorState';
+
+const PART_DEFAULTS = { partLength: 24, partWidth: 8, partThickness: 0.75 };
+
+describe('joinery shaping survives editing', () => {
+  it.each(['taperAngle', 'wallAngle', 'sideWallAngle'] as const)('preserves %s when relabeling a socket', (angle) => {
+    const original = buildFeatureFromDraft(createRectDraft({ [angle]: 10 }));
+    const draft = buildDraftFromFeature(original, { length: 24, width: 8, thickness: 0.75 });
+    const saved = buildFeatureFromDraft({ ...draft, label: 'Relabeled socket' });
+    expect(saved.parameters).toMatchObject({ [angle]: 10 });
+  });
+
+  it('preserves the narrow mitred lip of a secret dovetail', () => {
+    const original = buildFeatureFromDraft(
+      createEndCutDraft({ cutType: 'bevel', verticalAngle: 45, band: { from: 0, to: 0.25 } })
+    );
+    const saved = buildFeatureFromDraft({ ...buildDraftFromFeature(original), label: 'Mitred lip' });
+    expect(saved.parameters).toMatchObject({ band: { from: 0, to: 0.25 } });
+  });
+});
+
+type RectDraft = Extract<FeatureDraft, { mode: 'rect_cut' }>;
+type EndCutDraft = Extract<FeatureDraft, { mode: 'end_cut' }>;
+
+function createRectDraft(overrides?: Partial<RectDraft>): RectDraft {
+  return {
+    mode: 'rect_cut',
+    featureId: null,
+    label: '',
+    enabled: true,
+    cutType: 'cutout',
+    faceTarget: 'top_face',
+    edgeTarget: 'top_front_edge',
+    cornerTarget: 'front_left_corner',
+    sizeLength: 2,
+    sizeWidth: 2,
+    depthMode: 'through',
+    depth: 0.25,
+    cornerRadius: 0,
+    placementX: 1,
+    placementZ: 1,
+    ...overrides
+  };
+}
+
+function createEndCutDraft(overrides?: Partial<EndCutDraft>): EndCutDraft {
+  return {
+    mode: 'end_cut',
+    featureId: null,
+    label: '',
+    enabled: true,
+    targetFace: 'left_end',
+    cutType: 'mitre',
+    lengthMode: 'long_point',
+    referenceMode: null,
+    referenceValue: null,
+    horizontalAngle: 45,
+    horizontalFlip: false,
+    verticalAngle: 0,
+    verticalFlip: false,
+    ...overrides
+  };
+}
+
+describe('partFeatureEditorState', () => {
+  it('builds and round-trips every round-cut preset', () => {
+    for (const preset of ['round_hole', 'countersink', 'counterbore'] as const) {
+      const draft = buildDraftFromPreset(preset, PART_DEFAULTS);
+      expect(draft.mode).toBe('circular_cut');
+      const feature = buildFeatureFromDraft(draft);
+      expect(feature).toMatchObject({ kind: 'circular_cut', cutType: preset, target: { face: 'top_face' } });
+      expect(buildFeatureFromDraft(buildDraftFromFeature(feature))).toEqual(feature);
+    }
+  });
+
+  it('builds and round-trips rounded profiles', () => {
+    for (const preset of ['rounded_slot', 'rounded_rectangle'] as const) {
+      const feature = buildFeatureFromDraft(buildDraftFromPreset(preset, PART_DEFAULTS));
+      expect(feature).toMatchObject({ kind: 'rounded_cut', cutType: preset });
+      expect(buildFeatureFromDraft(buildDraftFromFeature(feature))).toEqual(feature);
+    }
+  });
+  it('preserves end-cut length semantics when round-tripping through the draft model', () => {
+    const feature = {
+      id: 'feature-1',
+      kind: 'end_cut' as const,
+      version: 1 as const,
+      enabled: true,
+      target: { type: 'face' as const, face: 'left_end' as const },
+      reference: { primaryFrom: 'min' as const },
+      cutType: 'mitre' as const,
+      lengthMode: 'centerline' as const,
+      parameters: {
+        horizontalAngle: 45,
+        reference: {
+          mode: 'centerline' as const,
+          value: 23.5
+        }
+      }
+    };
+
+    const draft = buildDraftFromFeature(feature);
+    const rebuilt = buildFeatureFromDraft(draft);
+
+    expect(draft).toMatchObject({
+      lengthMode: 'centerline',
+      referenceMode: 'centerline',
+      referenceValue: 23.5
+    });
+    expect(rebuilt).toMatchObject({
+      lengthMode: 'centerline',
+      parameters: {
+        reference: {
+          mode: 'centerline',
+          value: 23.5
+        }
+      }
+    });
+  });
+
+  describe('edge notch side mapping', () => {
+    it('maps sides to canonical top edges and back', () => {
+      expect(edgeNotchSideToTarget('front')).toBe('top_front_edge');
+      expect(edgeNotchSideToTarget('back')).toBe('top_back_edge');
+      expect(edgeNotchSideToTarget('left')).toBe('top_left_edge');
+      expect(edgeNotchSideToTarget('right')).toBe('top_right_edge');
+
+      expect(edgeTargetToSide('bottom_front_edge')).toBe('front');
+      expect(edgeTargetToSide('bottom_back_edge')).toBe('back');
+      expect(edgeTargetToSide('bottom_left_edge')).toBe('left');
+      expect(edgeTargetToSide('top_right_edge')).toBe('right');
+    });
+  });
+
+  describe('normalizeRectCutDraft', () => {
+    it('forces blind depth for blind-only cut types and clamps the depth to the part thickness', () => {
+      const normalized = normalizeRectCutDraft(
+        createRectDraft({ cutType: 'dado', depthMode: 'through', depth: 5 }),
+        PART_DEFAULTS
+      );
+      expect(normalized.depthMode).toBe('blind');
+      expect(normalized.depth).toBeCloseTo(0.749);
+    });
+
+    it('replaces non-positive or non-finite blind depths with usable values', () => {
+      // Stated outright rather than relying on the cut type to force it: a
+      // mortise may now be taken through, so only a blind one is sanitised.
+      const blindMortise = (depth: number) => createRectDraft({ cutType: 'mortise', depthMode: 'blind', depth });
+      expect(normalizeRectCutDraft(blindMortise(0), PART_DEFAULTS).depth).toBe(0.25);
+      expect(normalizeRectCutDraft(blindMortise(Number.NaN), PART_DEFAULTS).depth).toBe(0.25);
+      expect(normalizeRectCutDraft(blindMortise(0.01), PART_DEFAULTS).depth).toBe(0.01);
+    });
+
+    it('lets a mortise be taken through a face or a long edge', () => {
+      // A wedged tenon needs a through mortise, and drawing it as a Cutout
+      // instead costs the cut its identity everywhere it is later described.
+      expect(
+        normalizeRectCutDraft(createRectDraft({ cutType: 'mortise', depthMode: 'through' }), PART_DEFAULTS).depthMode
+      ).toBe('through');
+      // An edge mortise exits the opposite edge, as in an open bridle.
+      expect(
+        normalizeRectCutDraft(
+          createRectDraft({ cutType: 'mortise', faceTarget: 'front_face', depthMode: 'through' }),
+          PART_DEFAULTS
+        ).depthMode
+      ).toBe('through');
+      // A new mortise is still blind, which is what one usually is.
+      expect(normalizeRectCutDraft(createRectDraft({ cutType: 'mortise' }), PART_DEFAULTS).depth).toBeGreaterThan(0);
+    });
+
+    it('sanitizes sizes and negative offsets but preserves malformed offsets for explicit correction', () => {
+      const normalized = normalizeRectCutDraft(
+        createRectDraft({ sizeLength: Number.NaN, sizeWidth: Number.NaN, placementX: Number.NaN, placementZ: -3 }),
+        PART_DEFAULTS
+      );
+      expect(normalized.sizeLength).toBe(0.75);
+      expect(normalized.sizeWidth).toBe(0.75);
+      expect(normalized.placementX).toBeNaN();
+      expect(normalized.placementZ).toBe(0);
+    });
+
+    it('coerces face targets per cut type, keeping side faces for pockets', () => {
+      // Channels stay on top/bottom where run semantics are defined.
+      for (const cutType of ['dado', 'stopped_dado', 'half_lap'] as const) {
+        const normalized = normalizeRectCutDraft(createRectDraft({ cutType, faceTarget: 'front_face' }), PART_DEFAULTS);
+        expect(normalized.faceTarget).toBe('top_face');
+      }
+      // Pockets and grooves retain long-edge targets.
+      for (const cutType of ['cutout', 'mortise', 'groove', 'stopped_groove'] as const) {
+        const normalized = normalizeRectCutDraft(createRectDraft({ cutType, faceTarget: 'front_face' }), PART_DEFAULTS);
+        expect(normalized.faceTarget).toBe('front_face');
+        expect(normalized.depthMode).toBe(cutType === 'cutout' || cutType === 'mortise' ? 'through' : 'blind');
+      }
+      const bottom = normalizeRectCutDraft(createRectDraft({ faceTarget: 'bottom_face' }), PART_DEFAULTS);
+      expect(bottom.faceTarget).toBe('bottom_face');
+    });
+
+    it('forces edge notches through-depth and canonicalizes legacy edge targets', () => {
+      const frontNotch = normalizeRectCutDraft(
+        createRectDraft({ cutType: 'edge_notch', depthMode: 'blind', edgeTarget: 'bottom_front_edge', placementZ: 2 }),
+        PART_DEFAULTS
+      );
+      expect(frontNotch.depthMode).toBe('through');
+      expect(frontNotch.edgeTarget).toBe('top_front_edge');
+      expect(frontNotch.placementZ).toBe(0);
+
+      const leftNotch = normalizeRectCutDraft(
+        createRectDraft({ cutType: 'edge_notch', edgeTarget: 'bottom_left_edge', placementX: 2, placementZ: 1 }),
+        PART_DEFAULTS
+      );
+      expect(leftNotch.edgeTarget).toBe('top_left_edge');
+      expect(leftNotch.placementX).toBe(0);
+      expect(leftNotch.placementZ).toBe(1);
+    });
+
+    it('keeps top/bottom rabbet edges but replaces side edges with the default', () => {
+      const kept = normalizeRectCutDraft(
+        createRectDraft({ cutType: 'rabbet', edgeTarget: 'bottom_back_edge' }),
+        PART_DEFAULTS
+      );
+      expect(kept.edgeTarget).toBe('bottom_back_edge');
+
+      const replaced = normalizeRectCutDraft(
+        createRectDraft({ cutType: 'rabbet', edgeTarget: 'front_left_edge' }),
+        PART_DEFAULTS
+      );
+      expect(replaced.edgeTarget).toBe('top_front_edge');
+    });
+
+    it('zeroes corner notch placement', () => {
+      const normalized = normalizeRectCutDraft(
+        createRectDraft({ cutType: 'corner_notch', placementX: 3, placementZ: 4 }),
+        PART_DEFAULTS
+      );
+      expect(normalized.placementX).toBe(0);
+      expect(normalized.placementZ).toBe(0);
+    });
+
+    it('locks through-running dado width to the part width', () => {
+      for (const cutType of ['dado'] as const) {
+        const normalized = normalizeRectCutDraft(
+          createRectDraft({ cutType, sizeWidth: 3, placementZ: 2 }),
+          PART_DEFAULTS
+        );
+        expect(normalized.sizeWidth).toBe(8);
+        expect(normalized.placementZ).toBe(0);
+      }
+    });
+
+    it('preserves a stopped dado span, radius and offset through editing', () => {
+      const normalized = normalizeRectCutDraft(
+        createRectDraft({
+          cutType: 'stopped_dado',
+          sizeLength: 0.75,
+          sizeWidth: 6,
+          placementZ: 1,
+          cornerRadius: 0.375
+        }),
+        PART_DEFAULTS
+      );
+      expect(normalized.sizeWidth).toBe(6);
+      expect(normalized.placementZ).toBe(1);
+      const feature = buildFeatureFromDraft(normalized);
+      expect(buildDraftFromFeature(feature, { length: 24, width: 8, thickness: 0.75 })).toMatchObject({
+        sizeWidth: 6,
+        placementZ: 1,
+        cornerRadius: 0.375
+      });
+    });
+
+    it('locks groove run to the part length', () => {
+      const normalized = normalizeRectCutDraft(
+        createRectDraft({ cutType: 'groove', sizeLength: 3, placementX: 2 }),
+        PART_DEFAULTS
+      );
+      expect(normalized.sizeLength).toBe(24);
+      expect(normalized.placementX).toBe(0);
+    });
+
+    it('derives rabbet run and shoulder from the target edge', () => {
+      const frontRabbet = normalizeRectCutDraft(
+        createRectDraft({
+          cutType: 'rabbet',
+          edgeTarget: 'top_front_edge',
+          sizeWidth: 0.5,
+          placementX: 3,
+          placementZ: 2
+        }),
+        PART_DEFAULTS
+      );
+      expect(frontRabbet.sizeLength).toBe(24);
+      expect(frontRabbet.sizeWidth).toBe(0.5);
+      expect(frontRabbet.placementX).toBe(0);
+      expect(frontRabbet.placementZ).toBe(0);
+
+      const sideRabbet = normalizeRectCutDraft(
+        createRectDraft({ cutType: 'rabbet', edgeTarget: 'top_left_edge', sizeLength: 0.625 }),
+        PART_DEFAULTS
+      );
+      expect(sideRabbet.sizeLength).toBe(0.625);
+      expect(sideRabbet.sizeWidth).toBe(8);
+
+      const zeroShoulder = normalizeRectCutDraft(
+        createRectDraft({ cutType: 'rabbet', edgeTarget: 'top_front_edge', sizeWidth: 0 }),
+        PART_DEFAULTS
+      );
+      expect(zeroShoulder.sizeWidth).toBe(0.5);
+    });
+
+    it('clamps placement within the remaining part footprint', () => {
+      const normalized = normalizeRectCutDraft(
+        createRectDraft({ sizeLength: 4, sizeWidth: 4, placementX: 30, placementZ: 30 }),
+        PART_DEFAULTS
+      );
+      expect(normalized.placementX).toBe(20);
+      expect(normalized.placementZ).toBe(4);
+    });
+
+    it('uses fallback part dimensions when defaults are omitted', () => {
+      const normalized = normalizeRectCutDraft(createRectDraft({ sizeLength: 4, sizeWidth: 4, placementX: 30 }));
+      expect(normalized.placementX).toBe(0);
+      expect(normalized.placementZ).toBe(0);
+    });
+  });
+
+  describe('buildDraftFromPreset', () => {
+    it('starts a routed path as a centered two-point straight-bit route', () => {
+      expect(buildDraftFromPreset('routed_path', PART_DEFAULTS)).toMatchObject({
+        mode: 'routed_path',
+        faceTarget: 'top_face',
+        points: [
+          { primary: -1.5, secondary: 0 },
+          { primary: 1.5, secondary: 0 }
+        ],
+        bitProfile: 'straight',
+        bitDiameter: 0.25,
+        depthMode: 'blind'
+      });
+    });
+
+    it('builds the default end cut draft', () => {
+      expect(buildDraftFromPreset('end_cut')).toEqual({
+        mode: 'end_cut',
+        featureId: null,
+        label: '',
+        enabled: true,
+        targetFace: 'left_end',
+        cutType: 'mitre',
+        lengthMode: 'long_point',
+        referenceMode: null,
+        referenceValue: null,
+        horizontalAngle: 45,
+        horizontalFlip: false,
+        verticalAngle: 0,
+        verticalFlip: false
+      });
+    });
+
+    it('builds normalized rect cut drafts with per-type default sizes', () => {
+      const dado = buildDraftFromPreset('dado', PART_DEFAULTS);
+      expect(dado).toMatchObject({
+        mode: 'rect_cut',
+        cutType: 'dado',
+        sizeLength: 0.75,
+        sizeWidth: 8,
+        depthMode: 'blind'
+      });
+
+      const rabbet = buildDraftFromPreset('rabbet', PART_DEFAULTS);
+      expect(rabbet).toMatchObject({ mode: 'rect_cut', cutType: 'rabbet', sizeLength: 24, sizeWidth: 0.5 });
+
+      const mortise = buildDraftFromPreset('mortise', PART_DEFAULTS);
+      expect(mortise).toMatchObject({ mode: 'rect_cut', cutType: 'mortise', sizeLength: 2, depthMode: 'blind' });
+
+      const stoppedGroove = buildDraftFromPreset('stopped_groove', PART_DEFAULTS);
+      expect(stoppedGroove).toMatchObject({
+        mode: 'rect_cut',
+        cutType: 'stopped_groove',
+        sizeLength: 4,
+        sizeWidth: 0.5
+      });
+
+      const cutout = buildDraftFromPreset('cutout', PART_DEFAULTS);
+      expect(cutout).toMatchObject({ mode: 'rect_cut', cutType: 'cutout', depthMode: 'through', sizeLength: 0.75 });
+    });
+  });
+
+  describe('buildDraftFromFeature / buildFeatureFromDraft round trips', () => {
+    it('round-trips a custom edge profile library id and immutable snapshot', () => {
+      const feature: PartFeature = {
+        id: 'custom-edge-1',
+        kind: 'edge_profile',
+        version: 1,
+        enabled: true,
+        target: { type: 'edge', edge: 'top_front_edge' },
+        reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+        profile: 'custom',
+        routerProfileId: 'profile-1',
+        routerProfileSnapshot: {
+          version: 1,
+          id: 'profile-1',
+          name: 'Shop Ogee',
+          family: 'Decorative',
+          source: 'generic',
+          parameters: {},
+          boundary: { start: { u: 0, v: 0 }, segments: [{ kind: 'line', to: { u: 0.5, v: 0.25 } }] }
+        },
+        parameters: { size: 0.5, depth: 0.25 }
+      };
+      const draft = buildDraftFromFeature(feature);
+      expect(draft).toMatchObject({ mode: 'edge_profile', profile: 'custom', routerProfileId: 'profile-1' });
+      expect(buildFeatureFromDraft(draft)).toEqual(feature);
+    });
+
+    it('round-trips a routed polyline and V-bit settings', () => {
+      const feature: PartFeature = {
+        id: 'route-1',
+        kind: 'routed_path',
+        version: 1,
+        enabled: true,
+        label: 'Inlay channel',
+        target: { type: 'face', face: 'front_face' },
+        reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+        path: {
+          points: [
+            { primary: -2, secondary: 0 },
+            { primary: 0, secondary: 1, cornerRadius: 0.25 },
+            { primary: 2, secondary: 0 }
+          ],
+          closed: true
+        },
+        bit: { profile: 'v_bit', diameter: 0.5, includedAngle: 60 },
+        parameters: { depthMode: 'blind', depth: 0.125 }
+      };
+
+      const draft = buildDraftFromFeature(feature);
+      expect(draft).toMatchObject({
+        mode: 'routed_path',
+        faceTarget: 'front_face',
+        bitProfile: 'v_bit',
+        bitDiameter: 0.5,
+        bitAngle: 60,
+        closed: true,
+        points: expect.arrayContaining([{ primary: 0, secondary: 1, cornerRadius: 0.25 }])
+      });
+      expect(buildFeatureFromDraft(draft)).toEqual(feature);
+    });
+
+    it('zeros corner radii on open-path endpoints when building a feature', () => {
+      const draft = buildDraftFromPreset('routed_path', PART_DEFAULTS);
+      if (draft.mode !== 'routed_path') throw new Error('Expected a routed path draft');
+      draft.points = [
+        { primary: -2, secondary: 0, cornerRadius: 0.5 },
+        { primary: 0, secondary: 1, cornerRadius: 0.25 },
+        { primary: 2, secondary: 0, cornerRadius: 0.5 }
+      ];
+
+      const feature = buildFeatureFromDraft(draft);
+      if (feature.kind !== 'routed_path') throw new Error('Expected a routed path feature');
+      expect(feature.path.points).toEqual([
+        { primary: -2, secondary: 0 },
+        { primary: 0, secondary: 1, cornerRadius: 0.25 },
+        { primary: 2, secondary: 0 }
+      ]);
+    });
+
+    it.each([
+      {
+        bit: { profile: 'dovetail' as const, diameter: 0.5, shankDiameter: 0.25, includedAngle: 14 },
+        draft: { bitProfile: 'dovetail', bitDiameter: 0.5, bitShankDiameter: 0.25, bitAngle: 14 }
+      },
+      {
+        bit: { profile: 't_slot' as const, diameter: 0.75, shankDiameter: 0.25, cutterHeight: 0.1875 },
+        draft: { bitProfile: 't_slot', bitDiameter: 0.75, bitShankDiameter: 0.25, bitCutterHeight: 0.1875 }
+      },
+      {
+        bit: { profile: 'keyhole' as const, diameter: 0.375, shankDiameter: 0.125, cutterHeight: 0.125 },
+        draft: { bitProfile: 'keyhole', bitDiameter: 0.375, bitShankDiameter: 0.125, bitCutterHeight: 0.125 }
+      }
+    ])('round-trips $bit.profile router dimensions', ({ bit, draft: expectedDraft }) => {
+      const feature: PartFeature = {
+        id: `route-${bit.profile}`,
+        kind: 'routed_path',
+        version: 1,
+        enabled: true,
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+        path: {
+          points: [
+            { primary: -1, secondary: 0 },
+            { primary: 1, secondary: 0 }
+          ]
+        },
+        bit,
+        parameters: { depthMode: 'blind', depth: 0.25 }
+      };
+
+      const draft = buildDraftFromFeature(feature);
+      expect(draft).toMatchObject(expectedDraft);
+      expect(buildFeatureFromDraft(draft)).toEqual(feature);
+    });
+
+    it('round-trips a rect cut feature preserving id, label, and blind depth', () => {
+      const feature: RectCutFeature = {
+        id: 'rect-1',
+        kind: 'rect_cut',
+        version: 1 as const,
+        enabled: false,
+        label: 'Shelf dado',
+        target: { type: 'face', face: 'bottom_face' },
+        reference: { primaryFrom: 'min' },
+        cutType: 'dado',
+        parameters: { size: { length: 0.75, width: 8 }, depthMode: 'blind', depth: 0.375 },
+        placement: { x: 2, z: 0 }
+      };
+
+      const draft = buildDraftFromFeature(feature, { length: 24, width: 8, thickness: 0.75 });
+      expect(draft).toMatchObject({
+        mode: 'rect_cut',
+        featureId: 'rect-1',
+        label: 'Shelf dado',
+        enabled: false,
+        cutType: 'dado',
+        faceTarget: 'bottom_face',
+        depthMode: 'blind',
+        depth: 0.375
+      });
+
+      const rebuilt = buildFeatureFromDraft(draft);
+      expect(rebuilt).toMatchObject({
+        id: 'rect-1',
+        kind: 'rect_cut',
+        enabled: false,
+        label: 'Shelf dado',
+        cutType: 'dado',
+        target: { type: 'face', face: 'bottom_face' },
+        parameters: { size: { length: 0.75, width: 8 }, depthMode: 'blind', depth: 0.375 },
+        placement: { x: 2, z: 0 }
+      });
+    });
+
+    it('maps corner and edge targets into the draft and back', () => {
+      const cornerFeature: RectCutFeature = {
+        id: 'corner-1',
+        kind: 'rect_cut',
+        version: 1 as const,
+        enabled: true,
+        target: { type: 'corner', corner: 'back_right_corner' },
+        reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+        cutType: 'corner_notch',
+        parameters: { size: { length: 2, width: 2 }, depthMode: 'through' },
+        placement: { x: 0, z: 0 }
+      };
+      const cornerDraft = buildDraftFromFeature(cornerFeature);
+      expect(cornerDraft).toMatchObject({ mode: 'rect_cut', cornerTarget: 'back_right_corner' });
+      const rebuiltCorner = buildFeatureFromDraft(cornerDraft);
+      expect(rebuiltCorner).toMatchObject({
+        target: { type: 'corner', corner: 'back_right_corner' },
+        reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+        placement: { x: 0, z: 0 }
+      });
+
+      const edgeFeature: RectCutFeature = {
+        id: 'edge-1',
+        kind: 'rect_cut',
+        version: 1 as const,
+        enabled: true,
+        target: { type: 'edge', edge: 'top_back_edge' },
+        reference: { primaryFrom: 'min' },
+        cutType: 'edge_notch',
+        parameters: { size: { length: 2, width: 1 }, depthMode: 'through' },
+        placement: { x: 3, z: 0 }
+      };
+      const edgeDraft = buildDraftFromFeature(edgeFeature);
+      expect(edgeDraft).toMatchObject({ mode: 'rect_cut', edgeTarget: 'top_back_edge' });
+      expect(buildFeatureFromDraft(edgeDraft)).toMatchObject({ target: { type: 'edge', edge: 'top_back_edge' } });
+    });
+
+    it('generates a new id and omits empty labels when building from a fresh draft', () => {
+      const rebuilt = buildFeatureFromDraft(createRectDraft());
+      expect(rebuilt.id).toBeTruthy();
+      expect(rebuilt.label).toBeUndefined();
+      if (rebuilt.kind !== 'rect_cut') throw new Error('expected rect cut');
+      expect(rebuilt.parameters.depth).toBeUndefined();
+    });
+
+    it('anchors the end cut reference to the targeted end', () => {
+      const left = buildFeatureFromDraft(createEndCutDraft({ targetFace: 'left_end' }));
+      expect(left.reference).toEqual({ primaryFrom: 'min' });
+      const right = buildFeatureFromDraft(createEndCutDraft({ targetFace: 'right_end' }));
+      expect(right.reference).toEqual({ primaryFrom: 'max' });
+    });
+
+    it('normalizes end cut parameters per cut type', () => {
+      const bevel = buildFeatureFromDraft(
+        createEndCutDraft({ cutType: 'bevel', horizontalAngle: 45, verticalAngle: 30, verticalFlip: true })
+      ) as EndCutFeature;
+      expect(bevel.parameters.horizontalAngle).toBe(0);
+      expect(bevel.parameters.verticalAngle).toBe(30);
+      expect(bevel.parameters.verticalFlip).toBe(true);
+
+      const mitre = buildFeatureFromDraft(
+        createEndCutDraft({ cutType: 'mitre', verticalAngle: 30, verticalFlip: true })
+      ) as EndCutFeature;
+      expect(mitre.parameters.horizontalAngle).toBe(45);
+      expect(mitre.parameters.verticalAngle).toBeUndefined();
+      expect(mitre.parameters.verticalFlip).toBeUndefined();
+      expect(mitre.parameters.reference).toBeUndefined();
+    });
+
+    it('defaults missing end cut angles and flips when building the draft', () => {
+      const feature: EndCutFeature = {
+        id: 'end-1',
+        kind: 'end_cut',
+        version: 1 as const,
+        enabled: true,
+        target: { type: 'face', face: 'right_end' },
+        reference: { primaryFrom: 'max' },
+        cutType: 'mitre',
+        lengthMode: 'long_point',
+        parameters: { horizontalAngle: 30 }
+      };
+      const draft = buildDraftFromFeature(feature);
+      expect(draft).toMatchObject({
+        mode: 'end_cut',
+        label: '',
+        referenceMode: null,
+        referenceValue: null,
+        horizontalFlip: false,
+        verticalAngle: 0,
+        verticalFlip: false
+      });
+    });
+  });
+
+  describe('getFeatureDraftTarget', () => {
+    it('returns the appropriate target per draft shape', () => {
+      expect(getFeatureDraftTarget(createEndCutDraft({ targetFace: 'right_end' }))).toEqual({
+        type: 'face',
+        face: 'right_end'
+      });
+      expect(
+        getFeatureDraftTarget(createRectDraft({ cutType: 'corner_notch', cornerTarget: 'back_left_corner' }))
+      ).toEqual({
+        type: 'corner',
+        corner: 'back_left_corner'
+      });
+      expect(getFeatureDraftTarget(createRectDraft({ cutType: 'rabbet', edgeTarget: 'top_back_edge' }))).toEqual({
+        type: 'edge',
+        edge: 'top_back_edge'
+      });
+      expect(getFeatureDraftTarget(createRectDraft({ faceTarget: 'bottom_face' }))).toEqual({
+        type: 'face',
+        face: 'bottom_face'
+      });
+    });
+  });
+
+  describe('applyTargetToFeatureDraft', () => {
+    it('applies only valid end targets to end cut drafts', () => {
+      const draft = createEndCutDraft();
+      expect(applyTargetToFeatureDraft(draft, { type: 'face', face: 'right_end' })).toMatchObject({
+        targetFace: 'right_end'
+      });
+      expect(applyTargetToFeatureDraft(draft, { type: 'face', face: 'top_face' })).toBe(draft);
+      expect(applyTargetToFeatureDraft(draft, { type: 'edge', edge: 'top_front_edge' })).toBe(draft);
+    });
+
+    it('applies corner targets only to corner notch drafts', () => {
+      const draft = createRectDraft({ cutType: 'corner_notch' });
+      expect(applyTargetToFeatureDraft(draft, { type: 'corner', corner: 'back_right_corner' })).toMatchObject({
+        cornerTarget: 'back_right_corner'
+      });
+      expect(applyTargetToFeatureDraft(draft, { type: 'face', face: 'top_face' })).toBe(draft);
+    });
+
+    it('applies edge targets to edge notch and rabbet drafts', () => {
+      const notch = createRectDraft({ cutType: 'edge_notch' });
+      expect(applyTargetToFeatureDraft(notch, { type: 'edge', edge: 'top_back_edge' })).toMatchObject({
+        edgeTarget: 'top_back_edge'
+      });
+      expect(applyTargetToFeatureDraft(notch, { type: 'corner', corner: 'back_left_corner' })).toBe(notch);
+    });
+
+    it('applies only top/bottom faces to face-cut drafts', () => {
+      const draft = createRectDraft();
+      expect(applyTargetToFeatureDraft(draft, { type: 'face', face: 'bottom_face' })).toMatchObject({
+        faceTarget: 'bottom_face'
+      });
+      expect(applyTargetToFeatureDraft(draft, { type: 'face', face: 'left_end' })).toBe(draft);
+      expect(applyTargetToFeatureDraft(draft, { type: 'edge', edge: 'top_front_edge' })).toBe(draft);
+    });
+  });
+
+  describe('duplicateFeature and generateFeatureId', () => {
+    it('duplicates a feature with a fresh id and independent nested objects', () => {
+      const feature: PartFeature = {
+        id: 'rect-1',
+        kind: 'rect_cut',
+        version: 1 as const,
+        enabled: true,
+        target: { type: 'face', face: 'top_face' },
+        reference: { primaryFrom: 'min' },
+        cutType: 'cutout',
+        parameters: { size: { length: 2, width: 2 }, depthMode: 'through' },
+        placement: { x: 1, z: 1 }
+      };
+
+      const duplicate = duplicateFeature(feature);
+      expect(duplicate.id).not.toBe(feature.id);
+      expect({ ...duplicate, id: feature.id }).toEqual(feature);
+      if (duplicate.kind !== 'rect_cut') throw new Error('expected rect cut');
+      duplicate.parameters.size.length = 99;
+      expect(feature.parameters.size.length).toBe(2);
+    });
+
+    it('turns a duplicated dowel member into an ordinary hole', () => {
+      const feature: PartFeature = {
+        id: 'dowel-1',
+        kind: 'circular_cut',
+        version: 1 as const,
+        enabled: true,
+        metadata: {
+          source: 'manual',
+          dowelJoint: {
+            jointId: 'joint-1',
+            matePartId: 'part-2',
+            memberIndex: 0,
+            dowelDiameter: 0.375,
+            dowelLength: 2,
+            embedmentDepth: 1
+          }
+        },
+        target: { type: 'face', face: 'right_end' },
+        reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+        cutType: 'round_hole',
+        placement: { primary: 0, secondary: 0, rotation: 0 },
+        parameters: { diameter: 0.375, depthMode: 'blind', depth: 1, tilt: 0, direction: 0 }
+      };
+
+      const duplicate = duplicateFeature(feature);
+
+      expect(duplicate.metadata).toEqual({ source: 'manual' });
+      expect(feature.metadata?.dowelJoint).toBeDefined();
+    });
+
+    it('generates unique feature ids', () => {
+      expect(generateFeatureId()).not.toBe(generateFeatureId());
+    });
+  });
+
+  describe('preset labels and hints', () => {
+    const presets: OperationPreset[] = [
+      'end_cut',
+      'corner_notch',
+      'edge_notch',
+      'cutout',
+      'dado',
+      'stopped_dado',
+      'rabbet',
+      'groove',
+      'stopped_groove',
+      'mortise'
+    ];
+
+    it('provides a label and hint for every preset', () => {
+      for (const preset of presets) {
+        expect(getPresetLabel(preset)).toBeTruthy();
+        expect(getPresetHint(preset)).toBeTruthy();
+      }
+      expect(getPresetLabel('stopped_dado')).toBe('Stopped Dado');
+      expect(getPresetHint('mortise')).toContain('Blind pocket');
+    });
+  });
+  describe('half lap preset', () => {
+    it('seeds a half lap at half the part thickness at the board end', () => {
+      const draft = buildDraftFromPreset('half_lap', { partLength: 24, partWidth: 4, partThickness: 1.5 });
+
+      expect(draft.mode).toBe('rect_cut');
+      if (draft.mode !== 'rect_cut') return;
+      // It is its own joint now, not a dado wearing a label.
+      expect(draft.cutType).toBe('half_lap');
+      expect(draft.depthMode).toBe('blind');
+      expect(draft.depth).toBeCloseTo(0.75);
+      expect(draft.placementX).toBe(0);
+    });
+  });
+  describe('edge bevel drafts', () => {
+    it('builds an edge bevel preset draft targeting the front edge', () => {
+      const draft = buildDraftFromPreset('edge_bevel');
+      expect(draft.mode).toBe('end_cut');
+      if (draft.mode !== 'end_cut') return;
+      expect(draft.targetFace).toBe('front_face');
+      expect(draft.cutType).toBe('bevel');
+      expect(draft.verticalAngle).toBe(45);
+    });
+
+    it('normalizes end drafts retargeted onto an edge to bevel-only settings', () => {
+      const endDraft = buildDraftFromPreset('end_cut');
+      if (endDraft.mode !== 'end_cut') return;
+      const retargeted = normalizeEndCutDraft({ ...endDraft, targetFace: 'back_face' });
+
+      expect(retargeted.cutType).toBe('bevel');
+      expect(retargeted.horizontalAngle).toBe(0);
+      expect(retargeted.lengthMode).toBe('long_point');
+      expect(retargeted.verticalAngle).toBe(45);
+
+      // End targets pass through untouched
+      const untouched = normalizeEndCutDraft(endDraft);
+      expect(untouched).toEqual(endDraft);
+    });
+  });
+  describe('tenon drafts', () => {
+    it('seeds a tenon preset on an end with a blind tongue', () => {
+      const draft = buildDraftFromPreset('tenon', { partLength: 24, partWidth: 4, partThickness: 1.5 });
+      expect(draft.mode).toBe('rect_cut');
+      if (draft.mode !== 'rect_cut') return;
+      expect(draft.cutType).toBe('tenon');
+      expect(draft.faceTarget).toBe('right_end');
+      expect(draft.depthMode).toBe('blind');
+      expect(draft.depth).toBeLessThan(1.5);
+      expect(draft.sizeWidth).toBeLessThanOrEqual(4);
+    });
+
+    it('coerces a tenon retargeted onto a face back to an end', () => {
+      const draft = normalizeRectCutDraft(createRectDraft({ cutType: 'tenon', faceTarget: 'top_face' }), {
+        partLength: 24,
+        partWidth: 4,
+        partThickness: 1.5
+      });
+      expect(draft.faceTarget).toBe('right_end');
+      expect(draft.placementX).toBe(0);
+    });
+  });
+});
+
+describe('regressions from the 2026-09-09 pre-release review', () => {
+  it('clamps a side-face pocket offset against thickness, not width', () => {
+    // On a leg (narrow but thick) the width clamp silently rewrote a valid
+    // front-face mortise the moment the inspector opened it.
+    const draft = normalizeRectCutDraft(
+      {
+        mode: 'rect_cut',
+        cutType: 'mortise',
+        faceTarget: 'front_face',
+        edgeTarget: 'top_front_edge',
+        cornerTarget: 'front_left_corner',
+        sizeLength: 2,
+        sizeWidth: 1,
+        placementX: 4,
+        placementZ: 2,
+        depthMode: 'blind',
+        depth: 0.5
+      } as never,
+      { partLength: 24, partWidth: 1.5, partThickness: 3.5 }
+    );
+    expect(draft.placementZ).toBeCloseTo(2);
+  });
+
+  it('still clamps a top-face pocket against the width', () => {
+    const draft = normalizeRectCutDraft(
+      {
+        mode: 'rect_cut',
+        cutType: 'mortise',
+        faceTarget: 'top_face',
+        edgeTarget: 'top_front_edge',
+        cornerTarget: 'front_left_corner',
+        sizeLength: 2,
+        sizeWidth: 1,
+        placementX: 4,
+        placementZ: 99,
+        depthMode: 'blind',
+        depth: 0.25
+      } as never,
+      { partLength: 24, partWidth: 6, partThickness: 0.75 }
+    );
+    expect(draft.placementZ).toBeCloseTo(5);
+  });
+});

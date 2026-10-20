@@ -1,0 +1,22 @@
+{
+  "format": "carvd-router-catalog",
+  "version": 1,
+  "catalog": {
+    "version": 1,
+    "id": "signed-test-catalog",
+    "name": "Signed Test Catalog",
+    "source": "generic",
+    "profiles": [],
+    "tools": []
+  },
+  "signature": {
+    "algorithm": "Ed25519",
+    "publisherKeyId": "carvd-test-only-2026",
+    "publicKeySpki": "MCowBQYDK2VwAyEAhIr8GzpyWEjSVqHQWcCoY71xr7ufM6h2OdLORXVq8dE=",
+    "publicKeyFingerprint": "ead7b7fca9a8db5ed12024cbe819e2856cbcb45235b35a5d605d54ab530e14e0",
+    "payloadHash": "5f95532e0e7f62543789df99fd308151e335ebf6b6ab6b7804dd795cbe2eb4bf",
+    "signature": "bWACTcGTzDiGaqUck0G9fMjoPLnSJ51Na30afojLkhbHWVQZ8HeDiqwxaKpex1QA02q9N2x8VAM1X060AUaDAw==",
+    "signedAt": "2026-09-15T00:00:00Z",
+    "source": "TEST ONLY — not a production publisher identity"
+  }
+}

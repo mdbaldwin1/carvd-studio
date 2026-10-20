@@ -288,6 +288,64 @@ describe('useAssemblyEditing', () => {
   });
 
   describe('saveAndExit', () => {
+    it('refuses to save an assembly with an invalid dowel relationship', async () => {
+      const saveEditingAssembly = vi.fn();
+      useAssemblyEditingStore.setState({
+        editingAssemblyId: 'a1',
+        isEditingAssembly: true,
+        saveEditingAssembly
+      });
+      useProjectStore.setState({
+        parts: [
+          {
+            ...useProjectStore.getState().parts[0],
+            id: 'first',
+            name: 'Rail',
+            length: 12,
+            width: 2,
+            thickness: 1,
+            position: { x: 0, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            stockId: null,
+            grainSensitive: true,
+            grainDirection: 'length',
+            color: '#c4a574',
+            features: [
+              {
+                id: 'hole-1',
+                kind: 'circular_cut',
+                version: 1 as const,
+                enabled: true,
+                metadata: {
+                  dowelJoint: {
+                    jointId: 'joint-1',
+                    matePartId: 'missing',
+                    memberIndex: 0,
+                    dowelDiameter: 0.375,
+                    dowelLength: 2,
+                    embedmentDepth: 1
+                  }
+                },
+                target: { type: 'face', face: 'top_face' },
+                reference: { primaryFrom: 'center', secondaryFrom: 'center' },
+                cutType: 'round_hole',
+                placement: { primary: 0, secondary: 0, rotation: 0 },
+                parameters: { diameter: 0.375, depthMode: 'blind', depth: 1, tilt: 0, direction: 0 }
+              }
+            ]
+          }
+        ]
+      });
+      const showToast = vi.fn();
+      useUIStore.setState({ showToast });
+
+      const { result } = renderHook(() => useAssemblyEditing());
+      await act(async () => result.current.saveAndExit());
+
+      expect(saveEditingAssembly).not.toHaveBeenCalled();
+      expect(showToast).toHaveBeenCalledWith(expect.stringMatching(/matching hole/i), 'error');
+    });
+
     it('shows toast when no editingAssemblyId', async () => {
       useAssemblyEditingStore.setState({ editingAssemblyId: null });
       const showToast = vi.fn();

@@ -1,0 +1,16 @@
+{
+  "format": "carvd-router-profile",
+  "version": 2,
+  "profile": {
+    "version": 1,
+    "id": "future",
+    "name": "Future",
+    "family": "custom",
+    "source": "generic",
+    "parameters": {},
+    "boundary": {
+      "start": { "u": 0, "v": 1 },
+      "segments": [{ "kind": "line", "to": { "u": 1, "v": 0 } }]
+    }
+  }
+}

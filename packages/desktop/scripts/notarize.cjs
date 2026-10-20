@@ -36,6 +36,9 @@ exports.default = async function notarizing(context) {
   const teamId = process.env.APPLE_TEAM_ID;
 
   if (!appleId || !appleIdPassword || !teamId) {
+    if (process.env.CARVD_REQUIRE_NOTARIZATION === 'true') {
+      throw new Error('Release notarization requires APPLE_ID, APPLE_ID_PASSWORD, and APPLE_TEAM_ID');
+    }
     console.warn('⚠️  Skipping notarization: Missing environment variables');
     console.warn('   Required: APPLE_ID, APPLE_ID_PASSWORD, APPLE_TEAM_ID');
     console.warn('   Set these in your CI/CD environment or local .env file');

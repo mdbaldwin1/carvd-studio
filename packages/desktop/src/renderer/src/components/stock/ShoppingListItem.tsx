@@ -1,5 +1,5 @@
 import { Checkbox } from '@renderer/components/ui/checkbox';
-import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { formatReadableMeasurement } from '../../utils/fractions';
 import { StockSummary } from '../../types';
 
 interface ShoppingListItemProps {
@@ -10,25 +10,58 @@ interface ShoppingListItemProps {
 }
 
 export function ShoppingListItem({ summary, units, checked, onToggle }: ShoppingListItemProps) {
-  const dimensions = `${formatMeasurementWithUnit(summary.stockLength, units)} × ${formatMeasurementWithUnit(summary.stockWidth, units)} × ${formatMeasurementWithUnit(summary.stockThickness, units)}`;
+  const isRod = summary.form === 'rod';
+  const isInsert = summary.form === 'insert';
+  const perPack = summary.packSize && summary.packSize > 1 ? summary.packSize : null;
 
-  const qtyLabel = summary.boardsNeeded === 1 ? 'board' : 'boards';
+  const dimensions = isInsert
+    ? `${formatReadableMeasurement(summary.stockLength, 'metric')} × ${formatReadableMeasurement(summary.stockWidth, 'metric')} × ${formatReadableMeasurement(summary.stockThickness, 'metric')}`
+    : summary.form === 'rod'
+      ? `${formatReadableMeasurement(summary.stockWidth, units)} dia × ${formatReadableMeasurement(summary.stockLength, units)}`
+      : `${formatReadableMeasurement(summary.stockLength, units)} × ${formatReadableMeasurement(summary.stockWidth, units)} × ${formatReadableMeasurement(summary.stockThickness, units)}`;
+
+  // You buy dowel by the rod and biscuits by the box, not by the board.
+  const qtyLabel = isInsert
+    ? perPack
+      ? summary.boardsNeeded === 1
+        ? 'box'
+        : 'boxes'
+      : summary.boardsNeeded === 1
+        ? 'piece'
+        : 'pieces'
+    : isRod
+      ? summary.boardsNeeded === 1
+        ? 'rod'
+        : 'rods'
+      : summary.form === 'sheet'
+        ? summary.boardsNeeded === 1
+          ? 'sheet'
+          : 'sheets'
+        : summary.boardsNeeded === 1
+          ? 'board'
+          : 'boards';
   const hasOverage = summary.boardsNeeded > summary.actualBoardsUsed;
-  const linearFeetDisplay =
-    summary.pricingUnit === 'board_foot' && summary.linearFeet > 0
-      ? ` (${summary.linearFeet.toFixed(1)} linear ft)`
-      : '';
-  const priceDisplay =
-    summary.pricingUnit === 'board_foot'
-      ? `$${summary.pricePerUnit.toFixed(2)}/bf`
-      : `$${summary.pricePerUnit.toFixed(2)}/sheet`;
+  // Linear feet is the honest measure of a rod, so show it however it is priced.
+  const showLinearFeet = !isInsert && (isRod || summary.pricingUnit === 'board_foot') && summary.linearFeet > 0;
+  const linearFeetDisplay = showLinearFeet ? ` (${summary.linearFeet.toFixed(1)} linear ft)` : '';
+  const priceDisplay = isInsert
+    ? `$${summary.pricePerUnit.toFixed(2)}/${perPack ? 'box' : 'ea'}`
+    : isRod
+      ? `$${summary.pricePerUnit.toFixed(2)}/rod`
+      : summary.pricingUnit === 'board_foot'
+        ? `$${summary.pricePerUnit.toFixed(2)}/bf`
+        : `$${summary.pricePerUnit.toFixed(2)}/${summary.form === 'board' ? 'board' : 'sheet'}`;
 
   return (
     <div
       className={`flex items-start gap-3 py-3 px-4 bg-surface border border-border rounded transition-colors duration-150 ${checked ? 'opacity-50 bg-bg-alt' : ''}`}
     >
       <label className="flex items-center pt-0.5 shrink-0 cursor-pointer">
-        <Checkbox checked={checked} onChange={onToggle} />
+        <Checkbox
+          checked={checked}
+          onChange={onToggle}
+          aria-label={`Mark ${summary.stockName} as ${checked ? 'not purchased' : 'purchased'}`}
+        />
       </label>
 
       <div className="flex-1 min-w-0">
@@ -46,7 +79,12 @@ export function ShoppingListItem({ summary, units, checked, onToggle }: Shopping
           )}
           {linearFeetDisplay}
         </div>
-        {summary.pricingUnit === 'board_foot' && (
+        {isInsert && perPack && (
+          <div className="text-[11px] text-text-muted mt-0.5">
+            {summary.insertsNeeded} needed · {perPack} per box
+          </div>
+        )}
+        {!isRod && !isInsert && summary.pricingUnit === 'board_foot' && (
           <div className="text-[11px] text-text-muted mt-0.5">{summary.boardFeet.toFixed(2)} board feet total</div>
         )}
       </div>

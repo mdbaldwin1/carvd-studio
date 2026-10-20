@@ -4,14 +4,9 @@ import * as THREE from 'three';
 import { useProjectStore } from '../../store/projectStore';
 import { useSelectionStore } from '../../store/selectionStore';
 import { useCameraStore } from '../../store/cameraStore';
+import { getPartBounds } from '../../utils/snapToPartsUtil';
 import { resolveExplicitSelectedPartIds } from '../../utils/interactionSelection';
 import { isOrbitControls } from './workspaceUtils';
-
-// Pre-allocated objects for camera centering (avoids per-part allocations in the loop)
-const _ccEuler = new THREE.Euler();
-const _ccQuat = new THREE.Quaternion();
-const _ccCorners = Array.from({ length: 8 }, () => new THREE.Vector3());
-const _ccPosition = new THREE.Vector3();
 
 // Component that handles camera centering and view vector tracking
 export function CameraController() {
@@ -126,49 +121,30 @@ export function CameraController() {
       maxZ = -Infinity;
 
     for (const part of selectedParts) {
-      // Get part's bounding box (accounting for rotation) — reuses pre-allocated objects
-      _ccEuler.set(
-        (part.rotation.x * Math.PI) / 180,
-        (part.rotation.y * Math.PI) / 180,
-        (part.rotation.z * Math.PI) / 180,
-        'XYZ'
-      );
-      _ccQuat.setFromEuler(_ccEuler);
-
-      const hL = part.length / 2;
-      const hT = part.thickness / 2;
-      const hW = part.width / 2;
-
-      // Set the 8 corners (reuses pre-allocated Vector3 array)
-      _ccCorners[0].set(-hL, -hT, -hW);
-      _ccCorners[1].set(-hL, -hT, hW);
-      _ccCorners[2].set(-hL, hT, -hW);
-      _ccCorners[3].set(-hL, hT, hW);
-      _ccCorners[4].set(hL, -hT, -hW);
-      _ccCorners[5].set(hL, -hT, hW);
-      _ccCorners[6].set(hL, hT, -hW);
-      _ccCorners[7].set(hL, hT, hW);
-
-      _ccPosition.set(part.position.x, part.position.y, part.position.z);
-
-      for (const corner of _ccCorners) {
-        corner.applyQuaternion(_ccQuat);
-        corner.add(_ccPosition);
-        minX = Math.min(minX, corner.x);
-        maxX = Math.max(maxX, corner.x);
-        minY = Math.min(minY, corner.y);
-        maxY = Math.max(maxY, corner.y);
-        minZ = Math.min(minZ, corner.z);
-        maxZ = Math.max(maxZ, corner.z);
-      }
+      const bounds = getPartBounds(part);
+      minX = Math.min(minX, bounds.minX);
+      maxX = Math.max(maxX, bounds.maxX);
+      minY = Math.min(minY, bounds.minY);
+      maxY = Math.max(maxY, bounds.maxY);
+      minZ = Math.min(minZ, bounds.minZ);
+      maxZ = Math.max(maxZ, bounds.maxZ);
     }
 
     const centerX = (minX + maxX) / 2;
     const centerY = (minY + maxY) / 2;
     const centerZ = (minZ + maxZ) / 2;
 
-    // Set the orbit controls target to the center of selected parts
+    // Frame the selected stock as well as centering it. Tiny inserts need a
+    // close view just as a full assembly needs room around its outer bounds.
     if (isOrbitControls(controls)) {
+      const direction = camera.position.clone().sub(controls.target).normalize();
+      const radius = Math.max(0.1, Math.hypot(maxX - minX, maxY - minY, maxZ - minZ) / 2);
+      if (camera instanceof THREE.PerspectiveCamera) {
+        const halfFov = THREE.MathUtils.degToRad(camera.fov) / 2;
+        const limitingAngle = Math.min(halfFov, Math.atan(Math.tan(halfFov) * camera.aspect));
+        const distance = Math.max(0.5, (radius * 1.25) / Math.sin(limitingAngle));
+        camera.position.set(centerX, centerY, centerZ).addScaledVector(direction, distance);
+      }
       controls.target.set(centerX, centerY, centerZ);
       controls.update();
     }
@@ -180,6 +156,7 @@ export function CameraController() {
     selectedGroupIds,
     groupMembers,
     parts,
+    camera,
     controls,
     clearCenterCameraRequest
   ]);

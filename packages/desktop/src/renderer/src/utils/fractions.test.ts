@@ -6,6 +6,8 @@ import {
   formatMeasurementWithUnit,
   parseInput,
   decimalToFraction,
+  decimalToExactFraction,
+  formatFabricationMeasurement,
   fractionToDecimal
 } from './fractions';
 
@@ -50,9 +52,9 @@ describe('Unit Conversions', () => {
 
 describe('decimalToFraction', () => {
   it('converts whole numbers', () => {
-    expect(decimalToFraction(5)).toBe('5');
-    expect(decimalToFraction(0)).toBe('0');
-    expect(decimalToFraction(100)).toBe('100');
+    expect(decimalToFraction(5!)).toBe('5');
+    expect(decimalToFraction(0!)).toBe('0');
+    expect(decimalToFraction(100!)).toBe('100');
   });
 
   it('converts simple fractions', () => {
@@ -212,6 +214,14 @@ describe('formatMeasurementWithUnit', () => {
 });
 
 describe('parseInput', () => {
+  it('respects explicit units when hardware and lumber use different systems', () => {
+    expect(parseInput('20mm', 'imperial')).toBeCloseTo(20 / 25.4, 12);
+    expect(parseInput('2 cm', 'imperial')).toBeCloseTo(20 / 25.4, 12);
+    expect(parseInput('3/4 in', 'metric')).toBe(0.75);
+    expect(parseInput('1 1/2"', 'metric')).toBe(1.5);
+    expect(parseInput('20 bananas', 'imperial')).toBeNull();
+    expect(parseInput('1/0', 'imperial')).toBeNull();
+  });
   describe('imperial parsing', () => {
     it('parses fractions and returns inches', () => {
       expect(parseInput('1/2', 'imperial')).toBe(0.5);
@@ -276,13 +286,47 @@ describe('Real-world woodworking scenarios', () => {
     // Typical table saw kerf is 1/8"
     const kerf = fractionToDecimal('1/8');
     expect(kerf).toBe(0.125);
-    expect(decimalToFraction(kerf)).toBe('1/8');
+    expect(decimalToFraction(kerf!)).toBe('1/8');
   });
 
   it('handles precise joinery measurements', () => {
     // Dovetail spacing might be 1 7/16"
     const spacing = fractionToDecimal('1 7/16');
     expect(spacing).toBeCloseTo(1.4375, 4);
-    expect(decimalToFraction(spacing)).toBe('1 7/16');
+    expect(decimalToFraction(spacing!)).toBe('1 7/16');
+  });
+});
+
+describe('exact 32nds and 64ths', () => {
+  it.each([
+    [0.78125, '25/32'],
+    [3.984375, '3 63/64'],
+    [3.03125, '3 1/32'],
+    [2.984375, '2 63/64'],
+    [0.015625, '1/64'],
+    [0.75, '3/4']
+  ])('writes %p as %s rather than rounding it away', (value, expected) => {
+    // These are the values a mortise-and-tenon project actually produces, and
+    // a woodworker can find every one of them on a rule.
+    expect(decimalToExactFraction(value)).toBe(expected);
+    expect(decimalToFraction(value)).toBe(expected);
+    expect(formatFabricationMeasurement(value, 'imperial')).toBe(`${expected}"`);
+  });
+
+  it('refuses to call a value a fraction it is not', () => {
+    // 0.7813 is near 25/32 but is not 25/32, and a shop measurement that is
+    // only nearly right is worse than one written as a decimal.
+    expect(decimalToExactFraction(0.7813)).toBeNull();
+    expect(formatFabricationMeasurement(0.7813, 'imperial')).toBe('0.7813"');
+  });
+
+  it('still rounds an unrepresentable value for ordinary display', () => {
+    expect(decimalToFraction(0.7813)).toBe('13/16');
+  });
+
+  it('handles negatives and whole numbers', () => {
+    expect(decimalToExactFraction(-0.78125)).toBe('-25/32');
+    expect(decimalToExactFraction(4)).toBe('4');
+    expect(decimalToExactFraction(Number.NaN)).toBeNull();
   });
 });

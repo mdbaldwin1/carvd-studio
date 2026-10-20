@@ -1,0 +1,132 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://carvd.studio/schemas/router-profile.schema.json",
+  "title": "Carvd Router Profile File",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "version", "profile"],
+  "properties": {
+    "format": { "const": "carvd-router-profile" },
+    "version": { "const": 1 },
+    "profile": { "$ref": "#/definitions/profile" }
+  },
+  "definitions": {
+    "nonBlank": { "type": "string", "pattern": "\\S" },
+    "revision": { "type": "string", "pattern": "^fnv1a64:[0-9a-f]{16}$" },
+    "coordinate": { "type": "number", "minimum": -1000, "maximum": 1000 },
+    "positiveDimension": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1000
+    },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["u", "v"],
+      "properties": {
+        "u": { "$ref": "#/definitions/coordinate" },
+        "v": { "$ref": "#/definitions/coordinate" }
+      }
+    },
+    "line": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "to"],
+      "properties": {
+        "kind": { "const": "line" },
+        "to": { "$ref": "#/definitions/point" }
+      }
+    },
+    "arc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "to", "radius", "clockwise"],
+      "properties": {
+        "kind": { "const": "arc" },
+        "to": { "$ref": "#/definitions/point" },
+        "radius": { "$ref": "#/definitions/positiveDimension" },
+        "clockwise": { "type": "boolean" }
+      }
+    },
+    "ellipseArc": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "to", "radiusU", "radiusV", "clockwise"],
+      "properties": {
+        "kind": { "const": "ellipseArc" },
+        "to": { "$ref": "#/definitions/point" },
+        "radiusU": { "$ref": "#/definitions/positiveDimension" },
+        "radiusV": { "$ref": "#/definitions/positiveDimension" },
+        "clockwise": { "type": "boolean" }
+      }
+    },
+    "cubicBezier": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "to", "control1", "control2"],
+      "properties": {
+        "kind": { "const": "cubicBezier" },
+        "to": { "$ref": "#/definitions/point" },
+        "control1": { "$ref": "#/definitions/point" },
+        "control2": { "$ref": "#/definitions/point" }
+      }
+    },
+    "segment": {
+      "oneOf": [
+        { "$ref": "#/definitions/line" },
+        { "$ref": "#/definitions/arc" },
+        { "$ref": "#/definitions/ellipseArc" },
+        { "$ref": "#/definitions/cubicBezier" }
+      ]
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "id",
+        "name",
+        "family",
+        "source",
+        "parameters",
+        "boundary"
+      ],
+      "properties": {
+        "version": { "const": 1 },
+        "revision": { "$ref": "#/definitions/revision" },
+        "id": { "$ref": "#/definitions/nonBlank" },
+        "name": { "$ref": "#/definitions/nonBlank" },
+        "family": { "$ref": "#/definitions/nonBlank" },
+        "source": { "enum": ["generic", "manufacturer"] },
+        "manufacturer": { "$ref": "#/definitions/nonBlank" },
+        "sku": { "$ref": "#/definitions/nonBlank" },
+        "sourceUrl": { "$ref": "#/definitions/nonBlank" },
+        "parameters": {
+          "type": "object",
+          "maxProperties": 256,
+          "propertyNames": { "pattern": "\\S" },
+          "additionalProperties": {
+            "oneOf": [
+              { "type": "string" },
+              { "$ref": "#/definitions/coordinate" }
+            ]
+          }
+        },
+        "boundary": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["start", "segments"],
+          "properties": {
+            "start": { "$ref": "#/definitions/point" },
+            "segments": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 2048,
+              "items": { "$ref": "#/definitions/segment" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

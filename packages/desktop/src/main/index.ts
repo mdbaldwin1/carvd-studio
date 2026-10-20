@@ -1,5 +1,7 @@
 import { app, BrowserWindow, shell, ipcMain, dialog } from 'electron';
 import { join, normalize, isAbsolute, dirname } from 'path';
+import { setImmediate } from 'node:timers';
+import { projectFilesFromArguments } from './projectFileArguments';
 
 // Enable CDP for automation when explicitly opted in via env. Off in normal dev,
 // so it doesn't keep a debugging port open by default. Set CARVD_REMOTE_DEBUG=1
@@ -27,9 +29,6 @@ import {
   removeFavoriteProject,
   isFavoriteProject,
   setFavoriteProjects,
-  getNewProjectDefaults,
-  setNewProjectDefaults,
-  NewProjectDefaults,
   getHasCompletedWelcome,
   setHasCompletedWelcome,
   getUserTemplates,
@@ -72,6 +71,7 @@ import {
   getStoredLicenseData
 } from './license';
 import { initializeAutoUpdater, checkForUpdates, downloadUpdate, quitAndInstall, getUpdateInfo } from './updater';
+import { createUpdateRestart } from './updateRestart';
 import {
   getTrialStatus,
   acknowledgeTrialExpired,
@@ -103,7 +103,7 @@ function getQueuedTestSaveDialogResult(): Electron.SaveDialogReturnValue | null 
 
   const filePath = queuedTestSaveDialogPaths.shift();
   if (!filePath) {
-    return { canceled: true, filePath: undefined };
+    return { canceled: true, filePath: '' };
   }
 
   return { canceled: false, filePath };
@@ -276,6 +276,20 @@ const windows: Set<BrowserWindow> = new Set();
 // Track windows that are allowed to close (after user confirmed or chose to discard)
 const windowsAllowedToClose: Set<BrowserWindow> = new Set();
 
+// Native file choosers must belong to the renderer window that requested them.
+// Keeping one chooser per WebContents also prevents repeated shortcuts from
+// creating a backlog of native dialogs while the first chooser is unresolved.
+const pendingSaveDialogs = new Map<number, Promise<Electron.SaveDialogReturnValue>>();
+
+// Electron cancels app.quit() when a close listener prevents the first close.
+// Keep the user's intent until every window approves, or any renderer cancels.
+let quitRequested = false;
+const updateRestart = createUpdateRestart({ requestQuit: () => app.quit(), install: quitAndInstall });
+app.on('before-quit', () => {
+  quitRequested = true;
+});
+app.on('will-quit', (event) => updateRestart.onWillQuit(event));
+
 // Splash window reference and timing
 let splashWindow: BrowserWindow | null = null;
 let splashStartTime: number = 0;
@@ -438,6 +452,26 @@ function createWindow(fileToOpen?: string): BrowserWindow {
     }
   });
 
+  let recoveringRenderer = false;
+  newWindow.webContents.on('render-process-gone', (_event, details) => {
+    log.error(`[Main] Renderer exited (${details.reason}, code ${details.exitCode}); reloading document window`);
+    if (details.reason === 'clean-exit' || recoveringRenderer || newWindow.isDestroyed()) return;
+    recoveringRenderer = true;
+    pendingSaveDialogs.delete(newWindow.webContents.id);
+    // A reload preserves the BrowserWindow and lets the renderer's existing
+    // auto-recovery flow offer the latest recoverable document state.
+    newWindow.webContents.reload();
+  });
+  newWindow.webContents.on('did-finish-load', () => {
+    recoveringRenderer = false;
+  });
+  newWindow.on('unresponsive', () => {
+    log.error('[Main] Document window became unresponsive');
+  });
+  newWindow.on('responsive', () => {
+    log.info('[Main] Document window became responsive again');
+  });
+
   // Fallback: force-show after 5s if ready-to-show never fires.
   // Works around Electron bug on Windows where titleBarOverlay + show:false
   // can prevent the event from firing (electron/electron#42409).
@@ -456,9 +490,6 @@ function createWindow(fileToOpen?: string): BrowserWindow {
     const currentBounds = newWindow.getBounds();
     setWindowBounds(currentBounds);
 
-    // In test mode, always allow close (prevents teardown timeout)
-    if (isTest) return;
-
     // If this window is allowed to close, proceed
     if (windowsAllowedToClose.has(newWindow)) {
       windowsAllowedToClose.delete(newWindow);
@@ -473,6 +504,11 @@ function createWindow(fileToOpen?: string): BrowserWindow {
   newWindow.on('closed', () => {
     windows.delete(newWindow);
     windowsAllowedToClose.delete(newWindow);
+    if (quitRequested && windows.size === 0) {
+      setImmediate(() => {
+        if (quitRequested && windows.size === 0) app.quit();
+      });
+    }
   });
 
   // Open external links in default browser
@@ -516,20 +552,52 @@ ipcMain.handle('set-preference', (_event, key: string, value: unknown) => {
   store.set(key as keyof typeof store.store, value as never);
 });
 
-ipcMain.handle('show-save-dialog', async (_event, options) => {
+ipcMain.handle('router-catalog:transact-libraries', async (_event, payload: unknown) => {
+  const { transactRouterCatalogLibraries } = await import('./routerCatalogTransaction');
+  return transactRouterCatalogLibraries(store as unknown as { store: Record<string, unknown> }, payload, (changes) => {
+    BrowserWindow.getAllWindows().forEach((win) => win.webContents.send('settings-changed', changes));
+  });
+});
+
+ipcMain.handle('router-catalog:verify-signature', async (_event, text: unknown) => {
+  if (typeof text !== 'string') return { status: 'invalid', reason: 'Catalog input is invalid.' };
+  const { verifyRouterCatalogSignature } = await import('./routerCatalogSignature');
+  return verifyRouterCatalogSignature(text, store.get('trustedRouterPublishers', []));
+});
+
+ipcMain.handle('show-save-dialog', async (event, options) => {
   const queuedResult = getQueuedTestSaveDialogResult();
   if (queuedResult) {
     return queuedResult;
   }
-  return dialog.showSaveDialog(options);
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) {
+    throw new Error('Cannot show Save dialog without an active document window');
+  }
+  const existing = pendingSaveDialogs.get(event.sender.id);
+  if (existing) return existing;
+
+  const pending = showSaveDialog(win, options);
+  pendingSaveDialogs.set(event.sender.id, pending);
+  try {
+    return await pending;
+  } finally {
+    if (pendingSaveDialogs.get(event.sender.id) === pending) {
+      pendingSaveDialogs.delete(event.sender.id);
+    }
+  }
 });
 
-ipcMain.handle('show-open-dialog', async (_event, options) => {
+ipcMain.handle('show-open-dialog', async (event, options) => {
   const queuedResult = getQueuedTestOpenDialogResult();
   if (queuedResult) {
     return queuedResult;
   }
-  return dialog.showOpenDialog(options);
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win || win.isDestroyed()) {
+    throw new Error('Cannot show Open dialog without an active document window');
+  }
+  return showOpenDialog(win, options);
 });
 
 ipcMain.handle('queue-test-save-dialog-path', (_event, filePath: string | null) => {
@@ -555,6 +623,10 @@ ipcMain.handle('read-file', async (_event, filePath: string) => {
   return readFile(filePath, 'utf-8');
 });
 
+// Renderer save queues preserve each document's request order. Serialize the
+// physical boundary too, so independent windows cannot complete old writes
+// after newer writes to the same file (including differently spelled aliases).
+let pendingTextWrite = Promise.resolve();
 ipcMain.handle('write-file', async (_event, filePath: string, data: string) => {
   if (!isPathSafe(filePath)) {
     throw new Error('Invalid file path');
@@ -562,7 +634,9 @@ ipcMain.handle('write-file', async (_event, filePath: string, data: string) => {
   if (typeof data !== 'string') {
     throw new Error('Invalid data type');
   }
-  await writeFile(filePath, data, 'utf-8');
+  const write = pendingTextWrite.then(() => writeFile(filePath, data, 'utf-8'));
+  pendingTextWrite = write.catch(() => undefined);
+  await write;
 });
 
 // Write binary file (for PDFs, images, etc.)
@@ -1147,16 +1221,6 @@ ipcMain.handle('reorder-favorite-projects', (_event, filePaths: string[]) => {
   return { success: true };
 });
 
-// New project defaults (for "remember these choices" feature)
-ipcMain.handle('get-new-project-defaults', () => {
-  return getNewProjectDefaults();
-});
-
-ipcMain.handle('set-new-project-defaults', (_event, defaults: Partial<NewProjectDefaults>) => {
-  setNewProjectDefaults(defaults);
-  return { success: true };
-});
-
 // Window title
 ipcMain.handle('set-window-title', (event, title: string) => {
   const win = BrowserWindow.fromWebContents(event.sender);
@@ -1187,9 +1251,21 @@ ipcMain.handle('confirm-close', (event) => {
 });
 
 // Window close cancellation - called by renderer to cancel close
-ipcMain.handle('cancel-close', () => {
-  // Nothing to do - just don't close the window
-  // The close was already prevented by event.preventDefault()
+ipcMain.handle('cancel-close', (_event, reason?: 'save-failed') => {
+  // The save-error dialog remains open and can retry Save. Keep its quit/update
+  // intent until the user explicitly cancels; never start installation here.
+  if (reason === 'save-failed') return;
+  if (reason !== undefined) throw new Error('Invalid close cancellation reason');
+  quitRequested = false;
+  updateRestart.cancel();
+});
+
+// Called only after the renderer's unsaved-change guard approves the action.
+// Reload directly: dispatching another menu command would recurse into the guard.
+ipcMain.handle('reload-window', (event, ignoreCache: boolean) => {
+  if (typeof ignoreCache !== 'boolean') throw new Error('Invalid reload mode');
+  if (ignoreCache) event.sender.reloadIgnoringCache();
+  else event.sender.reload();
 });
 
 // Print to PDF - uses Electron's native PDF generation
@@ -1295,7 +1371,7 @@ ipcMain.handle('download-update', async () => {
 });
 
 ipcMain.handle('quit-and-install', () => {
-  quitAndInstall();
+  updateRestart.request();
 });
 
 ipcMain.handle('get-update-info', () => {
@@ -1340,6 +1416,8 @@ const syncedSettingsKeys = [
   'defaultUnits',
   'defaultGridSize',
   'stockLibrary',
+  'routerProfileLibrary',
+  'routerToolLibrary',
   'assemblyLibrary'
 ];
 
@@ -1381,7 +1459,8 @@ app.whenReady().then(async () => {
     const appIconPath = resolveAppIconPath();
     if (appIconPath) {
       try {
-        app.dock.setIcon(appIconPath);
+        // `dock` is only present on macOS, which this branch already checks.
+        app.dock?.setIcon(appIconPath);
       } catch (error) {
         log.warn('[Main] Failed to set dock icon:', error);
       }
@@ -1397,11 +1476,16 @@ app.whenReady().then(async () => {
   // Create application menu
   createApplicationMenu();
 
-  // If a file was double-clicked before app was ready, open it
-  // Otherwise create a normal window
-  if (pendingFileToOpen) {
-    createWindow(pendingFileToOpen);
-    pendingFileToOpen = null;
+  // macOS sends open-file; Windows/Linux launchers pass project paths in argv.
+  const launchFiles = pendingFileToOpen
+    ? [pendingFileToOpen]
+    : projectFilesFromArguments(process.argv.slice(app.isPackaged ? 1 : 2));
+  pendingFileToOpen = null;
+  if (launchFiles.length > 0) {
+    for (const filePath of launchFiles) {
+      addRecentProject(filePath);
+      createWindow(filePath);
+    }
   } else {
     createWindow();
   }

@@ -7,10 +7,17 @@ import type { InteractionSelectionEntity } from './interactionSelection';
 import type { ReferenceRelation } from './referenceRelations';
 
 type Delta3D = { x: number; y: number; z: number };
+export type MoveInteractionOwner = 'part' | 'group';
+
+export function isActiveMoveInteractionOwner(moveOwner: MoveInteractionOwner): boolean {
+  const session = useInteractionStore.getState().activeSession;
+  return session?.kind === 'move' && session.moveOwner === moveOwner;
+}
 
 export function beginMoveInteractionSession(params: {
   affectedPartIds: string[];
   primaryPartId?: string | null;
+  moveOwner?: 'part' | 'group';
   initialDelta?: Delta3D;
   referenceState?: {
     selectionEntities?: InteractionSelectionEntity[];
@@ -96,6 +103,7 @@ export function publishSelectionDragDelta(delta: Delta3D): void {
 export function publishMoveInteractionPreview(params: {
   delta: Delta3D;
   snapLines: SnapLine[];
+  moveOwner?: MoveInteractionOwner;
   referenceDistances?: ReferenceDistanceIndicator[];
   referenceState?: {
     selectionEntities?: InteractionSelectionEntity[];
@@ -107,7 +115,8 @@ export function publishMoveInteractionPreview(params: {
   };
   publishSelectionDragDelta?: boolean;
 }): void {
-  const { delta, snapLines, referenceDistances, referenceState, publishSelectionDragDelta = true } = params;
+  const { delta, snapLines, moveOwner, referenceDistances, referenceState, publishSelectionDragDelta = true } = params;
+  if (moveOwner && !isActiveMoveInteractionOwner(moveOwner)) return;
   useInteractionStore.getState().updateMoveSessionDelta(delta);
   if (referenceState) {
     useInteractionStore.getState().updateSessionReferenceState(referenceState);
@@ -164,8 +173,10 @@ export function publishResizeInteractionPreview(params: {
 export function clearMoveInteractionPreview(params?: {
   clearSelectionDragDelta?: boolean;
   clearReferenceDistances?: boolean;
+  moveOwner?: MoveInteractionOwner;
 }): void {
-  const { clearSelectionDragDelta = true, clearReferenceDistances = true } = params ?? {};
+  const { clearSelectionDragDelta = true, clearReferenceDistances = true, moveOwner } = params ?? {};
+  if (moveOwner && !isActiveMoveInteractionOwner(moveOwner)) return;
   if (clearSelectionDragDelta) {
     useSelectionStore.getState().setActiveDragDelta(null);
   }
@@ -177,25 +188,30 @@ export function clearMoveInteractionPreview(params?: {
   }
 }
 
-export function clearTransformInteractionPreview(): void {
-  clearMoveInteractionPreview();
+export function clearTransformInteractionPreview(moveOwner?: MoveInteractionOwner): void {
+  clearMoveInteractionPreview({ moveOwner });
 }
 
-export function clearTransformInteractionPreviewKeepingReferenceDistances(): void {
+export function clearTransformInteractionPreviewKeepingReferenceDistances(moveOwner?: MoveInteractionOwner): void {
   clearMoveInteractionPreview({
-    clearReferenceDistances: false
+    clearReferenceDistances: false,
+    moveOwner
   });
 }
 
-export function clearTransformInteractionPreviewKeepingSelectionDelta(): void {
-  clearMoveInteractionPreview({
-    clearSelectionDragDelta: false
-  });
-}
-
-export function clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances(): void {
+export function clearTransformInteractionPreviewKeepingSelectionDelta(moveOwner?: MoveInteractionOwner): void {
   clearMoveInteractionPreview({
     clearSelectionDragDelta: false,
-    clearReferenceDistances: false
+    moveOwner
+  });
+}
+
+export function clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances(
+  moveOwner?: MoveInteractionOwner
+): void {
+  clearMoveInteractionPreview({
+    clearSelectionDragDelta: false,
+    clearReferenceDistances: false,
+    moveOwner
   });
 }

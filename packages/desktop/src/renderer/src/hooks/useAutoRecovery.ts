@@ -38,6 +38,7 @@ interface UseAutoRecoveryResult {
   // Actions
   restoreRecovery: () => Promise<boolean>;
   discardRecovery: () => Promise<void>;
+  prepareRecoveryForClose: () => Promise<() => void>;
   // Status
   lastAutoSave: Date | null;
 }
@@ -73,9 +74,32 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
   const autoSaveIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const recoveryFileName = useRef(getRecoveryFileName());
 
+  // Order writes and deletion so an in-flight auto-save cannot resurrect a
+  // recovery file after a deliberate save/discard close.
+  const recoveryTaskRef = useRef<Promise<unknown>>(Promise.resolve());
+  const closingRef = useRef(false);
+  const enqueueRecoveryTask = useCallback((task: () => Promise<unknown>) => {
+    const pending = recoveryTaskRef.current.then(task, task);
+    recoveryTaskRef.current = pending.catch(() => undefined);
+    return pending;
+  }, []);
+
+  const prepareRecoveryForClose = useCallback(async () => {
+    closingRef.current = true;
+    try {
+      await enqueueRecoveryTask(() => window.electronAPI.deleteRecoveryFile(recoveryFileName.current));
+      return () => {
+        closingRef.current = false;
+      };
+    } catch (error) {
+      closingRef.current = false;
+      throw error;
+    }
+  }, [enqueueRecoveryTask]);
+
   // Save to recovery file
   const saveToRecovery = useCallback(async () => {
-    if (!isDirty) return;
+    if (!isDirty || closingRef.current) return;
 
     try {
       const fileData = serializeProject({
@@ -108,7 +132,12 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
       };
 
       const json = JSON.stringify(recoveryData);
-      await window.electronAPI.saveRecoveryFile(recoveryFileName.current, json);
+      const saved = await enqueueRecoveryTask(async () => {
+        if (closingRef.current) return false;
+        await window.electronAPI.saveRecoveryFile(recoveryFileName.current, json);
+        return true;
+      });
+      if (!saved) return;
       setLastAutoSave(new Date());
       logger.info('[AutoRecovery] Saved recovery file');
     } catch (error) {
@@ -116,6 +145,7 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
     }
   }, [
     isDirty,
+    enqueueRecoveryTask,
     filePath,
     projectName,
     createdAt,
@@ -140,12 +170,12 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
   // Clear recovery file (called after successful save)
   const clearRecovery = useCallback(async () => {
     try {
-      await window.electronAPI.deleteRecoveryFile(recoveryFileName.current);
+      await enqueueRecoveryTask(() => window.electronAPI.deleteRecoveryFile(recoveryFileName.current));
       logger.info('[AutoRecovery] Cleared recovery file');
     } catch (error) {
       logger.error('[AutoRecovery] Failed to clear recovery file:', error);
     }
-  }, []);
+  }, [enqueueRecoveryTask]);
 
   // Check for existing recovery files on mount
   useEffect(() => {
@@ -198,12 +228,16 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
     checkForRecovery();
   }, []);
 
-  // Set up auto-save interval
+  // Snapshot changes must not postpone crash protection while someone keeps
+  // working. Keep one cadence and use the latest committed render's snapshot.
+  const latestSaveToRecovery = useRef(saveToRecovery);
+  useEffect(() => {
+    latestSaveToRecovery.current = saveToRecovery;
+  }, [saveToRecovery]);
+
   useEffect(() => {
     autoSaveIntervalRef.current = setInterval(() => {
-      if (isDirty) {
-        saveToRecovery();
-      }
+      void latestSaveToRecovery.current();
     }, AUTO_SAVE_INTERVAL);
 
     return () => {
@@ -211,7 +245,7 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
         clearInterval(autoSaveIntervalRef.current);
       }
     };
-  }, [isDirty, saveToRecovery]);
+  }, []);
 
   // Clear recovery file when project is saved (isDirty becomes false)
   useEffect(() => {
@@ -305,6 +339,7 @@ export function useAutoRecovery(): UseAutoRecoveryResult {
     recoveryInfo,
     restoreRecovery,
     discardRecovery,
+    prepareRecoveryForClose,
     lastAutoSave
   };
 }

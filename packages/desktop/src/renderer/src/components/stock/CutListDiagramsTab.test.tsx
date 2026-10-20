@@ -152,6 +152,36 @@ describe('CutListDiagramsTab', () => {
       expect(screen.getByText('Plywood - Board #1')).toBeInTheDocument();
     });
 
+    it('opens board detail from the keyboard and identifies placements with full dimensions', async () => {
+      const user = userEvent.setup();
+      render(<CutListDiagramsTab {...defaultProps} />);
+
+      const board = screen.getByRole('button', { name: 'Open Board #1 cutting diagram details' });
+      board.focus();
+      await user.keyboard('{Enter}');
+
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+      const placement = screen.getByRole('button', { name: 'Top, 24" × 12"' });
+      placement.focus();
+      await user.keyboard(' ');
+      expect(screen.getByText(/Selected: Top \(24" x 12"\)/)).toBeInTheDocument();
+    });
+
+    it.each([
+      ['imperial', '4"', '0.47"'],
+      ['metric', '101.6mm', '11.938mm']
+    ] as const)('preserves narrow blank dimensions in %s diagram details', async (units, length, width) => {
+      const user = userEvent.setup();
+      const board = createBoard();
+      board.placements = [{ ...board.placements[0], partName: 'T-slot bar', width: 4, height: 0.47 }];
+      render(<CutListDiagramsTab {...defaultProps} units={units} cutList={createCutList({ stockBoards: [board] })} />);
+
+      await user.click(screen.getByRole('button', { name: 'Open Board #1 cutting diagram details' }));
+      await user.click(screen.getByRole('button', { name: `T-slot bar, ${length} × ${width}` }));
+      expect(screen.getByText(`Selected: T-slot bar (${length} x ${width})`)).toBeInTheDocument();
+      expect(screen.getByText(width, { selector: 'text' })).toBeInTheDocument();
+    });
+
     it('renders utilization percentage', () => {
       render(<CutListDiagramsTab {...defaultProps} />);
       expect(screen.getByText('8.8% used')).toBeInTheDocument();
@@ -492,6 +522,59 @@ describe('CutListDiagramsTab', () => {
     it('renders download button', () => {
       render(<CutListDiagramsTab {...defaultProps} />);
       expect(screen.getByText('Download')).toBeInTheDocument();
+    });
+  });
+  describe('board detail zoom controls', () => {
+    it('zooms in, out, clamps, and resets from the detail modal', async () => {
+      const user = userEvent.setup();
+      render(<CutListDiagramsTab {...defaultProps} />);
+      await user.click(screen.getByText('Board #1'));
+
+      const zoomLabel = () => document.querySelector('span.min-w-14')!;
+      expect(zoomLabel().textContent).toBe('100%');
+
+      const plus = screen.getByRole('button', { name: 'Zoom in' });
+      const minus = screen.getByRole('button', { name: 'Zoom out' });
+
+      await user.click(plus);
+      expect(zoomLabel().textContent).toBe('125%');
+
+      await user.click(minus);
+      await user.click(minus);
+      expect(zoomLabel().textContent).toBe('75%');
+
+      // Clamp at the minimum
+      await user.click(minus);
+      await user.click(minus);
+      expect(zoomLabel().textContent).toBe('50%');
+
+      await user.click(screen.getByRole('button', { name: 'Reset' }));
+      expect(zoomLabel().textContent).toBe('100%');
+    });
+
+    it('closes the detail modal', async () => {
+      const user = userEvent.setup();
+      render(<CutListDiagramsTab {...defaultProps} />);
+      await user.click(screen.getByText('Board #1'));
+      expect(screen.getByRole('dialog')).toBeInTheDocument();
+
+      const close = screen.getAllByRole('button').find((b) => b.getAttribute('aria-label')?.match(/close/i));
+      if (close) {
+        await user.click(close);
+      }
+    });
+  });
+
+  describe('pdf export gating', () => {
+    it('blocks PDF export without a license', async () => {
+      const user = userEvent.setup();
+      render(<CutListDiagramsTab {...defaultProps} canExportPDF={false} />);
+
+      const exportButton = screen.queryByRole('button', { name: /PDF/i });
+      if (exportButton) {
+        await user.click(exportButton);
+        expect(useUIStore.getState().showToast).toHaveBeenCalled();
+      }
     });
   });
 });

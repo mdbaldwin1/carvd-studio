@@ -1,9 +1,11 @@
+import { CUT_LIST_FORMAT_VERSION } from './cutListVersion';
 // Cut List Optimizer - Guillotine Bin Packing Algorithm
 // Optimizes part placement on stock boards for woodworking cut lists
 
 import { v4 as uuidv4 } from 'uuid';
 import {
   Part,
+  PartFeature,
   Stock,
   CutList,
   CutInstruction,
@@ -13,7 +15,11 @@ import {
   StockSummary,
   PartValidationIssue
 } from '../types';
+import { formatReadableMeasurement } from './fractions';
 import { logger } from './logger';
+import { clonePartFeatures } from './partFeatures';
+import { getPacksNeeded, isCountedStockForm, isRectangularStockForm, resolveStockForm } from '../../../shared/stock';
+import { estimateSeasonalMovement, needsMovementAllowance } from './woodMovement';
 
 // Internal types for the algorithm
 interface Rectangle {
@@ -33,6 +39,10 @@ interface PartToPlace {
   notes?: string;
   isGlueUp: boolean;
   boardsNeeded?: number;
+}
+
+function getEnabledPartFeatures(part: Part): PartFeature[] {
+  return clonePartFeatures((part.features ?? []).filter((feature) => feature.enabled));
 }
 
 interface PlacementResult {
@@ -59,17 +69,72 @@ export function generateOptimizedCutList(
   const partsByStock = groupPartsByStock(validParts, stocks);
 
   const instructions: CutInstruction[] = [];
+  const postGlueUpInstructions: CutInstruction[] = [];
+  const postPurchaseInstructions: CutInstruction[] = [];
   const stockBoards: StockBoard[] = [];
   const allSkippedParts: string[] = [];
 
+  // Inserts are bought at a fixed size and used as they come, so they are
+  // counted here and never reach the packer. Explicitly authored machining
+  // is retained separately, after purchase.
+  const insertCounts = new Map<string, number>();
+
   for (const [stockId, stockParts] of partsByStock) {
     const stock = stocks.find((s) => s.id === stockId)!;
+
+    if (isCountedStockForm(resolveStockForm(stock))) {
+      insertCounts.set(stockId, stockParts.length);
+      for (const part of stockParts) {
+        const features = getEnabledPartFeatures(part);
+        if (features.length > 0)
+          postPurchaseInstructions.push({
+            stage: 'post_purchase',
+            partId: part.id,
+            partName: part.name,
+            cutLength: part.length,
+            cutWidth: part.width,
+            thickness: part.thickness,
+            stockId: stock.id,
+            stockName: stock.name,
+            grainSensitive: part.grainSensitive,
+            canRotate: false,
+            isGlueUp: false,
+            features,
+            notes: [
+              'After purchase: machine the purchased component; do not cut an additional stock blank.',
+              part.notes
+            ]
+              .filter(Boolean)
+              .join('\n')
+          });
+      }
+      continue;
+    }
 
     // Generate cut instructions for all parts of this stock
     // For glue-up panels, this creates individual strip instructions
     for (const part of stockParts) {
       const partInstructions = createInstructions(part, stock);
       instructions.push(...partInstructions);
+      const features = getEnabledPartFeatures(part);
+      if (part.glueUpPanel) {
+        postGlueUpInstructions.push({
+          stage: 'post_glue_up',
+          partId: part.id,
+          partName: part.name,
+          cutLength: part.length,
+          cutWidth: part.width,
+          thickness: part.thickness,
+          stockId: stock.id,
+          stockName: stock.name,
+          grainSensitive: part.grainSensitive,
+          canRotate: false,
+          isGlueUp: true,
+          features,
+          notes:
+            'After glue-up: assemble the strips, then size the finished panel and perform these operations once on the complete panel.'
+        });
+      }
     }
 
     // Convert parts to placement format
@@ -85,17 +150,21 @@ export function generateOptimizedCutList(
   }
 
   // Calculate statistics (use original part count, not expanded strips)
-  const statistics = calculateStatistics(stockBoards, stocks, overageFactor, validParts.length);
+  const statistics = calculateStatistics(stockBoards, stocks, overageFactor, validParts.length, insertCounts);
 
   return {
     id: uuidv4(),
     generatedAt: new Date().toISOString(),
+    formatVersion: CUT_LIST_FORMAT_VERSION,
     projectModifiedAt,
     isStale: false,
     instructions,
+    postGlueUpInstructions,
+    postPurchaseInstructions,
+    validationIssues: bypassedIssues,
     stockBoards,
     statistics,
-    bypassedIssues,
+    bypassedIssues: bypassedIssues.filter((issue) => issue.canBypass),
     skippedParts: allSkippedParts,
     kerfWidth,
     overageFactor
@@ -129,6 +198,11 @@ function createInstructions(part: Part, stock: Stock): CutInstruction[] {
   const cutLength = part.length + (part.extraLength || 0);
   const cutWidth = part.width + (part.extraWidth || 0);
   const isGlueUp = part.glueUpPanel || false;
+  const preparation =
+    resolveStockForm(stock) === 'board' && part.thickness < stock.thickness - 0.000001
+      ? `Stock preparation: start with ${formatReadableMeasurement(stock.thickness, 'imperial')} lumber and prepare stock to ${formatReadableMeasurement(part.thickness, 'imperial')} finished thickness before cutting these blanks and their joinery. Keep thin or small parts on a larger blank during preparation. The layout allocates one full-thickness stock footprint per blank; additional pieces recovered by resawing are not counted.`
+      : undefined;
+  const notes = [preparation, part.notes].filter(Boolean).join('\n') || undefined;
 
   if (!isGlueUp) {
     // Regular part: single instruction
@@ -138,13 +212,17 @@ function createInstructions(part: Part, stock: Stock): CutInstruction[] {
         partName: part.name,
         cutLength,
         cutWidth,
+        finishedLength: part.length,
+        finishedWidth: part.width,
         thickness: part.thickness,
         stockId: stock.id,
         stockName: stock.name,
         grainSensitive: part.grainSensitive,
         canRotate: !part.grainSensitive,
         isGlueUp: false,
-        notes: part.notes
+        features: getEnabledPartFeatures(part),
+        notes,
+        movementAllowance: needsMovementAllowance(part, stock) ? estimateSeasonalMovement(part, stock) : undefined
       }
     ];
   }
@@ -170,9 +248,10 @@ function createInstructions(part: Part, stock: Stock): CutInstruction[] {
       canRotate: false, // Glue-up strips should not rotate (need consistent grain)
       isGlueUp: true,
       boardsNeeded: numStrips,
+      features: [],
       notes:
         i === 0
-          ? `Glue-up panel: ${numStrips} strips × ${stripWidth.toFixed(2)}" = ${cutWidth}" final width${part.notes ? '. ' + part.notes : ''}`
+          ? `Glue-up panel: ${numStrips} strips × ${stripWidth.toFixed(2)}" = ${cutWidth}" final width${notes ? '. ' + notes : ''}`
           : undefined
     });
   }
@@ -191,6 +270,11 @@ function preparePartsForPlacement(parts: Part[], stock: Stock): PartToPlace[] {
     const cutLength = part.length + (part.extraLength || 0);
     const cutWidth = part.width + (part.extraWidth || 0);
     const isGlueUp = part.glueUpPanel || false;
+    const preparation =
+      resolveStockForm(stock) === 'board' && part.thickness < stock.thickness - 0.000001
+        ? `Stock preparation: start with ${formatReadableMeasurement(stock.thickness, 'imperial')} lumber and prepare stock to ${formatReadableMeasurement(part.thickness, 'imperial')} finished thickness before cutting these blanks and their joinery. Keep thin or small parts on a larger blank during preparation. The layout allocates one full-thickness stock footprint per blank; additional pieces recovered by resawing are not counted.`
+        : undefined;
+    const notes = [preparation, part.notes].filter(Boolean).join('\n') || undefined;
 
     if (!isGlueUp) {
       // Regular part: single placement
@@ -201,7 +285,7 @@ function preparePartsForPlacement(parts: Part[], stock: Stock): PartToPlace[] {
         height: cutWidth, // and "height" for width
         canRotate: !part.grainSensitive,
         color: part.color,
-        notes: part.notes,
+        notes,
         isGlueUp: false
       });
     } else {
@@ -222,7 +306,7 @@ function preparePartsForPlacement(parts: Part[], stock: Stock): PartToPlace[] {
           height: stripWidth, // Strip width = optimal width for this glue-up
           canRotate: false, // Glue-up strips should not rotate (need consistent grain)
           color: part.color,
-          notes: part.notes,
+          notes,
           isGlueUp: true,
           boardsNeeded: numStrips
         });
@@ -478,7 +562,8 @@ function calculateStatistics(
   stockBoards: StockBoard[],
   stocks: Stock[],
   overageFactor: number,
-  totalParts: number
+  totalParts: number,
+  insertCounts: Map<string, number> = new Map()
 ): CutListStatistics {
   // Group boards by stock
   const boardsByStock = new Map<string, StockBoard[]>();
@@ -502,8 +587,13 @@ function calculateStatistics(
 
     const actualBoardsUsed = boards.length;
     const boardsNeeded = Math.ceil(actualBoardsUsed * (1 + overageFactor));
-    const boardFeetPerBoard = calculateBoardFeet(stock.length, stock.width, stock.thickness);
-    const boardFeet = boardFeetPerBoard * boardsNeeded;
+    const form = resolveStockForm(stock);
+    // Board feet measure a rectangular solid. Run through a dowel they measure
+    // the box it fits in, about a quarter more material than the rod holds, so
+    // round stock is bought and reported by the rod and its linear feet.
+    const boardFeet = isRectangularStockForm(form)
+      ? calculateBoardFeet(stock.length, stock.width, stock.thickness) * boardsNeeded
+      : 0;
     const linearFeet = (stock.length / 12) * boardsNeeded;
 
     let cost = 0;
@@ -547,7 +637,8 @@ function calculateStatistics(
       linearFeet,
       actualBoardsUsed,
       averageUtilization: avgUtilization,
-      wasteSquareInches: stockWaste
+      wasteSquareInches: stockWaste,
+      form
     });
 
     totalBoardFeet += boardFeet;
@@ -555,6 +646,38 @@ function calculateStatistics(
     totalUsed += stockUsed;
     estimatedCost += cost;
     totalWasteCost += stockWasteCost;
+  }
+
+  // Inserts never reach the packer, so they are summarised straight from the
+  // count. Overage is skipped: a box already holds far more than a project
+  // needs, and rounding a box count up again would just sell another box.
+  for (const [stockId, insertsNeeded] of insertCounts) {
+    const stock = stocks.find((s) => s.id === stockId);
+    if (!stock) continue;
+    const packsNeeded = getPacksNeeded(insertsNeeded, stock.packSize);
+    const cost = packsNeeded * stock.pricePerUnit;
+
+    byStock.push({
+      stockId,
+      stockName: stock.name,
+      boardsNeeded: packsNeeded,
+      boardFeet: 0,
+      cost,
+      stockLength: stock.length,
+      stockWidth: stock.width,
+      stockThickness: stock.thickness,
+      pricingUnit: stock.pricingUnit,
+      pricePerUnit: stock.pricePerUnit,
+      linearFeet: 0,
+      actualBoardsUsed: packsNeeded,
+      averageUtilization: 0,
+      wasteSquareInches: 0,
+      form: 'insert',
+      insertsNeeded,
+      packSize: stock.packSize
+    });
+
+    estimatedCost += cost;
   }
 
   const wastePercentage = totalUsed + totalWaste > 0 ? (totalWaste / (totalUsed + totalWaste)) * 100 : 0;

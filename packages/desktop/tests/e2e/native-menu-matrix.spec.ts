@@ -1,5 +1,5 @@
+import { waitForJsonFile } from './helpers/files';
 import { expect, test } from '@playwright/test';
-import fs from 'fs';
 import path from 'path';
 import {
   closeElectronApp,
@@ -56,14 +56,14 @@ test.describe('native menu command workflows', () => {
 
     await queueSavePath(window, firstPath);
     await sendNativeMenuCommand(running, 'save-project');
-    await expect.poll(() => fs.existsSync(firstPath), { timeout: 5000 }).toBe(true);
+    await waitForJsonFile(firstPath, 5000);
 
     await sendNativeMenuCommand(running, 'add-to-favorites');
     await expect.poll(async () => window.evaluate(() => window.electronAPI.getFavoriteProjects())).toContain(firstPath);
 
     await queueSavePath(window, secondPath);
     await sendNativeMenuCommand(running, 'save-project-as');
-    await expect.poll(() => fs.existsSync(secondPath), { timeout: 5000 }).toBe(true);
+    await waitForJsonFile(secondPath, 5000);
 
     await sendNativeMenuCommand(running, 'close-project');
     await expect(window.locator('.start-screen')).toBeVisible();
@@ -138,7 +138,7 @@ test.describe('native menu command workflows', () => {
     await createBlankProject(window, 'Native Menu Blocked E2E');
     await queueSavePath(window, blockedOpenPath);
     await sendNativeMenuCommand(running, 'save-project');
-    await expect.poll(() => fs.existsSync(blockedOpenPath), { timeout: 5000 }).toBe(true);
+    await waitForJsonFile(blockedOpenPath, 5000);
 
     await window.evaluate(() => {
       window.useAssemblyEditingStore.getState().startEditingAssembly('e2e-assembly', 'E2E Assembly', []);

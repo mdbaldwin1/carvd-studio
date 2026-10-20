@@ -1,21 +1,191 @@
 import { Part } from '../types';
-import { getPartOBB, obbsOverlap, type PartOBB } from './snapToPartsUtil';
+import { getPartEdgeBevelProfiles, getPartEndCutProfiles } from './endCutUtils';
+import {
+  hasRenderablePartFeatures,
+  createPartTranslationMaterialTest,
+  partsOverlapOnYAxis,
+  partsOverlapInPlan,
+  partsOverlapInMaterial
+} from './partFeatureGeometry';
+import {
+  convexShapesOverlap,
+  detectFeatureMateSnaps,
+  getPartConvexShape,
+  getPartMaterialOBBs,
+  getPartOBB,
+  getPartSubOBBs,
+  obbsOverlap,
+  type PartOBB
+} from './snapToPartsUtil';
 import { dragDebug } from './dragDebug';
 import type { GeometryCache } from '../interaction/geometry/cache';
+import { isHousingCut } from './rectCutTraits';
+import { isTopTarget, isBottomTarget } from './rectCutUtils';
 
 const OBB_EPSILON = 1e-6;
+/**
+ * How far a part may sit from its seated position and still count as being in
+ * its joint. Authored joinery routinely lands a thousandth out through
+ * ordinary rounding, and a mortise cut to the tenon's own size turns that into
+ * a collision that refuses the whole assembly.
+ */
+const JOINERY_FIT_TOLERANCE = 0.005;
 const OBB_SEPARATION_TOLERANCE = 1e-8;
+const CONTOUR_TOLERANCE = 1e-6;
 const SAFE_SEARCH_STEPS = 14;
 const MIN_DIRECTIONAL_FRACTION = 0.005;
 type TranslationDelta = { x: number; y: number; z: number };
+
+function hasAngledEndCuts(part: Part): boolean {
+  const profiles = getPartEndCutProfiles(part);
+  if (profiles.left.maxInset > 0 || profiles.right.maxInset > 0) return true;
+  // Long-edge bevels also remove material along Y, so they need the same
+  // convex-shape treatment to avoid ghost corners at the beveled face.
+  const edgeProfiles = getPartEdgeBevelProfiles(part);
+  return edgeProfiles.front.inset > 0 || edgeProfiles.back.inset > 0;
+}
+
+function hasVerticalCuts(part: Part): boolean {
+  const profiles = getPartEndCutProfiles(part);
+  if (profiles.left.verticalInset > 0 || profiles.right.verticalInset > 0) return true;
+  const edgeProfiles = getPartEdgeBevelProfiles(part);
+  return edgeProfiles.front.inset > 0 || edgeProfiles.back.inset > 0;
+}
+
+function hasNonRectangularContour(part: Part): boolean {
+  if (!hasRenderablePartFeatures(part)) return false;
+  const features = (part.features ?? []).filter((f) => f.enabled);
+  return features.some(
+    (f) => f.kind === 'rect_cut' && (f as { parameters: { depthMode: string } }).parameters.depthMode === 'through'
+  );
+}
+
+/** True when the part lies flat (only rotated around Y, if at all). */
+function isFlat(part: Part): boolean {
+  const rx = Math.abs(part.rotation.x % 360);
+  const rz = Math.abs(part.rotation.z % 360);
+  return (
+    (rx < 0.01 || Math.abs(rx - 180) < 0.01 || Math.abs(rx - 360) < 0.01) &&
+    (rz < 0.01 || Math.abs(rz - 180) < 0.01 || Math.abs(rz - 360) < 0.01)
+  );
+}
 
 export function overlapCheckEnabled(a: Part, b: Part): boolean {
   // If either part explicitly allows overlap, the pair is exempt.
   return !a.ignoreOverlap && !b.ignoreOverlap;
 }
 
+/**
+ * Features whose removal the top-view contour cannot express, so the pair has
+ * to be settled against the real material instead.
+ *
+ * The contour decomposition carries every sub-box at the part's full
+ * thickness, which is fine for a shape that is only cut in plan. Housed
+ * joinery is not. A tenon thins the tongue as well as narrowing it, so a
+ * tenoned end still met its mortise at full stock thickness. A blind dado,
+ * groove, rabbet, or mortise is worse: it removes nothing in plan at all, so
+ * the housed part reads as driven into solid stock and every correctly
+ * seated shelf, back panel, and door panel is rejected as a collision.
+ *
+ * A pocket whose walls lean is the same problem in a different direction. It
+ * has a different section at every depth and the contour can only hold one
+ * of them, so a dovetail socket reads as its widest all the way down and the
+ * tail rattles in a hole that, in the wood, grips it.
+ *
+ * A shaped edge is the plainest case of all. A roundover, a cove, a chamfer,
+ * any router profile at all takes its wood off in section and leaves the
+ * outline it was cut from exactly as it was. So every joint that works by
+ * two profiles fitting one another -- a rule joint, cope and stick, a lock
+ * mitre -- is two square edges as far as the top view knows, and no amount
+ * of moving them will close it.
+ *
+ * An end cut that runs in a band of the thickness is the same again, and the
+ * worst of the three, because the contour shows the cut applied to the whole
+ * end. The secret mitred dovetail is mitred on its outer sliver only and
+ * square below, where its pins are; read from the top it is two mitres that
+ * cannot touch, and the boards slide through one another.
+ */
+function needsMaterialOverlapTest(part: Part): boolean {
+  if (part.blankShape) return true;
+  return (
+    part.features?.some(
+      (feature) =>
+        feature.enabled &&
+        (feature.kind === 'circular_cut' ||
+          feature.kind === 'rounded_cut' ||
+          feature.kind === 'edge_profile' ||
+          feature.kind === 'routed_path' ||
+          (feature.kind === 'end_cut' && feature.parameters.band !== undefined) ||
+          (feature.kind === 'rect_cut' &&
+            (isHousingCut(feature.cutType) ||
+              feature.parameters.depthMode === 'blind' ||
+              Boolean(feature.parameters.wallAngle) ||
+              Boolean(feature.parameters.sideWallAngle))))
+    ) ?? false
+  );
+}
+
 export function partsOverlap(a: Part, b: Part, geometryCache?: GeometryCache): boolean {
   if (!overlapCheckEnabled(a, b)) return false;
+
+  // Overlap is a symmetric relation, but the material test builds both solids
+  // in a frame centred on its first argument, so an exactly tangent joint —
+  // the shared plane of a mitred corner, say — could round differently
+  // depending on which part was passed first. That let a move be accepted or
+  // refused purely on where the two parts happened to sit in the parts array.
+  // Fixing the argument order by id makes the answer independent of it.
+  if (b.id < a.id) {
+    const swap = a;
+    a = b;
+    b = swap;
+  }
+
+  if (needsMaterialOverlapTest(a) || needsMaterialOverlapTest(b)) {
+    if (!obbsOverlap(getPartOBB(a), getPartOBB(b), OBB_EPSILON, OBB_SEPARATION_TOLERANCE, false)) return false;
+    return partsOverlapInMaterial(a, b);
+  }
+
+  const hasAngledCuts = hasAngledEndCuts(a) || hasAngledEndCuts(b);
+
+  // Flat horizontal end cuts have an exact top-view contour. Prefer that to
+  // the 3D convex fallback so contact is accepted while a real intrusion is
+  // still rejected at the authored mitre plane.
+  if (hasAngledCuts && !hasVerticalCuts(a) && !hasVerticalCuts(b) && isFlat(a) && isFlat(b)) {
+    if (!partsOverlapOnYAxis(a, b, CONTOUR_TOLERANCE)) return false;
+    return partsOverlapInPlan(a, b, CONTOUR_TOLERANCE);
+  }
+
+  // Bevels, compounds, edge bevels, and tilted horizontal cuts require the
+  // full 3D convex shape.
+  if (hasAngledCuts) {
+    return convexShapesOverlap(getPartConvexShape(a), getPartConvexShape(b), OBB_SEPARATION_TOLERANCE, false);
+  }
+
+  // For flat parts with through-depth features (corner notches, edge notches, etc.),
+  // use strict triangle SAT on the actual contour components and holes.
+  // This is exact for any contour geometry — no sub-box approximation.
+  // Non-flat parts (rotated around X or Z) fall through to the sub-OBB path
+  // because the 2D contour projection doesn't work for tilted parts.
+  if (hasNonRectangularContour(a) || hasNonRectangularContour(b)) {
+    if (isFlat(a) && isFlat(b)) {
+      if (!partsOverlapOnYAxis(a, b, CONTOUR_TOLERANCE)) return false;
+      return partsOverlapInPlan(a, b, CONTOUR_TOLERANCE);
+    }
+
+    // Non-flat featured parts: use sub-OBB decomposition which handles 3D rotation
+    const obbsA = getPartSubOBBs(a);
+    const obbsB = getPartSubOBBs(b);
+    for (const obbA of obbsA) {
+      for (const obbB of obbsB) {
+        if (obbsOverlap(obbA, obbB, OBB_EPSILON, OBB_SEPARATION_TOLERANCE, false)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  // Simple rectangular parts: fast OBB test
   return obbsOverlap(
     getPartOBB(a, a.position, geometryCache),
     getPartOBB(b, b.position, geometryCache),
@@ -33,6 +203,28 @@ export function wouldOverlapWithAny(part: Part, parts: Part[], geometryCache?: G
   return false;
 }
 
+/**
+ * True when a change carries both parts by the very same rigid move, leaving
+ * their shapes and their relationship to each other untouched.
+ */
+function movesRigidlyTogether(originalA: Part, movedA: Part, originalB: Part, movedB: Part): boolean {
+  const sameShape = (before: Part, after: Part) =>
+    before.length === after.length &&
+    before.width === after.width &&
+    before.thickness === after.thickness &&
+    before.rotation.x === after.rotation.x &&
+    before.rotation.y === after.rotation.y &&
+    before.rotation.z === after.rotation.z &&
+    before.features === after.features &&
+    before.ignoreOverlap === after.ignoreOverlap;
+  if (!sameShape(originalA, movedA) || !sameShape(originalB, movedB)) return false;
+  return (
+    Math.abs(movedA.position.x - originalA.position.x - (movedB.position.x - originalB.position.x)) <= OBB_EPSILON &&
+    Math.abs(movedA.position.y - originalA.position.y - (movedB.position.y - originalB.position.y)) <= OBB_EPSILON &&
+    Math.abs(movedA.position.z - originalA.position.z - (movedB.position.z - originalB.position.z)) <= OBB_EPSILON
+  );
+}
+
 export function wouldTransformedPartsOverlap(
   parts: Part[],
   transformedPartsById: Map<string, Part>,
@@ -41,8 +233,10 @@ export function wouldTransformedPartsOverlap(
   if (transformedPartsById.size === 0) return false;
 
   const effectivePartsById = new Map(parts.map((p) => [p.id, transformedPartsById.get(p.id) ?? p]));
+  const originalPartsById = new Map(parts.map((p) => [p.id, p]));
 
   for (const [transformedId, transformedPart] of transformedPartsById) {
+    const originalPart = originalPartsById.get(transformedId);
     for (const other of parts) {
       if (other.id === transformedId) continue;
 
@@ -51,9 +245,44 @@ export function wouldTransformedPartsOverlap(
       if (other.id < transformedId && transformedPartsById.has(other.id)) continue;
 
       const effectiveOther = effectivePartsById.get(other.id);
-      if (effectiveOther && partsOverlap(transformedPart, effectiveOther, geometryCache)) {
-        return true;
+      if (!effectiveOther) continue;
+      const originalOther = originalPartsById.get(other.id);
+
+      // Two parts carried by the same rigid move keep their exact
+      // relationship, so that pair is not this move's business. Without this a
+      // group whose members already touch -- a mitred door frame, say -- could
+      // never be dragged anywhere, because its own internal pairs vetoed every
+      // destination.
+      if (
+        originalPart &&
+        originalOther &&
+        transformedPartsById.has(other.id) &&
+        movesRigidlyTogether(originalPart, transformedPart, originalOther, effectiveOther)
+      ) {
+        continue;
       }
+
+      if (!partsOverlap(transformedPart, effectiveOther, geometryCache)) continue;
+
+      // A part sitting in its joint is assembled, not colliding. The drag-time
+      // guard already allows this, and the commit has to agree: otherwise a
+      // tenon is drawn into its mortise, previews correctly, and the whole
+      // move is then discarded, dropping the assembly back where the drag
+      // began.
+      if (isCompatibleSocketMate(transformedPart, effectiveOther)) continue;
+
+      // An overlap that already exists must not become a trap. The drag-time
+      // guard lets a part strictly work itself free; commits have to agree, or
+      // the drag previews fine and then snaps back on release.
+      if (
+        originalPart &&
+        originalOther &&
+        existingOverlapDoesNotWorsen(originalPart, transformedPart, effectiveOther, geometryCache, originalOther)
+      ) {
+        continue;
+      }
+
+      return true;
     }
   }
 
@@ -64,7 +293,8 @@ export function wouldTranslationCauseOverlap(
   parts: Part[],
   movingIds: Set<string>,
   delta: TranslationDelta,
-  geometryCache?: GeometryCache
+  geometryCache?: GeometryCache,
+  mateHostPartId?: string
 ): boolean {
   for (const p of parts) {
     if (!movingIds.has(p.id)) continue;
@@ -80,10 +310,19 @@ export function wouldTranslationCauseOverlap(
 
     for (const other of parts) {
       if (movingIds.has(other.id)) continue;
+      if (other.id === mateHostPartId && isCompatibleSocketMate(movedPart, other)) continue;
       if (existingOverlapDoesNotWorsen(p, movedPart, other, geometryCache)) {
         continue;
       }
       if (partsOverlap(movedPart, other, geometryCache)) {
+        // A part sitting in its joint is assembled, not colliding. The preview
+        // names a single host, but a rail seats into a leg at each end and a
+        // frame closes on every joint at once, so the parts that are not the
+        // reported host still have to be recognised. Checking here keeps the
+        // cost off the common path: only a pair that already reads as
+        // overlapping is tested.
+        if (isCompatibleSocketMate(movedPart, other)) continue;
+        dragDebug('overlapPolicy:blockingPair', { moved: movedPart.id, blockedBy: other.id });
         return true;
       }
     }
@@ -92,24 +331,129 @@ export function wouldTranslationCauseOverlap(
   return false;
 }
 
+/**
+ * Whether these two are assembled rather than colliding.
+ *
+ * Seating is a property of the pair, not of whichever piece is under the
+ * cursor. A peg driven through a leg is in that leg whether you pick up the
+ * peg or the leg, so both directions are tried: asking only whether the moved
+ * piece sits in the other one's socket made the leg impossible to drag once
+ * the peg was in it.
+ */
+function isCompatibleSocketMate(a: Part, b: Part): boolean {
+  return seatsInto(a, b) || seatsInto(b, a);
+}
+
+/** Whether the first piece is seated in a socket cut in the second. */
+function seatsInto(movedPart: Part, hostPart: Part): boolean {
+  const mate = detectFeatureMateSnaps(movedPart, movedPart.position, [hostPart], [movedPart.id], 0.03);
+  if (mate.mateHostPartId !== hostPart.id) return false;
+
+  const drift = {
+    x: mate.adjustedPosition.x - movedPart.position.x,
+    y: mate.adjustedPosition.y - movedPart.position.y,
+    z: mate.adjustedPosition.z - movedPart.position.z
+  };
+  const normal = mate.mateInsertionNormal;
+  let isSeatedMate: boolean;
+  if (normal) {
+    // Split the adjustment into the way out of the socket and the rest.
+    // Sideways is the piece sitting off-centre in its opening, which is a
+    // real misfit. Along the way in is only how near the floor it is -- and
+    // a piece that stops short of the floor is not a fault but the whole
+    // point of a great many joints: a biscuit, a domino, a loose tenon and a
+    // dowel are all deliberately shorter than the two holes that take them,
+    // so the boards can still be slid into line before the glue grabs. What
+    // is not allowed is the other sign, which means the piece has been driven
+    // past the floor and is standing in solid wood.
+    const outward = drift.x * normal.x + drift.y * normal.y + drift.z * normal.z;
+    const sideways = Math.hypot(
+      drift.x - normal.x * outward,
+      drift.y - normal.y * outward,
+      drift.z - normal.z * outward
+    );
+    // A through socket has no floor at all -- a peg driven through a lapped
+    // joint is meant to come out the far side -- so only a blind one can be
+    // said to have been driven too deep.
+    isSeatedMate = sideways <= JOINERY_FIT_TOLERANCE && (mate.mateThrough === true || outward <= JOINERY_FIT_TOLERANCE);
+  } else {
+    isSeatedMate =
+      Math.abs(drift.x) <= JOINERY_FIT_TOLERANCE &&
+      Math.abs(drift.y) <= JOINERY_FIT_TOLERANCE &&
+      Math.abs(drift.z) <= JOINERY_FIT_TOLERANCE;
+  }
+  if (!isSeatedMate) return false;
+
+  // A bore is round and the material grid is made of boxes, so for a dowel
+  // the grid has nothing true to say: it never subtracted the hole, and the
+  // host therefore still reads as solid where the dowel is. Seating is the
+  // check that applies here, and it is a real one -- the mate engine already
+  // required a square section matching the bore's radius and a placement good
+  // to a thousandth, so a dowel that is too fat never mates at all.
+  if (mate.mateKind === 'round_hole' || mate.mateKind === 'rounded_slot' || mate.mateKind === 'rounded_rectangle')
+    return true;
+
+  // Judge the joint on its own geometry, fully seated, rather than on a
+  // placement that is a thousandth out. A joint cut to fit stays clear of its
+  // host once seated; one cut wrong still collides there, so this forgives
+  // placement error without forgiving bad joinery. The material test itself
+  // stays exact.
+  const movingMaterial = getPartMaterialOBBs({ ...movedPart, position: mate.adjustedPosition });
+  const hostMaterial = getPartMaterialOBBs(hostPart);
+  return !movingMaterial.some((movingCell) =>
+    hostMaterial.some((hostCell) => obbsOverlap(movingCell, hostCell, OBB_EPSILON, OBB_SEPARATION_TOLERANCE, false))
+  );
+}
+
 function existingOverlapDoesNotWorsen(
   part: Part,
   movedPart: Part,
   other: Part,
-  geometryCache?: GeometryCache
+  geometryCache?: GeometryCache,
+  /** The other part as it was before this change, when it moves too. */
+  originalOther: Part = other
 ): boolean {
   if (!overlapCheckEnabled(part, other)) return true;
-  const beforeDepth = getObbOverlapDepth(
-    getPartOBB(part, part.position, geometryCache),
-    getPartOBB(other, other.position, geometryCache)
-  );
+  // The escape hatch is only for a pair that is genuinely overlapping at
+  // drag start. Material-cell OBBs are deliberately conservative and can
+  // overlap around a correctly seated mortise-and-tenon even when the exact
+  // rendered solids do not. Treating that coarse contact as an existing
+  // overlap allowed a slightly diagonal drag to bury the rail's shoulders.
+  if (!partsOverlap(part, originalOther, geometryCache)) return false;
+  // A coarse OBB is only the true overlap representation for an uncut board.
+  // Feature-bearing parts (custom cuts) interlock: their coarse OBBs overlap
+  // deeply and stably, so every translation would read as "not worsening" and
+  // skip the exact checks in partsOverlap. Measure those pairs over the
+  // material sub-OBBs instead, which respect the cuts. Refusing the exemption
+  // outright would strand a part seated in a dado -- it could never be dragged
+  // back out while Prevent Overlap is on.
+  const usesMaterialCells =
+    (part.features?.length ?? 0) > 0 || (other.features?.length ?? 0) > 0 || (movedPart.features?.length ?? 0) > 0;
+
+  const depthBetween = (a: Part, b: Part): number | null => {
+    if (!usesMaterialCells) {
+      return getObbOverlapDepth(getPartOBB(a, a.position, geometryCache), getPartOBB(b, b.position, geometryCache));
+    }
+    let deepest: number | null = null;
+    for (const aCell of getPartMaterialOBBs(a)) {
+      for (const bCell of getPartMaterialOBBs(b)) {
+        const depth = getObbOverlapDepth(aCell, bCell);
+        if (depth !== null) deepest = deepest === null ? depth : Math.max(deepest, depth);
+      }
+    }
+    return deepest;
+  };
+
+  const beforeDepth = depthBetween(part, originalOther);
   if (beforeDepth === null) return false;
 
-  const afterDepth = getObbOverlapDepth(
-    getPartOBB(movedPart, movedPart.position, geometryCache),
-    getPartOBB(other, other.position, geometryCache)
-  );
-  return afterDepth !== null && afterDepth <= beforeDepth + OBB_EPSILON;
+  const afterDepth = depthBetween(movedPart, other);
+  if (!usesMaterialCells) return afterDepth !== null && afterDepth <= beforeDepth + OBB_EPSILON;
+
+  // Interlocked parts must *strictly* retreat to earn the exemption. Accepting
+  // "no worse" here would fire at zero delta too, masking a real overlap
+  // wherever this is asked about the current position rather than a move.
+  return afterDepth === null || afterDepth < beforeDepth - OBB_EPSILON;
 }
 
 function getObbOverlapDepth(a: PartOBB, b: PartOBB): number | null {
@@ -176,9 +520,10 @@ export function resolveSafeTranslationDelta(
   parts: Part[],
   movingIds: Set<string>,
   proposedDelta: TranslationDelta,
-  geometryCache?: GeometryCache
+  geometryCache?: GeometryCache,
+  mateHostPartId?: string
 ): TranslationDelta | null {
-  if (!wouldTranslationCauseOverlap(parts, movingIds, proposedDelta, geometryCache)) {
+  if (!wouldTranslationCauseOverlap(parts, movingIds, proposedDelta, geometryCache, mateHostPartId)) {
     return proposedDelta;
   }
 
@@ -193,7 +538,7 @@ export function resolveSafeTranslationDelta(
       y: proposedDelta.y * mid,
       z: proposedDelta.z * mid
     };
-    if (wouldTranslationCauseOverlap(parts, movingIds, candidate, geometryCache)) {
+    if (wouldTranslationCauseOverlap(parts, movingIds, candidate, geometryCache, mateHostPartId)) {
       high = mid;
     } else {
       low = mid;
@@ -220,4 +565,234 @@ export function resolveSafeTranslationDelta(
     proposedDelta
   });
   return null;
+}
+
+/** Continuous broad phase for fixed-orientation translation. Separating-axis
+ * time intervals reject paths whose whole blank boxes never meet; this is only
+ * rejection, so the material test still decides every potentially touching pair. */
+function translatedBlankBoxesMayMeet(a: PartOBB, b: PartOBB, delta: TranslationDelta): boolean {
+  const dot = (u: TranslationDelta, v: TranslationDelta) => u.x * v.x + u.y * v.y + u.z * v.z;
+  const axes = [...a.axes, ...b.axes];
+  for (const first of a.axes)
+    for (const second of b.axes) {
+      const cross = {
+        x: first.y * second.z - first.z * second.y,
+        y: first.z * second.x - first.x * second.z,
+        z: first.x * second.y - first.y * second.x
+      };
+      const length = Math.hypot(cross.x, cross.y, cross.z);
+      if (length > 1e-8) axes.push({ x: cross.x / length, y: cross.y / length, z: cross.z / length });
+    }
+  const relative = { x: b.center.x - a.center.x, y: b.center.y - a.center.y, z: b.center.z - a.center.z };
+  let firstContact = 0,
+    lastContact = 1;
+  for (const axis of axes) {
+    // Inflate by numerical tolerance: tangency must reach the material test.
+    const radius =
+      a.axes.reduce((sum, local, i) => sum + Math.abs(dot(local, axis)) * a.halfExtents[i], 0) +
+      b.axes.reduce((sum, local, i) => sum + Math.abs(dot(local, axis)) * b.halfExtents[i], 0) +
+      OBB_EPSILON;
+    const separation = dot(relative, axis),
+      velocity = dot(delta, axis);
+    if (Math.abs(velocity) < 1e-12) {
+      if (Math.abs(separation) > radius) return false;
+      continue;
+    }
+    const near = (separation - radius) / velocity,
+      far = (separation + radius) / velocity;
+    firstContact = Math.max(firstContact, Math.min(near, far));
+    lastContact = Math.min(lastContact, Math.max(near, far));
+    if (firstContact > lastContact) return false;
+  }
+  return true;
+}
+
+/** Exact convex cells only; never use the approximate splayed/curved slabs
+ * from the broader fitting decomposition to decide a continuous path. */
+function nudgeMaterialCells(part: Part): Part[] | null {
+  const features = (part.features ?? []).filter((feature) => feature.enabled);
+  if (!features.length) return !part.blankShape || part.blankShape === 'round' ? [part] : null;
+  if (
+    part.blankShape ||
+    !features.every(
+      (feature) =>
+        feature.kind === 'rect_cut' &&
+        ['cutout', 'rabbet', 'notch', 'dado', 'groove'].includes(feature.cutType) &&
+        (isTopTarget(feature) || isBottomTarget(feature)) &&
+        !feature.parameters.wallAngle &&
+        !feature.parameters.sideWallAngle &&
+        !feature.parameters.taperAngle &&
+        !feature.parameters.cornerRadius
+    )
+  )
+    return null;
+  return getPartMaterialOBBs(part).map((cell) => ({
+    ...part,
+    features: [],
+    position: cell.center,
+    length: cell.halfExtents[0] * 2,
+    thickness: cell.halfExtents[1] * 2,
+    width: cell.halfExtents[2] * 2
+  }));
+}
+
+/** Keyboard nudges move through space, not directly to a destination. Test the
+ * exact swept solids of convex blanks or straight rectangular material cells
+ * against the actual host cuts. Other featured parts sweep their actual mesh
+ * boundary triangles, never a whole-blank hull that fills their openings.
+ * Numeric placement is unaffected.
+ */
+export function resolveSafeNudgeTranslationDelta(
+  parts: Part[],
+  movingIds: Set<string>,
+  proposedDelta: TranslationDelta,
+  insertionNormal?: TranslationDelta
+): TranslationDelta | null {
+  if (Math.hypot(proposedDelta.x, proposedDelta.y, proposedDelta.z) < 1e-10) return proposedDelta;
+  if (insertionNormal) {
+    // Semantic seating aligns across the opening before inserting. A diagonal
+    // shortcut clips the rim even though both stages are physically clear.
+    const depth =
+      proposedDelta.x * insertionNormal.x + proposedDelta.y * insertionNormal.y + proposedDelta.z * insertionNormal.z;
+    const insertion = { x: depth * insertionNormal.x, y: depth * insertionNormal.y, z: depth * insertionNormal.z };
+    const alignment = {
+      x: proposedDelta.x - insertion.x,
+      y: proposedDelta.y - insertion.y,
+      z: proposedDelta.z - insertion.z
+    };
+    const safeAlignment = resolveSafeNudgeTranslationDelta(parts, movingIds, alignment);
+    if (!safeAlignment) return null;
+    if (Math.hypot(safeAlignment.x - alignment.x, safeAlignment.y - alignment.y, safeAlignment.z - alignment.z) > 1e-6)
+      return safeAlignment;
+    const alignedParts = parts.map((part) =>
+      movingIds.has(part.id)
+        ? {
+            ...part,
+            position: {
+              x: part.position.x + alignment.x,
+              y: part.position.y + alignment.y,
+              z: part.position.z + alignment.z
+            }
+          }
+        : part
+    );
+    const safeInsertion = resolveSafeNudgeTranslationDelta(alignedParts, movingIds, insertion);
+    return {
+      x: alignment.x + (safeInsertion?.x ?? 0),
+      y: alignment.y + (safeInsertion?.y ?? 0),
+      z: alignment.z + (safeInsertion?.z ?? 0)
+    };
+  }
+  const endpointSafe = resolveSafeTranslationDelta(parts, movingIds, proposedDelta);
+  if (!endpointSafe) return null;
+  const pairs: Array<{
+    moving: Part;
+    fixed: Part;
+    general: boolean;
+    sweep?: ReturnType<typeof createPartTranslationMaterialTest>;
+  }> = [];
+  for (const moving of parts) {
+    if (!movingIds.has(moving.id)) continue;
+    let cells: Part[] | null | undefined;
+    for (const fixed of parts) {
+      if (movingIds.has(fixed.id) || !overlapCheckEnabled(moving, fixed)) continue;
+      // Cheap conservative swept-sphere rejection keeps distant scene parts
+      // out of the material/BVH test without filling any nearby cavities.
+      const distanceSquared = endpointSafe.x ** 2 + endpointSafe.y ** 2 + endpointSafe.z ** 2;
+      const relative = {
+        x: fixed.position.x - moving.position.x,
+        y: fixed.position.y - moving.position.y,
+        z: fixed.position.z - moving.position.z
+      };
+      const fraction =
+        distanceSquared > 0
+          ? Math.max(
+              0,
+              Math.min(
+                1,
+                (relative.x * endpointSafe.x + relative.y * endpointSafe.y + relative.z * endpointSafe.z) /
+                  distanceSquared
+              )
+            )
+          : 0;
+      const radius =
+        Math.hypot(moving.length, moving.width, moving.thickness) / 2 +
+        Math.hypot(fixed.length, fixed.width, fixed.thickness) / 2;
+      if (
+        Math.hypot(
+          relative.x - endpointSafe.x * fraction,
+          relative.y - endpointSafe.y * fraction,
+          relative.z - endpointSafe.z * fraction
+        ) > radius
+      )
+        continue;
+      if (!translatedBlankBoxesMayMeet(getPartOBB(moving), getPartOBB(fixed), endpointSafe)) continue;
+      // Keep the established recovery behavior for imported overlapping parts.
+      if (partsOverlap(moving, fixed)) continue;
+      cells ??= nudgeMaterialCells(moving);
+      if (cells) for (const cell of cells) pairs.push({ moving: cell, fixed, general: false });
+      else pairs.push({ moving, fixed, general: true });
+    }
+  }
+  const blocked = (fraction: number) =>
+    pairs.some((pair) => {
+      const delta = { x: endpointSafe.x * fraction, y: endpointSafe.y * fraction, z: endpointSafe.z * fraction };
+      if (!pair.general) return partsOverlapInMaterial(pair.moving, pair.fixed, 1e-6, delta);
+      pair.sweep ??= createPartTranslationMaterialTest(pair.moving, pair.fixed);
+      return pair.sweep.overlaps(delta);
+    });
+  try {
+    if (!blocked(1)) return endpointSafe;
+    // The exact swept volume grows monotonically. If it already hits before
+    // the minimum accepted motion, further bisection cannot produce a move.
+    if (blocked(MIN_DIRECTIONAL_FRACTION)) return null;
+    let low = 0,
+      high = 1;
+    for (let i = 0; i < SAFE_SEARCH_STEPS; i++) {
+      const mid = (low + high) / 2;
+      if (blocked(mid)) high = mid;
+      else low = mid;
+    }
+    return low >= MIN_DIRECTIONAL_FRACTION
+      ? { x: endpointSafe.x * low, y: endpointSafe.y * low, z: endpointSafe.z * low }
+      : null;
+  } finally {
+    for (const pair of pairs) pair.sweep?.dispose();
+  }
+}
+
+/** Preserve the existing board seating path while testing pins and seated
+ * rectangular inserts along the entire drag. An insert may be clear of the destination yet lock the start;
+ * endpoint-only collision would let a large pointer move tunnel through it.
+ */
+export function resolveSafeDragTranslationDelta(
+  parts: Part[],
+  movingIds: Set<string>,
+  proposedDelta: TranslationDelta,
+  geometryCache?: GeometryCache,
+  mateHostPartId?: string
+): TranslationDelta | null {
+  const endpoint = resolveSafeTranslationDelta(parts, movingIds, proposedDelta, geometryCache, mateHostPartId);
+  if (!endpoint) return null;
+  const movingParts = parts.filter((part) => movingIds.has(part.id));
+  return resolveSafeNudgeTranslationDelta(
+    parts.filter((part) => {
+      if (movingIds.has(part.id)) return true;
+      if (part.id === mateHostPartId) return false;
+      if (part.blankShape === 'round') return true;
+      // A plain insert already occupying a cut in a moving board must not be
+      // skipped just because a large pointer step ends beyond it. Keep normal
+      // board-to-board approach/seating on the existing endpoint path.
+      return (
+        !hasRenderablePartFeatures(part) &&
+        movingParts.some(
+          (moving) =>
+            hasRenderablePartFeatures(moving) &&
+            obbsOverlap(getPartOBB(moving), getPartOBB(part), OBB_EPSILON, OBB_SEPARATION_TOLERANCE, false)
+        )
+      );
+    }),
+    movingIds,
+    endpoint
+  );
 }

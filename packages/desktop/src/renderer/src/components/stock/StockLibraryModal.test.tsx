@@ -1,3 +1,4 @@
+import { createTestAssemblyPart } from '../../../../../tests/helpers/factories';
 import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from 'vitest';
 import { render, screen, fireEvent, cleanup } from '@testing-library/react';
 import { StockLibraryModal } from './StockLibraryModal';
@@ -8,7 +9,14 @@ import { Stock, Assembly } from '../../types';
 beforeAll(() => {
   window.electronAPI = {
     getCustomColors: vi.fn().mockResolvedValue([]),
-    setCustomColors: vi.fn().mockResolvedValue(undefined)
+    setCustomColors: vi.fn().mockResolvedValue(undefined),
+    getPreference: vi.fn().mockResolvedValue([]),
+    setPreference: vi.fn().mockResolvedValue(undefined),
+    onSettingsChanged: vi.fn().mockReturnValue(() => {}),
+    showOpenDialog: vi.fn(),
+    showSaveDialog: vi.fn(),
+    readFile: vi.fn(),
+    writeFile: vi.fn()
   } as unknown as typeof window.electronAPI;
 });
 
@@ -44,8 +52,8 @@ describe('StockLibraryModal', () => {
       name: 'Drawer Assembly',
       description: 'Standard drawer with dovetails',
       parts: [
-        { id: 'p1', name: 'Front', length: 18, width: 6, thickness: 0.75 },
-        { id: 'p2', name: 'Back', length: 18, width: 6, thickness: 0.75 }
+        createTestAssemblyPart(createTestAssemblyPart({ name: 'Front', length: 18, width: 6, thickness: 0.75 })),
+        createTestAssemblyPart(createTestAssemblyPart({ name: 'Back', length: 18, width: 6, thickness: 0.75 }))
       ],
       groups: [],
       groupMembers: [],
@@ -68,6 +76,8 @@ describe('StockLibraryModal', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    (window.electronAPI.getPreference as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+    (window.electronAPI.setPreference as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
     useProjectStore.setState({ units: 'imperial' });
   });
 
@@ -98,6 +108,34 @@ describe('StockLibraryModal', () => {
       render(<StockLibraryModal {...defaultProps} />);
 
       expect(screen.getByText('Assemblies')).toBeInTheDocument();
+    });
+
+    it('opens the searchable Router Profiles library', async () => {
+      render(<StockLibraryModal {...defaultProps} />);
+      expect(
+        screen.getByText(
+          'Manage reusable stock materials, assemblies, router profiles, and physical router tools used across all projects.'
+        )
+      ).toBeInTheDocument();
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Router Profiles/i }));
+      expect(await screen.findByLabelText('Search router profiles')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Import DXF…' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Import SVG…' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Formats & examples' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Export Catalog…' })).toBeInTheDocument();
+      expect(screen.getByText(/import an SVG or DXF cross-section/)).toBeInTheDocument();
+      expect(screen.queryByTitle('View assembly docs')).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Docs' })).not.toBeInTheDocument();
+    });
+
+    it('opens the physical Router Tools library without unrelated documentation', async () => {
+      render(<StockLibraryModal {...defaultProps} />);
+      fireEvent.mouseDown(screen.getByRole('tab', { name: /Router Tools/i }));
+      expect(await screen.findByRole('button', { name: 'Create Router Tool…' })).toBeInTheDocument();
+      expect(screen.getByText('No physical router tools saved')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Formats & examples' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Export Catalog…' })).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Docs' })).not.toBeInTheDocument();
     });
 
     it('shows Close button', () => {
@@ -407,7 +445,7 @@ describe('StockLibraryModal', () => {
         id: 'assembly-1',
         name: 'Drawer Assembly',
         description: 'Standard drawer',
-        parts: [{ name: 'Front', length: 18, width: 6, thickness: 0.75 }],
+        parts: [createTestAssemblyPart({ name: 'Front', length: 18, width: 6, thickness: 0.75 })],
         groups: [],
         groupMembers: [],
         createdAt: '2024-01-01T00:00:00.000Z',
@@ -417,7 +455,7 @@ describe('StockLibraryModal', () => {
         id: 'assembly-2',
         name: 'Cabinet Box',
         description: 'Basic cabinet',
-        parts: [{ name: 'Side', length: 24, width: 18, thickness: 0.75 }],
+        parts: [createTestAssemblyPart({ name: 'Side', length: 24, width: 18, thickness: 0.75 })],
         groups: [],
         groupMembers: [],
         createdAt: '2024-01-01T00:00:00.000Z',
@@ -619,7 +657,7 @@ describe('StockLibraryModal', () => {
       {
         id: 'assembly-1',
         name: 'Complex Assembly',
-        parts: [{ name: 'Part', length: 12, width: 6, thickness: 0.75 }],
+        parts: [createTestAssemblyPart({ name: 'Part', length: 12, width: 6, thickness: 0.75 })],
         groups: [
           { originalId: 'g1', name: 'Group 1' },
           { originalId: 'g2', name: 'Group 2' }

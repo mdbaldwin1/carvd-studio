@@ -21,6 +21,8 @@ export function GroupRotationHandles() {
   const parts = useProjectStore((s) => s.parts);
   const groupMembers = useProjectStore((s) => s.groupMembers);
   const rotateSelectedParts = useProjectStore((s) => s.rotateSelectedParts);
+  const beginHistoryStep = useProjectStore((s) => s.beginHistoryStep);
+  const endHistoryStep = useProjectStore((s) => s.endHistoryStep);
   const { selectedPartIds, selectedGroupIds, editingGroupId } = useSelectionStore(
     useShallow((s) => ({
       selectedPartIds: s.selectedPartIds,
@@ -78,18 +80,21 @@ export function GroupRotationHandles() {
 
   const handleRotateStart = useCallback(() => {
     pauseOrbitControls(controls);
+    // A drag turns the part once per frame; collapse the lot into one undo.
+    beginHistoryStep();
     if (!pivot || selectedIds.length === 0) return;
     beginRotateInteractionSession({
       affectedPartIds: selectedIds,
       primaryPartId: selectedIds[0] ?? null,
       pivot
     });
-  }, [controls, pivot, selectedIds]);
+  }, [beginHistoryStep, controls, pivot, selectedIds]);
 
   const handleRotateEnd = useCallback(() => {
     resumeOrbitControls(controls);
+    endHistoryStep();
     clearTransformInteractionPreviewKeepingSelectionDeltaAndReferenceDistances();
-  }, [controls]);
+  }, [controls, endHistoryStep]);
 
   if (!liveDims || !pivot || shouldHideGroupTransformHandles(activeSession)) return null;
 

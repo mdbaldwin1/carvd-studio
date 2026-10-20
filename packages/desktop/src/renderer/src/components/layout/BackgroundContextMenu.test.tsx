@@ -1,3 +1,4 @@
+import { createTestPart } from '../../../../../tests/helpers/factories';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { BackgroundContextMenu } from './BackgroundContextMenu';
@@ -25,7 +26,7 @@ beforeEach(() => {
     addSnapGuide: vi.fn()
   });
   useClipboardStore.setState({
-    clipboard: { parts: [], stocks: [], groupMembers: [], groups: [] },
+    clipboard: { parts: [], groupMembers: [], groups: [] },
     pasteAtPosition: vi.fn()
   });
   useCameraStore.setState({
@@ -86,7 +87,7 @@ describe('BackgroundContextMenu', () => {
 
   it('shows Paste Here when clipboard has parts', () => {
     useClipboardStore.setState({
-      clipboard: { parts: [{ id: 'p1' }] as never, stocks: [], groupMembers: [], groups: [] }
+      clipboard: { parts: [createTestPart({ id: 'p1' })], groupMembers: [], groups: [] }
     });
     render(
       <BackgroundContextMenu
@@ -103,7 +104,7 @@ describe('BackgroundContextMenu', () => {
   it('calls pasteAtPosition when Paste Here clicked', () => {
     const worldPos = { x: 1, y: 0, z: 1 };
     useClipboardStore.setState({
-      clipboard: { parts: [{ id: 'p1' }] as never, stocks: [], groupMembers: [], groups: [] },
+      clipboard: { parts: [createTestPart({ id: 'p1' })], groupMembers: [], groups: [] },
       pasteAtPosition: vi.fn()
     });
     const onClose = vi.fn();
@@ -196,7 +197,7 @@ describe('BackgroundContextMenu', () => {
   it('positions menu at given coordinates', () => {
     const ref = createRef();
     render(<BackgroundContextMenu menuRef={ref} x={150} y={250} onClose={vi.fn()} />);
-    const menu = screen.getByText('Reset View').closest('.context-menu')!;
+    const menu = screen.getByText('Reset View').closest<HTMLElement>('.context-menu')!;
     expect(menu.style.left).toBe('150px');
     expect(menu.style.top).toBe('250px');
   });

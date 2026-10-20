@@ -8,7 +8,12 @@ import {
   needsRevalidation,
   formatLicenseKeyForDisplay
 } from './license';
-import { validateLicense, activateLicense, deactivateLicense } from './lemonsqueezy-api';
+import {
+  validateLicense,
+  activateLicense,
+  deactivateLicense,
+  type LemonSqueezyLicenseValidationResponse
+} from './lemonsqueezy-api';
 
 // Mock the lemonsqueezy-api module
 vi.mock('./lemonsqueezy-api', () => ({
@@ -18,7 +23,7 @@ vi.mock('./lemonsqueezy-api', () => ({
 }));
 
 // Helper to create a valid LS response
-function createValidResponse(overrides = {}) {
+function createValidResponse(overrides = {}): LemonSqueezyLicenseValidationResponse {
   return {
     valid: true,
     license_key: {

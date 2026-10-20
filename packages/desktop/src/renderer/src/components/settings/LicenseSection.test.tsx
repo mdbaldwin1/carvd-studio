@@ -112,7 +112,11 @@ describe('LicenseSection', () => {
     it('records the settings checkout link with its current license mode', () => {
       render(<LicenseSection licenseMode="free" licenseData={licenseData} onClose={vi.fn()} />);
 
-      fireEvent.click(screen.getByText('Purchase License'));
+      const link = screen.getByRole('link', { name: 'Purchase License' });
+      // This unit test verifies analytics; Electron owns external navigation.
+      // Prevent happy-dom from performing a real network request for the anchor.
+      link.addEventListener('click', (event) => event.preventDefault(), { once: true });
+      fireEvent.click(link);
 
       expect(analytics.capture).toHaveBeenCalledWith('checkout_opened', {
         surface: 'settings',

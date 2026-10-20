@@ -2,59 +2,20 @@ import { Badge } from '@renderer/components/ui/badge';
 import { ChevronDown, ChevronRight, Download, FileText, FileSpreadsheet } from 'lucide-react';
 import React, { useState, useCallback, useMemo } from 'react';
 import { useUIStore } from '../../store/uiStore';
+import { getCutSetups } from '../../utils/cutSetups';
+import {
+  getInstructionFabricationLines,
+  getInstructionFabricationSummary,
+  groupCutInstructions
+} from '../../utils/cutListInstructions';
 import { getBlockedMessage } from '../../utils/featureLimits';
-import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { formatFabricationMeasurement as formatMeasurementWithUnit } from '../../utils/fractions';
 import { showSavedFileToast } from '../../utils/fileToast';
 // pdfExport is dynamically imported on export click to defer the jsPDF dependency
 import { logger } from '../../utils/logger';
-import { CutList, CutInstruction } from '../../types';
+import { CutList } from '../../types';
 import { DropdownButton, DropdownItem } from '../common/DropdownButton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@renderer/components/ui/table';
-
-// Grouped cut instruction for parts with identical dimensions
-interface GroupedCutInstruction {
-  key: string;
-  cutLength: number;
-  cutWidth: number;
-  thickness: number;
-  stockId: string;
-  stockName: string;
-  grainSensitive: boolean;
-  isGlueUp: boolean;
-  quantity: number;
-  items: CutInstruction[];
-}
-
-// Group identical cut instructions together
-function groupCutInstructions(instructions: CutInstruction[]): GroupedCutInstruction[] {
-  const groups = new Map<string, GroupedCutInstruction>();
-
-  for (const inst of instructions) {
-    // Create a key from the attributes that make parts "identical"
-    const key = `${inst.cutLength}-${inst.cutWidth}-${inst.thickness}-${inst.stockId}-${inst.grainSensitive}-${inst.isGlueUp}`;
-
-    const existing = groups.get(key);
-    if (existing) {
-      existing.quantity++;
-      existing.items.push(inst);
-    } else {
-      groups.set(key, {
-        key,
-        cutLength: inst.cutLength,
-        cutWidth: inst.cutWidth,
-        thickness: inst.thickness,
-        stockId: inst.stockId,
-        stockName: inst.stockName,
-        grainSensitive: inst.grainSensitive,
-        isGlueUp: inst.isGlueUp,
-        quantity: 1,
-        items: [inst]
-      });
-    }
-  }
-
-  return Array.from(groups.values());
-}
 
 export function CutListPartsTab({
   cutList,
@@ -71,6 +32,20 @@ export function CutListPartsTab({
   const showToast = useUIStore((s) => s.showToast);
 
   const groupedInstructions = useMemo(() => groupCutInstructions(cutList.instructions), [cutList.instructions]);
+  // The blank table answers "what do I buy and break down". This answers
+  // "what do I set the machine to", which is a different day's work.
+  const setups = useMemo(
+    () =>
+      getCutSetups(
+        [
+          ...cutList.instructions,
+          ...(cutList.postGlueUpInstructions ?? []),
+          ...(cutList.postPurchaseInstructions ?? [])
+        ],
+        units
+      ),
+    [cutList, units]
+  );
 
   const toggleGroup = (key: string) => {
     setExpandedGroups((prev) => {
@@ -148,10 +123,15 @@ export function CutListPartsTab({
   return (
     <div className="cut-list-parts-tab flex flex-col flex-1 min-h-0 overflow-hidden">
       <div className="flex items-center justify-between py-2 px-0 mb-2 shrink-0">
-        <span className="text-[12px] text-text-muted">
-          {groupedInstructions.length} unique dimension{groupedInstructions.length !== 1 ? 's' : ''} (
-          {cutList.instructions.length} parts total)
-        </span>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[12px] text-text-muted">
+            {groupedInstructions.length} unique blank{groupedInstructions.length !== 1 ? 's' : ''} (
+            {cutList.instructions.length} parts total)
+          </span>
+          <span className="text-[11px] text-text-muted">
+            Cut blanks first, then apply listed operations and shop notes.
+          </span>
+        </div>
         <DropdownButton label="Download" icon={<Download size={14} />} items={downloadItems} />
       </div>
       <div className="flex-1 overflow-y-auto overflow-x-auto min-h-0 border border-border rounded bg-surface">
@@ -161,17 +141,18 @@ export function CutListPartsTab({
               <TableHead className="col-expand sticky top-0 z-[1] w-6 text-center"></TableHead>
               <TableHead className="col-qty sticky top-0 z-[1] w-12 text-center">Qty</TableHead>
               <TableHead className="sticky top-0 z-[1]">Part Name</TableHead>
-              <TableHead className="sticky top-0 z-[1]">Cut Length</TableHead>
-              <TableHead className="sticky top-0 z-[1]">Cut Width</TableHead>
+              <TableHead className="sticky top-0 z-[1]">Blank Length</TableHead>
+              <TableHead className="sticky top-0 z-[1]">Blank Width</TableHead>
               <TableHead className="sticky top-0 z-[1]">Thickness</TableHead>
               <TableHead className="sticky top-0 z-[1]">Stock</TableHead>
-              <TableHead className="sticky top-0 z-[1]">Notes</TableHead>
+              <TableHead className="sticky top-0 z-[1]">Operations / Notes</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {groupedInstructions.map((group) => {
               const isExpanded = expandedGroups.has(group.key);
               const hasMultiple = group.quantity > 1;
+              const fabricationSummary = getInstructionFabricationSummary(group.items[0], units);
 
               return (
                 <React.Fragment key={group.key}>
@@ -214,32 +195,103 @@ export function CutListPartsTab({
                           Grain
                         </Badge>
                       )}
-                      {!hasMultiple && group.items[0].notes && (
-                        <span className="text-[11px] text-text-muted italic">{group.items[0].notes}</span>
+                      {fabricationSummary && (
+                        <span className="text-[11px] text-text-muted italic">{fabricationSummary}</span>
                       )}
                     </TableCell>
                   </TableRow>
 
                   {/* Expanded item rows */}
                   {isExpanded &&
-                    group.items.map((item) => (
-                      <TableRow key={item.partId} className="bg-bg-alt">
-                        <TableCell className="col-expand w-6 border-[rgba(255,255,255,0.05)] text-center"></TableCell>
-                        <TableCell className="col-qty w-12 border-[rgba(255,255,255,0.05)] text-center"></TableCell>
-                        <TableCell className="col-part-name border-[rgba(255,255,255,0.05)] pl-2 text-[12px] text-text-muted">
-                          {item.partName}
-                        </TableCell>
-                        <TableCell className="border-[rgba(255,255,255,0.05)]" colSpan={4}></TableCell>
-                        <TableCell className="border-[rgba(255,255,255,0.05)]">
-                          {item.notes && <span className="text-[11px] text-text-muted italic">{item.notes}</span>}
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    group.items.map((item) => {
+                      const itemFabricationSummary = getInstructionFabricationSummary(item, units);
+                      return (
+                        <TableRow key={item.partId} className="bg-bg-alt">
+                          <TableCell className="col-expand w-6 border-[rgba(255,255,255,0.05)] text-center"></TableCell>
+                          <TableCell className="col-qty w-12 border-[rgba(255,255,255,0.05)] text-center"></TableCell>
+                          <TableCell className="col-part-name border-[rgba(255,255,255,0.05)] pl-2 text-[12px] text-text-muted">
+                            {item.partName}
+                          </TableCell>
+                          <TableCell className="border-[rgba(255,255,255,0.05)]" colSpan={4}></TableCell>
+                          <TableCell className="border-[rgba(255,255,255,0.05)]">
+                            {itemFabricationSummary && (
+                              <span className="text-[11px] text-text-muted italic">{itemFabricationSummary}</span>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                 </React.Fragment>
               );
             })}
           </TableBody>
         </Table>
+        {(cutList.postGlueUpInstructions?.length ?? 0) > 0 && (
+          <section aria-label="After glue-up — finished panels" className="p-4 border-t border-border">
+            <h3 className="font-semibold">After glue-up — finished panels</h3>
+            <p className="text-sm text-text-muted">
+              These are assembled panels, not additional stock blanks. Glue the strips first; machine each complete
+              panel once.
+            </p>
+            {cutList.postGlueUpInstructions!.map((instruction) => (
+              <div key={instruction.partId} className="mt-3">
+                <h4 className="font-medium">{instruction.partName}</h4>
+                <p>
+                  Finished panel:{' '}
+                  {[instruction.cutLength, instruction.cutWidth, instruction.thickness]
+                    .map((value) => formatMeasurementWithUnit(value, units))
+                    .join(' × ')}
+                </p>
+                <ul className="text-sm list-disc pl-5">
+                  {getInstructionFabricationLines(instruction, units).map((line, index) => (
+                    <li key={index}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </section>
+        )}
+        {(cutList.postPurchaseInstructions?.length ?? 0) > 0 && (
+          <section aria-label="After purchase — component machining" className="p-4 border-t border-border">
+            <h3 className="font-semibold">After purchase — component machining</h3>
+            <p className="text-sm text-text-muted">
+              These components are counted in the shopping list, not cut from raw stock.
+            </p>
+            {cutList.postPurchaseInstructions!.map((instruction) => (
+              <div key={instruction.partId} className="mt-3">
+                <h4 className="font-medium">{instruction.partName}</h4>
+                <ul className="text-sm list-disc pl-5">
+                  {getInstructionFabricationLines(instruction, units).map((line, index) => (
+                    <li key={index}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </section>
+        )}
+        {setups.length > 0 && (
+          <section aria-label="Operations by setup" className="p-4 border-t border-border">
+            <h3 className="font-semibold">Operations by setup</h3>
+            <p className="text-sm text-text-muted">
+              The same operations, regrouped by what the machine has to be set to. Run every piece through one setup
+              before changing it, within each stage. Complete glue-up or purchase before the corresponding operations.
+              This is not an operation-order plan.
+            </p>
+            <ul className="mt-3 space-y-3">
+              {setups.map((setup) => (
+                <li key={setup.key}>
+                  <div className="text-sm font-medium text-text">
+                    {setup.stage} · {setup.operation} · {setup.setting}
+                  </div>
+                  <div className="text-[12px] text-text-muted">
+                    {setup.passes} {setup.passes === 1 ? 'pass' : 'passes'} ·{' '}
+                    {[...new Set(setup.parts.map((entry) => entry.partName))].join(', ')}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
       </div>
     </div>
   );

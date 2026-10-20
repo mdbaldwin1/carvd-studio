@@ -25,6 +25,58 @@ export default function DocsIndexPage() {
           topic.
         </p>
       </div>
+      <section className="site-section mb-12 p-5">
+        <h3 className="text-xl font-bold mb-4">
+          Design a joint, from blank to assembly
+        </h3>
+        <ol className="list-decimal pl-5 space-y-3 text-muted">
+          <li>
+            <a
+              className="text-text underline underline-offset-4"
+              href="/docs/stock"
+            >
+              Choose the stock
+            </a>{" "}
+            and enter actual board and insert dimensions.
+          </li>
+          <li>
+            <a
+              className="text-text underline underline-offset-4"
+              href="/docs/joint-recipes"
+            >
+              Choose a joint recipe
+            </a>{" "}
+            to understand what material to remove and what surfaces should meet.
+          </li>
+          <li>
+            <a
+              className="text-text underline underline-offset-4"
+              href="/docs/part-cuts#worked-example"
+            >
+              Follow the Part Cuts walkthrough
+            </a>
+            , or use matching layouts for supported paired joints.
+          </li>
+          <li>
+            <a
+              className="text-text underline underline-offset-4"
+              href="/docs/joinery#assembly-placement"
+            >
+              Bring the pieces together
+            </a>
+            , then inspect the fit and hidden surfaces.
+          </li>
+          <li>
+            <a
+              className="text-text underline underline-offset-4"
+              href="/docs/cut-lists#part-cut-instructions"
+            >
+              Review the shop instructions
+            </a>{" "}
+            after applying cuts and saving your project.
+          </li>
+        </ol>
+      </section>
       <div className="grid gap-8">
         {navSections.map((section) => (
           <div key={section.title}>

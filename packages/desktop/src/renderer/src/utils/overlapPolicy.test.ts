@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import { Part } from '../types';
+import { createTestPart } from '../../../../tests/helpers/factories';
+import { describe, expect, it, vi } from 'vitest';
+import { EdgeProfileFeature, Part, RectCutFeature } from '../types';
 import {
   overlapCheckEnabled,
   partsOverlap,
@@ -7,6 +8,12 @@ import {
   wouldTransformedPartsOverlap,
   wouldTranslationCauseOverlap
 } from './overlapPolicy';
+import { getPartContourSubBoxes } from './partFeatureGeometry';
+import { detectFeatureMateSnaps, getPartFeatureSockets, getPartSubOBBs } from './snapToPartsUtil';
+
+// Overlap for tenoned and round-cut parts is settled against the real
+// material, so this suite needs the actual three.js geometry classes.
+vi.unmock('three');
 
 function createPart(overrides: Partial<Part> = {}): Part {
   return {
@@ -21,11 +28,85 @@ function createPart(overrides: Partial<Part> = {}): Part {
     grainSensitive: overrides.grainSensitive ?? false,
     grainDirection: overrides.grainDirection ?? 'length',
     color: overrides.color ?? '#ffffff',
-    ignoreOverlap: overrides.ignoreOverlap
+    ignoreOverlap: overrides.ignoreOverlap,
+    features: overrides.features
   };
 }
 
 describe('overlapPolicy', () => {
+  // From a trestle table: a stretcher tenoned through a slab upright. The
+  // tenon thins the tongue as well as narrowing it, which the top-view
+  // contour cannot express, so this pair has to be judged on real material.
+  describe('a through mortise-and-tenon', () => {
+    const upright = (): Part =>
+      createPart({
+        id: 'upright',
+        length: 14,
+        width: 9,
+        thickness: 1.5,
+        position: { x: -15, y: 8.5, z: 0 },
+        rotation: { x: 0, y: 0, z: 90 },
+        features: [
+          {
+            id: 'through-mortise',
+            kind: 'rect_cut',
+            version: 1,
+            enabled: true,
+            cutType: 'cutout',
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 0.75, width: 3 }, depthMode: 'through' },
+            placement: { x: 4, z: 3 }
+          } as RectCutFeature
+        ]
+      });
+
+    const stretcher = (position: { x: number; y: number; z: number }): Part =>
+      createPart({
+        id: 'stretcher',
+        length: 34.5,
+        width: 4,
+        thickness: 1.25,
+        position,
+        features: (['left_end', 'right_end'] as const).map(
+          (face) =>
+            ({
+              id: `tenon-${face}`,
+              kind: 'rect_cut',
+              version: 1,
+              enabled: true,
+              cutType: 'tenon',
+              target: { type: 'face', face },
+              reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+              parameters: { size: { length: 3, width: 3 }, depthMode: 'blind', depth: 0.75 },
+              // Shoulder offset centres the 3" tongue on the 4" board, so it
+              // lines up with a mortise cut on the upright's centreline.
+              placement: { x: 0, z: 0.5 }
+            }) as RectCutFeature
+        )
+      });
+
+    it('seats a tenon that matches its mortise', () => {
+      expect(partsOverlap(upright(), stretcher({ x: 0, y: 5.875, z: 0 }))).toBe(false);
+    });
+
+    it('still refuses a tenon driven into solid wood beside the mortise', () => {
+      expect(partsOverlap(upright(), stretcher({ x: 0, y: 9, z: 0 }))).toBe(true);
+    });
+  });
+
+  const mitre = (horizontalFlip: boolean) => ({
+    id: `mitre-${horizontalFlip ? 'flipped' : 'default'}`,
+    kind: 'end_cut' as const,
+    version: 1 as const,
+    enabled: true,
+    target: { type: 'face' as const, face: 'right_end' as const },
+    reference: { primaryFrom: 'max' as const },
+    cutType: 'mitre' as const,
+    lengthMode: 'long_point' as const,
+    parameters: { horizontalAngle: 45, horizontalFlip }
+  });
+
   it('disables overlap checking when either part ignores overlap', () => {
     const a = createPart({ id: 'a', ignoreOverlap: true });
     const b = createPart({ id: 'b' });
@@ -40,6 +121,66 @@ describe('overlapPolicy', () => {
 
     expect(partsOverlap(a, b)).toBe(false);
   });
+
+  it.each([
+    {
+      firstFlip: true,
+      secondFlip: false,
+      rotationY: 90,
+      assembled: { x: 4, z: 4 },
+      intrusion: { x: -0.01, z: -0.01 }
+    },
+    {
+      firstFlip: false,
+      secondFlip: true,
+      rotationY: -90,
+      assembled: { x: 4, z: -4 },
+      intrusion: { x: -0.01, z: 0.01 }
+    }
+  ])(
+    'uses the actual complementary mitre solids for frame contact ($firstFlip/$secondFlip)',
+    ({ firstFlip, secondFlip, rotationY, assembled, intrusion }) => {
+      const horizontal = createPart({
+        id: 'mitre-horizontal',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [mitre(firstFlip)]
+      });
+      const vertical = createPart({
+        id: 'mitre-vertical',
+        length: 10,
+        width: 2,
+        thickness: 1,
+        position: { x: assembled.x, y: 0.5, z: assembled.z },
+        rotation: { x: 0, y: rotationY, z: 0 },
+        features: [mitre(secondFlip)]
+      });
+
+      expect(partsOverlap(horizontal, vertical)).toBe(false);
+      expect(
+        partsOverlap(horizontal, {
+          ...vertical,
+          position: {
+            ...vertical.position,
+            x: vertical.position.x - intrusion.x,
+            z: vertical.position.z - intrusion.z
+          }
+        })
+      ).toBe(false);
+      expect(
+        partsOverlap(horizontal, {
+          ...vertical,
+          position: {
+            ...vertical.position,
+            x: vertical.position.x + intrusion.x,
+            z: vertical.position.z + intrusion.z
+          }
+        })
+      ).toBe(true);
+    }
+  );
 
   it('detects overlap after transformed updates', () => {
     const a = createPart({ id: 'a', position: { x: 0, y: 0.5, z: 0 } });
@@ -99,6 +240,50 @@ describe('overlapPolicy', () => {
     expect(wouldTranslationCauseOverlap(parts, movingIds, safe!)).toBe(false);
   });
 
+  it('allows translating a rotated leg under a seat (Dining Bench regression)', () => {
+    const seat = createPart({
+      id: 'seat',
+      name: 'Bench Seat',
+      length: 40,
+      width: 11,
+      thickness: 2,
+      position: { x: 1.5625, y: 18.375, z: -16.4375 },
+      rotation: { x: 0, y: 0, z: 0 }
+    });
+
+    const legStart = createPart({
+      id: 'leg',
+      name: 'Leg 2 (copy)',
+      length: 14.625,
+      width: 1,
+      thickness: 1,
+      position: { x: -14.27589554684791, y: 10.0625, z: -30.61843547323637 },
+      rotation: { x: 270, y: 90, z: 0 }
+    });
+
+    // Place the leg footprint under the seat corner (keeping its original Y).
+    const seatMinX = seat.position.x - seat.length / 2;
+    const seatMinZ = seat.position.z - seat.width / 2;
+    const legTarget = createPart({
+      ...legStart,
+      position: { x: seatMinX + 0.5, y: legStart.position.y, z: seatMinZ + 0.5 }
+    });
+
+    expect(partsOverlap(legTarget, seat)).toBe(false);
+
+    const parts = [seat, legStart];
+    const proposed = {
+      x: legTarget.position.x - legStart.position.x,
+      y: legTarget.position.y - legStart.position.y,
+      z: legTarget.position.z - legStart.position.z
+    };
+    const safe = resolveSafeTranslationDelta(parts, new Set(['leg']), proposed);
+    expect(safe).not.toBeNull();
+    expect(safe!.x).toBeCloseTo(proposed.x, 6);
+    expect(safe!.y).toBeCloseTo(proposed.y, 6);
+    expect(safe!.z).toBeCloseTo(proposed.z, 6);
+  });
+
   it('returns null instead of redirecting to another axis when blocked', () => {
     const target = createPart({
       id: 'target',
@@ -144,7 +329,11 @@ describe('overlapPolicy', () => {
     const parts = [moving, neighbor];
     const movingIds = new Set<string>(['moving']);
 
-    expect(partsOverlap(moving, neighbor)).toBe(true);
+    // Exact face-axis SAT treats the zero-volume X touch as non-overlapping,
+    // so the move away is trivially allowed. The shipped guarantee is the
+    // second assertion: dragging away from a pre-existing micro-overlap must
+    // not be blocked.
+    expect(partsOverlap(moving, neighbor)).toBe(false);
     expect(resolveSafeTranslationDelta(parts, movingIds, { x: 0, y: 0, z: 0.25 })).toEqual({ x: 0, y: 0, z: 0.25 });
   });
 
@@ -194,5 +383,1322 @@ describe('overlapPolicy', () => {
       y: 0,
       z: 0.25
     });
+  });
+
+  it('allows beveled face to approach flush against another part (no ghost corner)', () => {
+    // Part A: a plain board lying flat
+    const partA = createPart({
+      id: 'a',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 }
+    });
+
+    // Part B: same dimensions but with a 45° bevel on the left end.
+    // The bevel removes 0.75" of material. The beveled face should be able
+    // to sit right next to Part A without a ghost corner blocking it.
+    const partB = createPart({
+      id: 'b',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      // Position so the outer (unbeveled) left face lines up with Part A's right end
+      // Part A right end is at x = 3. Part B has left bevel removing up to 0.75" from x = -3.
+      // With bevel, the leftmost point is at localX = -3 + 0.75 = -2.25 (at one Y extreme)
+      // while the other Y extreme is still at localX = -3.
+      // Position so the bevel face approaches Part A: partB.position.x = 3 + 3 = 6
+      // That puts Part B's left raw edge at x = 3, exactly touching Part A's right edge.
+      position: { x: 6, y: 0.375, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      features: [
+        {
+          id: 'bevel-left',
+          kind: 'end_cut' as const,
+          version: 1 as const,
+          cutType: 'bevel' as const,
+          enabled: true,
+          target: { type: 'face' as const, face: 'left_end' as const },
+          reference: { primaryFrom: 'min' as const },
+          lengthMode: 'long_point' as const,
+          parameters: {
+            horizontalAngle: 0,
+            verticalAngle: 45
+          }
+        }
+      ]
+    });
+
+    // With OBB only, this would incorrectly report overlap because the OBB
+    // includes the ghost corner. With convex shape SAT, no overlap occurs.
+    expect(partsOverlap(partA, partB)).toBe(false);
+  });
+
+  it('resolves beveled part to flush position without visible gap', () => {
+    const partA = createPart({
+      id: 'a',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 }
+    });
+
+    const partB = createPart({
+      id: 'b',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 20, y: 0.375, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      features: [
+        {
+          id: 'bevel-left',
+          kind: 'end_cut' as const,
+          version: 1 as const,
+          cutType: 'bevel' as const,
+          enabled: true,
+          target: { type: 'face' as const, face: 'left_end' as const },
+          reference: { primaryFrom: 'min' as const },
+          lengthMode: 'long_point' as const,
+          parameters: {
+            horizontalAngle: 0,
+            verticalAngle: 45
+          }
+        }
+      ]
+    });
+
+    const parts = [partA, partB];
+    const movingIds = new Set(['b']);
+    const proposedDelta = { x: -14, y: 0, z: 0 };
+    const safeDelta = resolveSafeTranslationDelta(parts, movingIds, proposedDelta);
+
+    expect(safeDelta).not.toBeNull();
+    const finalX = 20 + safeDelta!.x;
+    expect(finalX).toBeCloseTo(6, 1);
+  });
+
+  it('exempts only a validated socket mate while retaining unrelated overlap checks', () => {
+    const host = createPart({
+      id: 'host',
+      length: 12,
+      width: 6,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      features: [
+        {
+          id: 'dado',
+          kind: 'rect_cut',
+          version: 1 as const,
+          enabled: true,
+          cutType: 'dado',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          placement: { x: 5.6225, z: 0 },
+          parameters: { size: { length: 0.755, width: 6 }, depthMode: 'blind', depth: 0.375 }
+        }
+      ]
+    });
+    const moving = createPart({
+      id: 'moving',
+      length: 4,
+      width: 6,
+      thickness: 0.75,
+      position: { x: 0, y: 2.8, z: 0 },
+      rotation: { x: 0, y: 0, z: 90 }
+    });
+    const movingIds = new Set([moving.id]);
+    const proposed = { x: 0, y: -0.425, z: 0 };
+
+    // The proposed delta bottoms the part in the dado with no interference, so
+    // housed joinery is accepted on its own merits and needs no mate exemption.
+    expect(wouldTranslationCauseOverlap([host, moving], movingIds, proposed)).toBe(false);
+    expect(wouldTranslationCauseOverlap([host, moving], movingIds, proposed, undefined, host.id)).toBe(false);
+    expect(resolveSafeTranslationDelta([host, moving], movingIds, proposed, undefined, host.id)).toEqual(proposed);
+
+    const unrelatedSolid = createPart({
+      id: 'solid',
+      length: 1,
+      width: 6,
+      thickness: 0.5,
+      position: { x: 0, y: 0.5, z: 0 }
+    });
+    expect(wouldTranslationCauseOverlap([host, moving, unrelatedSolid], movingIds, proposed, undefined, host.id)).toBe(
+      true
+    );
+
+    const plainHost = createPart({ ...host, features: [] });
+    expect(wouldTranslationCauseOverlap([plainHost, moving], movingIds, proposed, undefined, plainHost.id)).toBe(true);
+  });
+
+  it('gives the same answer whichever part is passed first', () => {
+    // Two mitred frame members meeting on their shared 45-degree plane are
+    // exactly tangent, which is where the material test is most delicate.
+    const mitre = (id: string, face: 'left_end' | 'right_end', flip: boolean) => ({
+      id,
+      kind: 'end_cut' as const,
+      version: 1 as const,
+      enabled: true,
+      cutType: 'mitre' as const,
+      target: { type: 'face' as const, face },
+      reference: { primaryFrom: (face === 'left_end' ? 'min' : 'max') as 'min' | 'max' },
+      lengthMode: 'long_point' as const,
+      parameters: { horizontalAngle: 45, horizontalFlip: flip }
+    });
+    const plough = {
+      id: 'plough',
+      kind: 'rect_cut' as const,
+      version: 1 as const,
+      enabled: true,
+      cutType: 'mortise' as const,
+      target: { type: 'face' as const, face: 'front_face' as const },
+      reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
+      parameters: { size: { length: 24, width: 0.25 }, depthMode: 'blind' as const, depth: 0.5 },
+      placement: { x: 0, z: 0.25 }
+    };
+    const stile = createPart({
+      id: 'aaa-stile',
+      length: 24,
+      width: 2.25,
+      thickness: 0.75,
+      position: { x: -7.875, y: 12, z: 3.375 },
+      rotation: { x: 0, y: 90, z: 270 },
+      features: [plough, mitre('m-l', 'left_end', true), mitre('m-r', 'right_end', true)]
+    });
+    const rail = createPart({
+      id: 'zzz-rail',
+      length: 18,
+      width: 2.25,
+      thickness: 0.75,
+      position: { x: 0, y: 22.875, z: 3.375 },
+      rotation: { x: 90, y: 0, z: 180 },
+      features: [
+        { ...plough, parameters: { ...plough.parameters, size: { length: 18, width: 0.25 } } },
+        mitre('m-l', 'left_end', true),
+        mitre('m-r', 'right_end', true)
+      ]
+    });
+
+    expect(partsOverlap(stile, rail)).toBe(partsOverlap(rail, stile));
+  });
+
+  it('lets an already-overlapping assembly be moved without trapping it', () => {
+    // Two boards driven into each other. However they got that way -- an
+    // import, an older file, a cut edited after the fact -- the guard must not
+    // strand them there.
+    const a = createPart({ id: 'aaa', length: 12, width: 6, thickness: 0.75, position: { x: 0, y: 0.375, z: 0 } });
+    const b = createPart({ id: 'bbb', length: 12, width: 6, thickness: 0.75, position: { x: 4, y: 0.375, z: 0 } });
+    expect(partsOverlap(a, b)).toBe(true);
+
+    // carried together by one rigid move: their relationship is untouched
+    const together = new Map([
+      ['aaa', { ...a, position: { x: 0, y: 20, z: 0 } }],
+      ['bbb', { ...b, position: { x: 4, y: 20, z: 0 } }]
+    ]);
+    expect(wouldTransformedPartsOverlap([a, b], together)).toBe(false);
+
+    // one of them worked free on its own
+    const apart = new Map([['bbb', { ...b, position: { x: 14, y: 0.375, z: 0 } }]]);
+    expect(wouldTransformedPartsOverlap([a, b], apart)).toBe(false);
+  });
+
+  it('still refuses driving an existing overlap deeper', () => {
+    // Stacked faces, biting 1/8" into one another.
+    const a = createPart({ id: 'aaa', length: 12, width: 6, thickness: 0.75, position: { x: 0, y: 0.375, z: 0 } });
+    const b = createPart({ id: 'bbb', length: 12, width: 6, thickness: 0.75, position: { x: 0, y: 1, z: 0 } });
+    expect(partsOverlap(a, b)).toBe(true);
+
+    // backing out is allowed
+    const out = new Map([['bbb', { ...b, position: { x: 0, y: 1.1, z: 0 } }]]);
+    expect(wouldTransformedPartsOverlap([a, b], out)).toBe(false);
+
+    // pressing further in is not
+    const deeper = new Map([['bbb', { ...b, position: { x: 0, y: 0.9, z: 0 } }]]);
+    expect(wouldTransformedPartsOverlap([a, b], deeper)).toBe(true);
+  });
+
+  it('still refuses a move that creates a new overlap', () => {
+    const a = createPart({ id: 'aaa', length: 12, width: 6, thickness: 0.75, position: { x: 0, y: 0.375, z: 0 } });
+    const b = createPart({ id: 'bbb', length: 12, width: 6, thickness: 0.75, position: { x: 20, y: 0.375, z: 0 } });
+    expect(partsOverlap(a, b)).toBe(false);
+
+    const into = new Map([['bbb', { ...b, position: { x: 4, y: 0.375, z: 0 } }]]);
+    expect(wouldTransformedPartsOverlap([a, b], into)).toBe(true);
+
+    // and a rigid move of the pair that drives one of them into a third part
+    const c = createPart({ id: 'ccc', length: 12, width: 6, thickness: 0.75, position: { x: 40, y: 0.375, z: 0 } });
+    const slide = new Map([
+      ['aaa', { ...a, position: { x: 28, y: 0.375, z: 0 } }],
+      ['bbb', { ...b, position: { x: 48, y: 0.375, z: 0 } }]
+    ]);
+    expect(wouldTransformedPartsOverlap([a, b, c], slide)).toBe(true);
+  });
+
+  it('accepts housed joinery that the full-thickness contour cannot express', () => {
+    // A blind dado removes nothing in plan, so the contour decomposition
+    // carried the housed part at full thickness and every correctly seated
+    // shelf and panel read as a collision.
+    // Side lying flat: 24 along X, 6 along Z, 0.75 thick spanning Y 0..0.75.
+    // Stopped dado on the top face, 1/4" deep, so its floor sits at Y 0.5.
+    const side = createPart({
+      id: 'side',
+      length: 24,
+      width: 6,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      features: [
+        {
+          id: 'stopped-dado',
+          kind: 'rect_cut',
+          version: 1 as const,
+          enabled: true,
+          cutType: 'stopped_dado',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          parameters: { size: { length: 0.75, width: 5.25 }, depthMode: 'blind', depth: 0.25 },
+          placement: { x: (24 - 0.75) / 2, z: (6 - 5.25) / 2 }
+        }
+      ]
+    });
+
+    // Shelf stood on edge in that dado, bottomed exactly on the 0.5 floor.
+    const seated = createPart({
+      id: 'shelf',
+      length: 6.5,
+      width: 5.25,
+      thickness: 0.75,
+      position: { x: 0, y: 0.5 + 3.25, z: 0 },
+      rotation: { x: 0, y: 0, z: 90 }
+    });
+    expect(partsOverlap(side, seated)).toBe(false);
+
+    // Driving the same shelf a further 1/8" past the dado floor is a real
+    // collision and still has to be rejected.
+    const buried = { ...seated, position: { ...seated.position, y: seated.position.y - 0.125 } };
+    expect(partsOverlap(side, buried)).toBe(true);
+  });
+
+  it('exempts only a fully complementary half-lap from same-host collision', () => {
+    const halfLap = (
+      id: string,
+      face: 'top_face' | 'bottom_face',
+      depth = 0.375,
+      length = 2,
+      width = 2,
+      x = (6 - length) / 2,
+      z = (2 - width) / 2
+    ): RectCutFeature => ({
+      id,
+      kind: 'rect_cut',
+      version: 1 as const,
+      enabled: true,
+      cutType: 'dado',
+      target: { type: 'face', face },
+      reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+      parameters: { size: { length, width }, depthMode: 'blind', depth },
+      placement: { x, z }
+    });
+    const host = createPart({
+      id: 'half-lap-host',
+      length: 6,
+      width: 2,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      features: [halfLap('host-cut', 'top_face')]
+    });
+    const crossing = createPart({
+      id: 'half-lap-crossing',
+      length: 6,
+      width: 2,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      rotation: { x: 0, y: 90, z: 0 },
+      features: [halfLap('crossing-cut', 'bottom_face')]
+    });
+    const overlapsAtCurrentPosition = (candidate: Part) =>
+      wouldTranslationCauseOverlap(
+        [host, candidate],
+        new Set([candidate.id]),
+        { x: 0, y: 0, z: 0 },
+        undefined,
+        host.id
+      );
+
+    expect(overlapsAtCurrentPosition(crossing)).toBe(false);
+
+    // Authored joinery routinely lands a thousandth out through ordinary
+    // rounding. That is still an assembled joint, not a collision: a mortise
+    // cut to the tenon's own size would otherwise refuse the whole assembly.
+    for (const axis of ['x', 'y', 'z'] as const) {
+      const nudged = createPart({
+        ...crossing,
+        id: `nudged-${axis}`,
+        position: { ...crossing.position, [axis]: crossing.position[axis] + 0.001 }
+      });
+      expect(overlapsAtCurrentPosition(nudged), nudged.id).toBe(false);
+    }
+
+    const wrongFace = createPart({
+      ...crossing,
+      id: 'wrong-face',
+      position: { x: 0, y: 0.75, z: 0 },
+      features: [halfLap('wrong-face-cut', 'top_face')]
+    });
+    const partialLength = createPart({
+      ...crossing,
+      id: 'partial-length',
+      features: [halfLap('partial-length-cut', 'bottom_face', 0.375, 1, 2)]
+    });
+    const partialWidth = createPart({
+      ...crossing,
+      id: 'partial-width',
+      features: [{ ...halfLap('partial-width-cut', 'bottom_face', 0.375, 2, 1), cutType: 'cutout' }]
+    });
+    const offsetCut = createPart({
+      ...crossing,
+      id: 'offset-cut',
+      // A quarter turn about Y sends this part's cross-board offset onto
+      // world x, so the quarter inch the cut sits off centre is taken back
+      // there to leave the two still meeting as one mate shape.
+      position: { x: -0.25, y: 0.375, z: 0 },
+      features: [{ ...halfLap('offset-cut-feature', 'bottom_face', 0.375, 2, 2, 2, 0.25), cutType: 'cutout' }]
+    });
+    const depthMismatch = createPart({
+      ...crossing,
+      id: 'depth-mismatch',
+      features: [halfLap('depth-mismatch-cut', 'bottom_face', 0.25)]
+    });
+
+    // These candidates satisfy the narrow synthetic mate-shape check; the
+    // whole-material validation is what must prevent the host-wide exemption.
+    for (const candidate of [partialLength, partialWidth, offsetCut]) {
+      const mate = detectFeatureMateSnaps(candidate, candidate.position, [host], [candidate.id], 0.03);
+      expect(mate.mateHostPartId, candidate.id).toBe(host.id);
+      expect(mate.adjustedPosition.x, candidate.id).toBeCloseTo(candidate.position.x);
+      expect(mate.adjustedPosition.y, candidate.id).toBeCloseTo(candidate.position.y);
+      expect(mate.adjustedPosition.z, candidate.id).toBeCloseTo(candidate.position.z);
+    }
+
+    // A lap cut on the wrong face is poor joinery but not a collision: the
+    // crossing piece drops into the host's upward-facing pocket, rests on its
+    // floor, and stands proud. Overlap prevention settles interference, not
+    // joinery quality, so only the candidates that truly intrude are rejected.
+    expect(overlapsAtCurrentPosition(wrongFace), wrongFace.id).toBe(false);
+
+    for (const candidate of [partialLength, partialWidth, offsetCut, depthMismatch]) {
+      expect(overlapsAtCurrentPosition(candidate), candidate.id).toBe(true);
+    }
+  });
+
+  it.each(['mortise', 'stopped_groove', 'cutout'] as const)(
+    'exempts a mate on the side an off-center %s socket was cut',
+    (cutType) => {
+      const host = createPart({
+        id: `${cutType}-host`,
+        length: 12,
+        width: 6,
+        thickness: 1,
+        position: { x: 0, y: 0.5, z: 0 },
+        features: [
+          {
+            id: `${cutType}-socket`,
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            cutType,
+            target: { type: 'face', face: 'top_face' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            parameters: { size: { length: 0.755, width: 1 }, depthMode: 'blind', depth: 0.5 },
+            placement: { x: 5.6225, z: 0.5 }
+          }
+        ]
+      });
+      const mateAt = (id: string, z: number) =>
+        createPart({
+          id,
+          length: 4,
+          width: 1,
+          thickness: 0.75,
+          position: { x: 0, y: 2.5, z },
+          rotation: { x: 0, y: 0, z: 90 }
+        });
+      // Half an inch in from the back edge, so the void is at world z
+      // [-2.5, -1.5] and the far side of the board is still solid.
+      const visibleVoidMate = mateAt('visible-void-mate', -2);
+      const mirroredSolidMate = mateAt('solid-side-mate', 2);
+      const exactMate = (candidate: Part) =>
+        detectFeatureMateSnaps(candidate, candidate.position, [host], [candidate.id], 0.03);
+      const overlapWithClaimedHost = (candidate: Part) =>
+        wouldTranslationCauseOverlap(
+          [host, candidate],
+          new Set([candidate.id]),
+          { x: 0, y: 0, z: 0 },
+          undefined,
+          host.id
+        );
+
+      expect(exactMate(visibleVoidMate).mateHostPartId).toBe(host.id);
+      expect(overlapWithClaimedHost(visibleVoidMate)).toBe(false);
+      expect(exactMate(mirroredSolidMate).mateHostPartId).toBeUndefined();
+      expect(overlapWithClaimedHost(mirroredSolidMate)).toBe(true);
+    }
+  );
+
+  it('places an off-center tenon material shape on the side it was cut', () => {
+    const host = createPart({
+      id: 'tenon-material-host',
+      length: 12,
+      width: 6,
+      thickness: 1,
+      position: { x: 0, y: 0.5, z: 0 },
+      features: [
+        {
+          id: 'tenon-material-mortise',
+          kind: 'rect_cut',
+          version: 1 as const,
+          enabled: true,
+          cutType: 'mortise',
+          target: { type: 'face', face: 'top_face' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          parameters: { size: { length: 0.51, width: 1.01 }, depthMode: 'blind', depth: 0.75 },
+          placement: { x: 5.745, z: 2.495 }
+        }
+      ]
+    });
+    const tenonedRail = createPart({
+      id: 'off-center-tenon-material',
+      length: 4,
+      width: 2,
+      thickness: 1,
+      // The tongue sits a quarter off centre across the rail, so the rail
+      // stands a quarter the other way to bring it onto the mortise.
+      position: { x: 0, y: 2.25, z: 0.25 },
+      rotation: { x: 0, y: 0, z: 90 },
+      features: [
+        {
+          id: 'off-center-tenon-material-cut',
+          kind: 'rect_cut',
+          version: 1 as const,
+          enabled: true,
+          cutType: 'tenon',
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+          parameters: { size: { length: 0.75, width: 1 }, depthMode: 'blind', depth: 0.5 },
+          placement: { x: 0, z: 0.25 }
+        }
+      ]
+    });
+    const mate = detectFeatureMateSnaps(tenonedRail, tenonedRail.position, [host], [tenonedRail.id], 0.03);
+
+    expect(mate.mateHostPartId).toBe(host.id);
+    expect(
+      wouldTranslationCauseOverlap(
+        [host, tenonedRail],
+        new Set([tenonedRail.id]),
+        { x: 0, y: 0, z: 0 },
+        undefined,
+        host.id
+      )
+    ).toBe(false);
+    expect(
+      wouldTranslationCauseOverlap(
+        [host, { ...tenonedRail, position: { ...tenonedRail.position, z: 0.75 } }],
+        new Set([tenonedRail.id]),
+        { x: 0, y: 0, z: 0 },
+        undefined,
+        host.id
+      )
+    ).toBe(true);
+
+    const shoulderIntrusion = { x: 0.02, y: 0, z: 0.25 };
+    const safeShoulderMove = resolveSafeTranslationDelta(
+      [host, tenonedRail],
+      new Set([tenonedRail.id]),
+      shoulderIntrusion
+    );
+    expect(safeShoulderMove).not.toEqual(shoulderIntrusion);
+  });
+
+  it('snaps a tenon into a deeper side-face mortise until its shoulder is flush', () => {
+    const host = createPart({
+      id: 'side-mortise-leg',
+      length: 29.25,
+      width: 1.75,
+      thickness: 1.75,
+      position: { x: -21.625, y: 14.625, z: -5.8125 },
+      rotation: { x: 0, y: 0, z: 90 },
+      features: [
+        {
+          id: 'side-mortise',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'mortise',
+          target: { type: 'face', face: 'front_face' },
+          reference: { primaryFrom: 'min' },
+          parameters: { size: { length: 2, width: 0.5 }, depthMode: 'blind', depth: 0.5625 },
+          placement: { x: 26.75, z: 0.625 }
+        }
+      ]
+    });
+    const seatedZ = 3.3125;
+    const apron = createPart({
+      id: 'side-apron',
+      length: 17.5,
+      width: 3,
+      thickness: 0.75,
+      position: { x: -21.625, y: 27.75, z: seatedZ + 0.05 },
+      rotation: { x: 90, y: 0, z: 90 },
+      features: [
+        {
+          id: 'apron-tenon',
+          kind: 'rect_cut',
+          version: 1,
+          enabled: true,
+          cutType: 'tenon',
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min' },
+          parameters: { size: { length: 0.5, width: 2 }, depthMode: 'blind', depth: 0.5 },
+          placement: { x: 0, z: 0.5 }
+        }
+      ]
+    });
+
+    expect(getPartFeatureSockets(host)).toHaveLength(1);
+    const mate = detectFeatureMateSnaps(apron, apron.position, [host], [apron.id], 0.1);
+    expect(mate.mateHostPartId).toBe(host.id);
+    expect(mate.adjustedPosition.z).toBeCloseTo(seatedZ);
+    expect(partsOverlap({ ...apron, position: mate.adjustedPosition }, host)).toBe(false);
+  });
+
+  it('decomposes corner notch contour into correct sub-boxes', () => {
+    const cornerNotchFeature = (corner: string): Part['features'] => [
+      {
+        id: `notch-${corner}`,
+        kind: 'rect_cut' as const,
+        version: 1 as const,
+        enabled: true,
+        cutType: 'corner_notch' as const,
+        target: { type: 'corner' as const, corner: corner as 'front_left_corner' },
+        reference: { primaryFrom: 'min' as const },
+        placement: { x: 0, z: 0 },
+        parameters: {
+          size: { length: 2, width: 2 },
+          depthMode: 'through' as const,
+          depth: undefined
+        }
+      }
+    ];
+
+    // Part with front_right_corner notch removed (6x4)
+    const a = createPart({
+      id: 'a',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      features: cornerNotchFeature('front_right_corner')
+    });
+
+    const subBoxesA = getPartContourSubBoxes(a);
+    // front_right notch removes x=[1,3] z=[-2,0], should get 3 sub-boxes
+    expect(subBoxesA.length).toBe(3);
+
+    const obbsA = getPartSubOBBs(a);
+    expect(obbsA.length).toBe(3);
+
+    // Part with back_left_corner notch
+    const b = createPart({
+      id: 'b',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 4, y: 0.375, z: 0 },
+      features: cornerNotchFeature('back_left_corner')
+    });
+
+    const subBoxesB = getPartContourSubBoxes(b);
+    expect(subBoxesB.length).toBe(3);
+
+    const obbsB = getPartSubOBBs(b);
+    expect(obbsB.length).toBe(3);
+  });
+
+  it('allows interlocking corner notch parts to overlap in the removed area', () => {
+    // Two 6×4 boards, each with a 2×2 corner notch on complementary corners.
+    // Part A has notch at front-right, Part B has notch at back-left.
+    // They interlock: in the 2" overlap zone, A's material is in the back half
+    // and B's material is in the front half, so no actual solid collision.
+    const cornerNotchFeature = (corner: string): Part['features'] => [
+      {
+        id: `notch-${corner}`,
+        kind: 'rect_cut' as const,
+        version: 1 as const,
+        enabled: true,
+        cutType: 'corner_notch' as const,
+        target: { type: 'corner' as const, corner: corner as 'front_left_corner' },
+        reference: { primaryFrom: 'min' as const },
+        placement: { x: 0, z: 0 },
+        parameters: {
+          size: { length: 2, width: 2 },
+          depthMode: 'through' as const,
+          depth: undefined
+        }
+      }
+    ];
+
+    const a = createPart({
+      id: 'a',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      features: cornerNotchFeature('front_right_corner')
+    });
+
+    // Part B's back-left notch complements A's front-right notch.
+    // A at x=0 occupies x=[-3,3]. B at x=4 occupies x=[1,7].
+    // Shared zone x=[1,3]: A has material at z=[0,2], B at z=[-2,0].
+    const b = createPart({
+      id: 'b',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 4, y: 0.375, z: 0 },
+      features: cornerNotchFeature('back_left_corner')
+    });
+
+    expect(partsOverlap(a, b)).toBe(false);
+  });
+
+  it('still detects overlap when corner notch parts share solid material', () => {
+    const cornerNotchFeature = (corner: string): Part['features'] => [
+      {
+        id: `notch-${corner}`,
+        kind: 'rect_cut' as const,
+        version: 1 as const,
+        enabled: true,
+        cutType: 'corner_notch' as const,
+        target: { type: 'corner' as const, corner: corner as 'front_left_corner' },
+        reference: { primaryFrom: 'min' as const },
+        placement: { x: 0, z: 0 },
+        parameters: {
+          size: { length: 2, width: 2 },
+          depthMode: 'through' as const,
+          depth: undefined
+        }
+      }
+    ];
+
+    const a = createPart({
+      id: 'a',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      features: cornerNotchFeature('front_right_corner')
+    });
+
+    // Position B so its back portion overlaps A's back portion (solid area)
+    const b = createPart({
+      id: 'b',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 3, y: 0.375, z: 0 },
+      features: cornerNotchFeature('front_left_corner')
+    });
+
+    expect(partsOverlap(a, b)).toBe(true);
+  });
+
+  it('correctly rotates sub-OBBs for 180-degree Y-equivalent rotation', () => {
+    // Rotation {x:-180, y:0, z:180} is equivalent to 180° around Y: X→-X, Z→-Z
+    const cornerNotchFeature: Part['features'] = [
+      {
+        id: 'notch',
+        kind: 'rect_cut' as const,
+        version: 1 as const,
+        enabled: true,
+        cutType: 'corner_notch' as const,
+        target: { type: 'corner' as const, corner: 'front_left_corner' as const },
+        reference: { primaryFrom: 'min' as const },
+        placement: { x: 0, z: 0 },
+        parameters: {
+          size: { length: 2, width: 2 },
+          depthMode: 'through' as const,
+          depth: undefined
+        }
+      }
+    ];
+
+    const partB = createPart({
+      id: 'b',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      rotation: { x: -180, y: 0, z: 180 },
+      features: cornerNotchFeature
+    });
+
+    const obbsB = getPartSubOBBs(partB);
+
+    // Should have 3 sub-OBBs (same as unrotated — the notch removes 1 of 4 grid cells)
+    expect(obbsB).toHaveLength(3);
+
+    // Axes should reflect 180° Y rotation: X→-X, Z→-Z
+    expect(obbsB[0].axes[0].x).toBeCloseTo(-1, 5);
+    expect(obbsB[0].axes[2].z).toBeCloseTo(-1, 5);
+
+    // World centers should be negated from local centers (at position origin)
+    // Local sub-boxes: (-2, 1), (1, -1), (1, 1)
+    // With Z negation in getPartSubOBBs (to match rotateX(-π/2) rendering):
+    // World: (2, 1), (-1, -1), (-1, 1)
+    const worldCenters = obbsB.map((o) => ({ x: o.center.x, z: o.center.z }));
+    expect(worldCenters).toContainEqual(expect.objectContaining({ x: expect.closeTo(2, 3), z: expect.closeTo(1, 3) }));
+    expect(worldCenters).toContainEqual(
+      expect.objectContaining({ x: expect.closeTo(-1, 3), z: expect.closeTo(-1, 3) })
+    );
+    expect(worldCenters).toContainEqual(expect.objectContaining({ x: expect.closeTo(-1, 3), z: expect.closeTo(1, 3) }));
+  });
+
+  it('allows interlocking rotated corner-notch parts', () => {
+    // Two 6×4 parts with 2×2 front_left_corner notches.
+    // Part A unrotated at origin, Part B rotated 180° and offset to interlock.
+    const cornerNotchFeature: Part['features'] = [
+      {
+        id: 'notch',
+        kind: 'rect_cut' as const,
+        version: 1 as const,
+        enabled: true,
+        cutType: 'corner_notch' as const,
+        target: { type: 'corner' as const, corner: 'front_left_corner' as const },
+        reference: { primaryFrom: 'min' as const },
+        placement: { x: 0, z: 0 },
+        parameters: {
+          size: { length: 2, width: 2 },
+          depthMode: 'through' as const,
+          depth: undefined
+        }
+      }
+    ];
+
+    const partA = createPart({
+      id: 'a',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      features: cornerNotchFeature
+    });
+
+    // Offset B by -4 in X so B's solid strip fills A's notch and vice versa
+    const partB = createPart({
+      id: 'b',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: -4, y: 0.375, z: 0 },
+      rotation: { x: -180, y: 0, z: 180 },
+      features: cornerNotchFeature
+    });
+
+    // Parts should interlock — notch areas complement each other
+    expect(partsOverlap(partA, partB)).toBe(false);
+  });
+
+  it('detects overlap when rotated corner-notch parts collide in solid areas', () => {
+    const cornerNotchFeature: Part['features'] = [
+      {
+        id: 'notch',
+        kind: 'rect_cut' as const,
+        version: 1 as const,
+        enabled: true,
+        cutType: 'corner_notch' as const,
+        target: { type: 'corner' as const, corner: 'front_left_corner' as const },
+        reference: { primaryFrom: 'min' as const },
+        placement: { x: 0, z: 0 },
+        parameters: {
+          size: { length: 2, width: 2 },
+          depthMode: 'through' as const,
+          depth: undefined
+        }
+      }
+    ];
+
+    const partA = createPart({
+      id: 'a',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      features: cornerNotchFeature
+    });
+
+    // Offset B by only -2 — solid areas WILL collide
+    const partB = createPart({
+      id: 'b',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: -2, y: 0.375, z: 0 },
+      rotation: { x: -180, y: 0, z: 180 },
+      features: cornerNotchFeature
+    });
+
+    expect(partsOverlap(partA, partB)).toBe(true);
+  });
+
+  it('allows interlocking at exact project file positions and supports drag approach', () => {
+    const cornerNotchFeature: Part['features'] = [
+      {
+        id: 'notch',
+        kind: 'rect_cut' as const,
+        version: 1 as const,
+        enabled: true,
+        cutType: 'corner_notch' as const,
+        target: { type: 'corner' as const, corner: 'front_left_corner' as const },
+        reference: { primaryFrom: 'min' as const },
+        placement: { x: 0, z: 0 },
+        parameters: {
+          size: { length: 2, width: 2 },
+          depthMode: 'through' as const,
+          depth: undefined
+        }
+      }
+    ];
+
+    // Exact positions from project file
+    const partA = createPart({
+      id: 'a',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 3, y: 0.375, z: 30.125 },
+      rotation: { x: 0, y: 0, z: 0 },
+      features: cornerNotchFeature
+    });
+
+    const partB = createPart({
+      id: 'b',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 1, y: 0.375, z: 32.125 },
+      rotation: { x: -180, y: 0, z: 180 },
+      features: cornerNotchFeature
+    });
+
+    // Parts are interlocking at project file positions — no overlap
+    expect(partsOverlap(partA, partB)).toBe(false);
+
+    // Drag Part B from far away along Z — should reach interlocking position
+    const farB = createPart({ ...partB, position: { x: 1, y: 0.375, z: 35.25 } });
+    const safeZ = resolveSafeTranslationDelta([partA, farB], new Set([farB.id]), { x: 0, y: 0, z: -3.125 });
+    expect(safeZ).toEqual({ x: 0, y: 0, z: -3.125 });
+
+    // Drag Part B from far away along X — should reach interlocking position
+    const farBx = createPart({ ...partB, position: { x: -3, y: 0.375, z: 32.125 } });
+    const safeX = resolveSafeTranslationDelta([partA, farBx], new Set([farBx.id]), { x: 4, y: 0, z: 0 });
+    expect(safeX).toEqual({ x: 4, y: 0, z: 0 });
+
+    // Diagonal approach should also work
+    const farBd = createPart({ ...partB, position: { x: -3, y: 0.375, z: 35.25 } });
+    const safeDiag = resolveSafeTranslationDelta([partA, farBd], new Set([farBd.id]), { x: 4, y: 0, z: -3.125 });
+    expect(safeDiag).toEqual({ x: 4, y: 0, z: -3.125 });
+  });
+
+  it('detects overlap correctly for parts with complementary corner notches', () => {
+    // Part A: front_left_corner notch, Part B: back_right_corner notch
+    // With Z negation (rotateX(-π/2)), A's notch opens toward +Z, B's toward -Z.
+    // Interlocking requires A below B in Z: A at z=-2, B at z=0.
+    const partA = createPart({
+      id: 'a',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 2, y: 0.375, z: -2 },
+      features: [
+        {
+          id: 'notch-a',
+          kind: 'rect_cut' as const,
+          version: 1 as const,
+          enabled: true,
+          cutType: 'corner_notch' as const,
+          target: { type: 'corner' as const, corner: 'front_left_corner' as const },
+          reference: { primaryFrom: 'min' as const },
+          placement: { x: 0, z: 0 },
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: undefined }
+        }
+      ]
+    });
+
+    const partB = createPart({
+      id: 'b',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      features: [
+        {
+          id: 'notch-b',
+          kind: 'rect_cut' as const,
+          version: 1 as const,
+          enabled: true,
+          cutType: 'corner_notch' as const,
+          target: { type: 'corner' as const, corner: 'back_right_corner' as const },
+          reference: { primaryFrom: 'min' as const },
+          placement: { x: 0, z: 0 },
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: undefined }
+        }
+      ]
+    });
+
+    // At interlocking position — notches complement, no solid overlap
+    expect(partsOverlap(partA, partB)).toBe(false);
+
+    // When A is directly on top of B, solid areas DO overlap
+    const partAonB = createPart({ ...partA, position: { x: 0, y: 0.375, z: 0 } });
+    expect(partsOverlap(partAonB, partB)).toBe(true);
+
+    // When A moves slightly toward B, solid areas overlap immediately
+    const partAslightX = createPart({ ...partA, position: { x: 1.75, y: 0.375, z: -2 } });
+    expect(partsOverlap(partAslightX, partB)).toBe(true);
+
+    const partAslightZ = createPart({ ...partA, position: { x: 2, y: 0.375, z: -1.75 } });
+    expect(partsOverlap(partAslightZ, partB)).toBe(true);
+  });
+
+  it('prevents drag from interlocked position into solid corner overlap', () => {
+    // Same complementary notch setup (Z negated: A at z=-2, B at z=0)
+    const partA = createPart({
+      id: 'a',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 2, y: 0.375, z: -2 },
+      features: [
+        {
+          id: 'notch-a',
+          kind: 'rect_cut' as const,
+          version: 1 as const,
+          enabled: true,
+          cutType: 'corner_notch' as const,
+          target: { type: 'corner' as const, corner: 'front_left_corner' as const },
+          reference: { primaryFrom: 'min' as const },
+          placement: { x: 0, z: 0 },
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: undefined }
+        }
+      ]
+    });
+
+    const partB = createPart({
+      id: 'b',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      features: [
+        {
+          id: 'notch-b',
+          kind: 'rect_cut' as const,
+          version: 1 as const,
+          enabled: true,
+          cutType: 'corner_notch' as const,
+          target: { type: 'corner' as const, corner: 'back_right_corner' as const },
+          reference: { primaryFrom: 'min' as const },
+          placement: { x: 0, z: 0 },
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: undefined }
+        }
+      ]
+    });
+
+    // Drag A from interlocked position to push back-left corner into B's front-right corner
+    // This delta would put A at (3, 0.375, 1) where solid corners overlap
+    const safeDelta = resolveSafeTranslationDelta([partA, partB], new Set(['a']), { x: 1, y: 0, z: 3 });
+    // Should be blocked or clamped — should NOT allow full delta
+    if (safeDelta) {
+      const finalX = 2 + safeDelta.x;
+      const finalZ = -2 + safeDelta.z;
+      const finalA = createPart({ ...partA, position: { x: finalX, y: 0.375, z: finalZ } });
+      expect(partsOverlap(finalA, partB)).toBe(false);
+    }
+
+    // Drag A with large delta in +Z only (from interlocked to overlapping above)
+    const safeDeltaZ = resolveSafeTranslationDelta([partA, partB], new Set(['a']), { x: 0, y: 0, z: 6 });
+    if (safeDeltaZ) {
+      const finalZonly = createPart({ ...partA, position: { x: 2, y: 0.375, z: -2 + safeDeltaZ.z } });
+      expect(partsOverlap(finalZonly, partB)).toBe(false);
+    }
+
+    // Drag A with large delta in -X only (from interlocked toward B)
+    const safeDeltaX = resolveSafeTranslationDelta([partA, partB], new Set(['a']), { x: -6, y: 0, z: 0 });
+    if (safeDeltaX) {
+      const finalXonly = createPart({ ...partA, position: { x: 2 + safeDeltaX.x, y: 0.375, z: -2 } });
+      expect(partsOverlap(finalXonly, partB)).toBe(false);
+    }
+
+    // Diagonal drag that exploits non-convex collision boundary:
+    // Moving A right (clear at z=-2) then up into B's solid area.
+    // The per-axis search could allow X=+2 then Z=+4, but the combined
+    // result would overlap. The final verification must catch this.
+    const safeDiag = resolveSafeTranslationDelta([partA, partB], new Set(['a']), { x: 2, y: 0, z: 4 });
+    if (safeDiag) {
+      const diagFinal = createPart({ ...partA, position: { x: 2 + safeDiag.x, y: 0.375, z: -2 + safeDiag.z } });
+      expect(partsOverlap(diagFinal, partB)).toBe(false);
+    }
+
+    // Reversed priority: large Z, moderate X — tests corridor from the other direction
+    const safeDiag2 = resolveSafeTranslationDelta([partA, partB], new Set(['a']), { x: 3, y: 0, z: 3 });
+    if (safeDiag2) {
+      const diag2Final = createPart({
+        ...partA,
+        position: { x: 2 + safeDiag2.x, y: 0.375, z: -2 + safeDiag2.z }
+      });
+      expect(partsOverlap(diag2Final, partB)).toBe(false);
+    }
+
+    // Every delta from interlocked position should produce a safe result
+    for (let dx = -4; dx <= 4; dx += 1) {
+      for (let dz = -4; dz <= 4; dz += 1) {
+        if (dx === 0 && dz === 0) continue;
+        const delta = { x: dx, y: 0, z: dz };
+        const sd = resolveSafeTranslationDelta([partA, partB], new Set(['a']), delta);
+        if (sd) {
+          const testPart = createPart({ ...partA, position: { x: 2 + sd.x, y: 0.375, z: -2 + sd.z } });
+          expect(partsOverlap(testPart, partB)).toBe(false);
+        }
+      }
+    }
+  });
+
+  it('detects solid arm overlap when face-touching parts have corner notches', () => {
+    // Regression: mate snap exemption previously bypassed overlap checking entirely,
+    // allowing the solid arms of L-shaped (corner notch) parts to overlap.
+    // With Z negation: A at z=-2, B at z=0 for interlocking.
+    const partA = createPart({
+      id: 'a',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 2, y: 0.375, z: -2 },
+      features: [
+        {
+          id: 'notch-a',
+          kind: 'rect_cut' as const,
+          version: 1 as const,
+          enabled: true,
+          cutType: 'corner_notch' as const,
+          target: { type: 'corner' as const, corner: 'front_left_corner' as const },
+          reference: { primaryFrom: 'min' as const },
+          placement: { x: 0, z: 0 },
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: undefined }
+        }
+      ]
+    });
+
+    const partB = createPart({
+      id: 'b',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      features: [
+        {
+          id: 'notch-b',
+          kind: 'rect_cut' as const,
+          version: 1 as const,
+          enabled: true,
+          cutType: 'corner_notch' as const,
+          target: { type: 'corner' as const, corner: 'back_right_corner' as const },
+          reference: { primaryFrom: 'min' as const },
+          placement: { x: 0, z: 0 },
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: undefined }
+        }
+      ]
+    });
+
+    // At interlocked position, no overlap
+    expect(partsOverlap(partA, partB)).toBe(false);
+
+    // Move B slightly toward A in -Z — solid arms collide (the "skinny long" arm overlap)
+    const partBpushed = createPart({ ...partB, position: { x: 0, y: 0.375, z: -0.5 } });
+    expect(partsOverlap(partA, partBpushed)).toBe(true);
+
+    // Even a tiny movement past interlocking should be detected
+    const partBtiny = createPart({ ...partB, position: { x: 0, y: 0.375, z: -0.01 } });
+    expect(partsOverlap(partA, partBtiny)).toBe(true);
+
+    // Face-touching rectangular parts must still be non-overlapping
+    const plainA = createPart({ id: 'a', length: 6, width: 4, thickness: 0.75, position: { x: 0, y: 0.375, z: 0 } });
+    const plainB = createPart({ id: 'b', length: 6, width: 4, thickness: 0.75, position: { x: 6, y: 0.375, z: 0 } });
+    expect(partsOverlap(plainA, plainB)).toBe(false);
+  });
+
+  it('exact project file: drag from interlocked position blocks arm overlap in all directions', () => {
+    // Exact project file data: Part A front_left_corner, Part B back_right_corner
+    // With Z negation: A at z=-2, B at z=0 for interlocking.
+    const partA = createPart({
+      id: 'a',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 2.00006103515625, y: 0.375, z: -2 },
+      features: [
+        {
+          id: 'notch-a',
+          kind: 'rect_cut' as const,
+          version: 1 as const,
+          enabled: true,
+          cutType: 'corner_notch' as const,
+          target: { type: 'corner' as const, corner: 'front_left_corner' as const },
+          reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
+          placement: { x: 0, z: 0 },
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: undefined }
+        }
+      ]
+    });
+
+    const partB = createPart({
+      id: 'b',
+      length: 6,
+      width: 4,
+      thickness: 0.75,
+      position: { x: 0, y: 0.375, z: 0 },
+      features: [
+        {
+          id: 'notch-b',
+          kind: 'rect_cut' as const,
+          version: 1 as const,
+          enabled: true,
+          cutType: 'corner_notch' as const,
+          target: { type: 'corner' as const, corner: 'back_right_corner' as const },
+          reference: { primaryFrom: 'min' as const, secondaryFrom: 'min' as const },
+          placement: { x: 0, z: 0 },
+          parameters: { size: { length: 2, width: 2 }, depthMode: 'through' as const, depth: undefined }
+        }
+      ]
+    });
+
+    // 1. At project file positions (interlocked): no overlap
+    expect(partsOverlap(partA, partB)).toBe(false);
+
+    // 2. Any movement of B toward A in -Z causes arm overlap
+    expect(partsOverlap(partA, createPart({ ...partB, position: { x: 0, y: 0.375, z: -0.001 } }))).toBe(true);
+    expect(partsOverlap(partA, createPart({ ...partB, position: { x: 0, y: 0.375, z: -0.5 } }))).toBe(true);
+    expect(partsOverlap(partA, createPart({ ...partB, position: { x: 0, y: 0.375, z: -1 } }))).toBe(true);
+
+    // 3. Any movement of B toward A in +X causes arm overlap
+    expect(partsOverlap(partA, createPart({ ...partB, position: { x: 0.001, y: 0.375, z: 0 } }))).toBe(true);
+    expect(partsOverlap(partA, createPart({ ...partB, position: { x: 0.5, y: 0.375, z: 0 } }))).toBe(true);
+
+    // 4. Movement AWAY from A is allowed
+    expect(partsOverlap(partA, createPart({ ...partB, position: { x: -1, y: 0.375, z: 0 } }))).toBe(false);
+    expect(partsOverlap(partA, createPart({ ...partB, position: { x: 0, y: 0.375, z: 1 } }))).toBe(false);
+
+    // 5. resolveSafeTranslationDelta blocks B from moving into A
+    const parts = [partA, partB];
+
+    // Drag B in -Z from interlocked: must be blocked
+    const safeZ = resolveSafeTranslationDelta(parts, new Set(['b']), { x: 0, y: 0, z: -2 });
+    expect(safeZ).toBeNull();
+
+    // Drag B in +X from interlocked: must be blocked
+    const safeX = resolveSafeTranslationDelta(parts, new Set(['b']), { x: 2, y: 0, z: 0 });
+    expect(safeX).toBeNull();
+
+    // Drag B diagonally toward A: must be blocked
+    const safeDiag = resolveSafeTranslationDelta(parts, new Set(['b']), { x: 1, y: 0, z: -1 });
+    expect(safeDiag).toBeNull();
+
+    // Drag B AWAY from A: allowed
+    const safeAway = resolveSafeTranslationDelta(parts, new Set(['b']), { x: -2, y: 0, z: 2 });
+    expect(safeAway).toEqual({ x: -2, y: 0, z: 2 });
+
+    // 6. Drag B from far away toward A — must stop at interlocking position
+    const farB = createPart({ ...partB, position: { x: 0, y: 0.375, z: 5 } });
+    const safeFar = resolveSafeTranslationDelta([partA, farB], new Set(['b']), { x: 0, y: 0, z: -10 });
+    expect(safeFar).not.toBeNull();
+    if (safeFar) {
+      const finalZ = 5 + safeFar.z;
+      // Should stop at or before interlocking position (z=0)
+      expect(finalZ).toBeGreaterThanOrEqual(-0.001);
+      const finalB = createPart({ ...partB, position: { x: 0, y: 0.375, z: finalZ } });
+      expect(partsOverlap(partA, finalB)).toBe(false);
+    }
+  });
+  it('does not report overlap in the wedge removed by a long-edge bevel', () => {
+    const beveled = createPart({
+      id: 'beveled',
+      length: 10,
+      width: 4,
+      thickness: 1,
+      position: { x: 0, y: 0.5, z: 0 },
+      features: [
+        {
+          id: 'eb-1',
+          kind: 'end_cut',
+          version: 1 as const,
+          enabled: true,
+          target: { type: 'face', face: 'front_face' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'bevel',
+          lengthMode: 'long_point',
+          parameters: { horizontalAngle: 0, verticalAngle: 45 }
+        }
+      ]
+    });
+    // A slat sitting inside the removed top-front wedge. The front face
+    // renders at +Z, so the wedge is on the +Z side at z 1.4..1.9.
+    const slat = createPart({
+      id: 'slat',
+      length: 10,
+      width: 0.5,
+      thickness: 0.3,
+      position: { x: 0, y: 0.85, z: 1.65 }
+    });
+
+    expect(partsOverlap(beveled, slat)).toBe(false);
+
+    // Same slat against the unbeveled version of the part must overlap.
+    const plain = { ...beveled, features: [] };
+    expect(partsOverlap(plain, slat)).toBe(true);
+  });
+});
+
+describe('an edge that has been shaped', () => {
+  const T = 0.75;
+  const board = (features: Part['features']) =>
+    createTestPart({ id: 'a', length: 12, width: 3, thickness: T, position: { x: 0, y: T / 2, z: 0 }, features });
+  const chamfer: EdgeProfileFeature = {
+    id: 'e',
+    kind: 'edge_profile',
+    version: 1,
+    enabled: true,
+    target: { type: 'edge', edge: 'top_front_edge' },
+    reference: { primaryFrom: 'min' },
+    profile: 'chamfer',
+    parameters: { size: 0.375, depth: 0.375 }
+  };
+
+  it('gives up the wood it took, so a profile can be met by another', () => {
+    // A profile takes its wood off in section and leaves the top view exactly
+    // as it was, so read from above these two are still square edges -- and
+    // a rule joint, cope and stick, or a lock mitre could never close.
+    const speck = createTestPart({
+      id: 'b',
+      length: 0.1,
+      width: 0.06,
+      thickness: 0.06,
+      position: { x: 0, y: 0.7, z: 1.45 }
+    });
+    expect(partsOverlap(board([chamfer]), speck)).toBe(false);
+    // The same speck against the unshaped board is buried in it.
+    expect(partsOverlap(board([]), speck)).toBe(true);
   });
 });

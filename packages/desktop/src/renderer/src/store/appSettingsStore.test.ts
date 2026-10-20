@@ -75,7 +75,7 @@ beforeAll(() => {
     readRecoveryFile: vi.fn(),
     deleteRecoveryFile: vi.fn(),
     listRecoveryFiles: vi.fn()
-  };
+  } as unknown as typeof window.electronAPI;
 });
 
 // Setup mock before each test
@@ -359,6 +359,31 @@ describe('appSettingsStore', () => {
       expect(mockSetPreference).toHaveBeenCalledWith('theme', 'light');
     });
 
+    it('does not rewrite unrelated preferences when changing a setting', async () => {
+      mockSetPreference.mockClear();
+      await useAppSettingsStore.getState().updateSettings({ theme: 'light' });
+      expect(mockSetPreference.mock.calls).toEqual([['theme', 'light']]);
+    });
+
+    it('persists successive preset fields without replaying older values', async () => {
+      mockSetPreference.mockClear();
+      await Promise.all([
+        useAppSettingsStore.getState().updateSettings({ advancedSnapPreset: 'simple' }),
+        useAppSettingsStore.getState().updateSettings({ enableFeatureAnchors: false }),
+        useAppSettingsStore.getState().updateSettings({ enableLayoutSnaps: false })
+      ]);
+      expect(mockSetPreference.mock.calls).toEqual([
+        ['advancedSnapPreset', 'simple'],
+        ['enableFeatureAnchors', false],
+        ['enableLayoutSnaps', false]
+      ]);
+      expect(useAppSettingsStore.getState().settings).toMatchObject({
+        advancedSnapPreset: 'simple',
+        enableFeatureAnchors: false,
+        enableLayoutSnaps: false
+      });
+    });
+
     it('persists all individual settings to preferences', async () => {
       await useAppSettingsStore.getState().updateSettings({
         defaultUnits: 'metric',
@@ -521,6 +546,31 @@ describe('appSettingsStore', () => {
       const state = useAppSettingsStore.getState();
       expect(state.isInitialized).toBe(true);
       expect(state.isLoading).toBe(false);
+    });
+
+    it('still loads settings when the bridge cannot sync between windows', async () => {
+      // A preload without onSettingsChanged used to throw straight out of
+      // initSettings, before the try that defaults the settings — so every
+      // consumer of this store got an unhandled rejection and no settings.
+      // A fresh module is needed because the listener latch is module-level.
+      vi.resetModules();
+      const original = window.electronAPI.onSettingsChanged;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (window.electronAPI as any).onSettingsChanged;
+      mockGetPreference.mockImplementation((key) => Promise.resolve(key === 'appSettings' ? { theme: 'light' } : null));
+
+      try {
+        const { useAppSettingsStore: freshStore } = await import('./appSettingsStore');
+
+        await expect(freshStore.getState().initSettings()).resolves.toBeUndefined();
+
+        const state = freshStore.getState();
+        expect(state.settings.theme).toBe('light');
+        expect(state.isInitialized).toBe(true);
+        expect(state.isLoading).toBe(false);
+      } finally {
+        window.electronAPI.onSettingsChanged = original;
+      }
     });
 
     it('handles concurrent updateSettings calls', async () => {

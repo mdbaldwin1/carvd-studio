@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import {
   Ruler,
   Settings,
@@ -62,7 +63,8 @@ export default function CutListsPage() {
           <ol className="text-muted text-sm grid gap-sm">
             <li>
               <strong>1. Assign stock to all parts</strong> — Parts without
-              stock are excluded from the cut list.
+              stock produce a blocking error; assign the correct material before
+              generating.
             </li>
             <li>
               <strong>2. Click "Generate Cut List"</strong> — The optimizer runs
@@ -84,7 +86,8 @@ export default function CutListsPage() {
                   board
                 </li>
                 <li>
-                  • <strong>Shopping:</strong> Complete material list with costs
+                  • <strong>Shopping:</strong> Stock and entered supplies with
+                  costs
                 </li>
               </ul>
             </li>
@@ -154,9 +157,15 @@ export default function CutListsPage() {
             <div>
               <p className="font-bold mb-xs">Shopping Tab</p>
               <p className="text-muted">
-                Complete material list: how many boards of each type, board feet
+                Stock purchase summary: how many boards of each type, board feet
                 needed, linear feet, cost per material, total cost, waste
-                percentage, and utilization efficiency.
+                percentage, and utilization efficiency. Waste and utilization
+                measure the length-by-width nesting layout. They do not measure
+                volume removed by thicknessing, joinery, or routing. A board
+                with no unused area can still lose material during those steps.
+                Material totals use entered prices and quantities; add supplies
+                separately and account for labor, delivery, tax, and finishing
+                when preparing a complete project budget.
               </p>
             </div>
           </div>
@@ -169,6 +178,31 @@ export default function CutListsPage() {
           <p className="text-muted mb-md">
             Add non-lumber items to your shopping list: hardware, screws, glue,
             finish, etc.
+          </p>
+          <p className="text-muted mb-md">
+            Buy a bolt with its head as one complete item, and list a matching
+            nut separately or as part of a kit. Count shelf pins, screws, and
+            hinges as purchased pieces or kits; do not create dowel-stock parts
+            to stand in for them. Custom shopping items do not enter cutting
+            diagrams or receive lumber overage. Include canvas dimensions and
+            cutting instructions in the item description, rather than treating
+            cloth as plywood.
+          </p>
+          <p className="text-muted mb-md">
+            Add hardware and supplies explicitly: holes and recesses do not
+            automatically create purchases. Replace sample prices with supplier
+            quotes. A zero entered for an unpriced item contributes nothing to
+            the estimate; the total is incomplete until you price it. The app
+            cannot tell a free item from one whose price has not been entered.
+          </p>
+          <p className="text-muted mb-md">
+            Custom items belong to the project, not to a particular assembly.
+            Duplicating a drawer or inserting another cabinet does not multiply
+            its manually entered slides, hinges, or screws. Recount those items
+            after changing the number of assemblies. Match thread, diameter,
+            length, head style, and mating components against the supplier’s
+            specification; the shopping list does not check hardware
+            compatibility.
           </p>
           <ul className="text-muted text-sm grid gap-sm">
             <li>• Click "Add Item" in the Shopping tab</li>
@@ -185,7 +219,10 @@ export default function CutListsPage() {
           </h3>
           <p className="text-muted mb-md">
             The optimizer validates your design before generating cut lists.
-            Here's what each warning means:
+            Blocking errors must be corrected before generation or export.
+            Warnings remain available for review. Imported cuts can be opened
+            for repair even when their dimensions prevent report generation.
+            Here are common issues:
           </p>
           <div className="grid gap-sm text-sm">
             <div>
@@ -290,6 +327,95 @@ export default function CutListsPage() {
         </div>
       </div>
 
+      <section
+        id="part-cut-instructions"
+        className="site-section p-6 mt-xl scroll-mt-28"
+      >
+        <h3 className="text-2xl font-bold mb-4">Part-cut instructions</h3>
+        <p className="text-muted mb-4">
+          The blank dimensions and cutting diagrams describe the material
+          required for a part. Custom-cut instructions describe the operations
+          that turn that blank into the finished shape. Review both; a
+          rectangular blank diagram alone does not describe a mortise, tenon, or
+          routed profile.
+        </p>
+        <p className="text-muted mb-4">
+          Operation summaries are not complete machining drawings. A routed path
+          summary includes its point count and first and last coordinates, not
+          every intermediate point. A custom edge-profile summary identifies the
+          profile and dimensions, not its complete boundary. Keep the saved
+          .carvd project with the report, inspect those layouts in Part Cuts,
+          and supply the full layout or template needed to reproduce them.
+        </p>
+        <ol className="list-decimal pl-5 space-y-3 text-muted">
+          <li>
+            Save the Part Cuts edits and open View Cut List after changing the
+            model. Outdated results must be regenerated before export.
+          </li>
+          <li>
+            Review the listed operations and plan their machining order. Check
+            the named target face and reference edges, the opening dimensions,
+            and blind depth or Through. Through is an intentional opening
+            through the material, not a zero-depth operation.
+          </li>
+          <li>
+            Resolve blocking errors in the affected parts. A blocked or outdated
+            result cannot be exported. Read Review before fabrication for
+            remaining warnings; generating a report does not dismiss them.
+          </li>
+          <li>
+            Review inserts and their stock assignments, then export the current
+            report. Verify the fabrication instructions and any warnings before
+            using it in the shop.
+          </li>
+        </ol>
+        <p className="text-muted mt-4">
+          Stock blanks describes work on individual pieces. After glue-up —
+          finished panels contains operations on the assembled panel, rather
+          than repeating them on each strip. After purchase — component
+          machining lists cuts you added to purchased inserts; the inserts are
+          counted in Shopping and are not nested as raw lumber. Operations by
+          setup groups compatible operations within these stages. It helps
+          organize setups but does not decide their execution order.
+        </p>
+        <p className="text-muted mt-4">
+          For oversized blanks, Finished modeled envelope gives the original
+          modeled dimensions alongside the blank size. Allowance is unassigned
+          to edges: establish that envelope and its reference edges before
+          locating the cuts. Do not measure a modeled offset from an oversized
+          blank edge. Do not add a second tenon allowance when the intended
+          blank already includes that material. See{" "}
+          <Link
+            className="text-text underline underline-offset-4 decoration-primary"
+            to="/docs/joinery#fabrication"
+          >
+            From model to shop
+          </Link>{" "}
+          and{" "}
+          <Link
+            className="text-text underline underline-offset-4 decoration-primary"
+            to="/docs/part-cuts"
+          >
+            Part Cuts
+          </Link>
+          .
+        </p>
+      </section>
+      <p className="text-muted mt-4">
+        Disabled operations are omitted from fabrication instructions. Named
+        cuts include their labels, so a label such as “Left shelf housing” helps
+        distinguish otherwise similar operations. Edge profiles can add TOOL
+        ERROR, Tool warning, or Tool note lines for the assigned cutter. These
+        are findings to review, not extra machining passes. For their meaning,
+        see{" "}
+        <Link
+          className="text-text underline underline-offset-4 decoration-primary"
+          to="/docs/part-cuts#router-profiles"
+        >
+          profiles and physical router tools
+        </Link>
+        .
+      </p>
       <DocsPrevNext />
     </section>
   );

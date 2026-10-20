@@ -84,7 +84,9 @@ export function useAssemblyLibrary() {
     const unsubscribe = subscribeToAssemblyLibrary(() => {
       setIsLoading(getAssemblyLibraryLoadingSnapshot());
     });
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // Save assembly library whenever it changes

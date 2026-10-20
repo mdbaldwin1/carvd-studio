@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent } from '@testing-library/react';
 import { SnappingSection } from './SnappingSection';
 import { AppSettings } from '../../types';
 
@@ -18,168 +18,149 @@ const defaultFormData: AppSettings = {
   liveGridSnap: false,
   snapSensitivity: 'normal',
   snapToOrigin: true,
-  dimensionSnapSameTypeOnly: false
+  dimensionSnapSameTypeOnly: false,
+  lightingMode: 'default'
 };
 
-function getSettingControl(labelText: string): HTMLElement {
+/** The input or select in the same row as a given label. */
+function control(labelText: string): HTMLInputElement {
   const label = screen.getByText(labelText);
   const row = label.closest('.settings-row')!;
-  return row.querySelector('select, input') as HTMLElement;
+  return row.querySelector('select, input') as HTMLInputElement;
+}
+
+/** What a preset set a given key to, from the recorded calls. */
+function settingFrom(onChange: ReturnType<typeof vi.fn>, key: string): unknown {
+  const call = [...onChange.mock.calls].reverse().find(([name]) => name === key);
+  return call?.[1];
+}
+
+function renderSection(overrides: Partial<AppSettings> = {}) {
+  const onChange = vi.fn();
+  render(<SnappingSection formData={{ ...defaultFormData, ...overrides }} onSettingChange={onChange} />);
+  return onChange;
 }
 
 describe('SnappingSection', () => {
-  it('renders section heading', () => {
-    render(<SnappingSection formData={defaultFormData} onSettingChange={vi.fn()} />);
+  it('renders the section', () => {
+    renderSection();
     expect(screen.getByText('Snapping')).toBeInTheDocument();
   });
 
-  it('renders snap sensitivity with current value', () => {
-    render(<SnappingSection formData={defaultFormData} onSettingChange={vi.fn()} />);
-    const select = getSettingControl('Snap Sensitivity') as HTMLInputElement;
-    expect(select.value).toBe('normal');
+  it('shows the sensitivity currently in force', () => {
+    renderSection({ snapSensitivity: 'tight' });
+    expect(control('Snap Sensitivity').value).toBe('tight');
   });
 
-  it('calls onSettingChange when snap sensitivity changes', () => {
-    const onChange = vi.fn();
-    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
-    fireEvent.change(getSettingControl('Snap Sensitivity'), { target: { value: 'tight' } });
-    expect(onChange).toHaveBeenCalledWith('snapSensitivity', 'tight');
+  it.each(['tight', 'normal', 'loose'] as const)('changes the sensitivity to %s', (value) => {
+    const onChange = renderSection();
+    fireEvent.change(control('Snap Sensitivity'), { target: { value } });
+    expect(onChange).toHaveBeenCalledWith('snapSensitivity', value);
   });
 
-  it('renders live grid snapping checkbox', () => {
-    render(<SnappingSection formData={defaultFormData} onSettingChange={vi.fn()} />);
-    const checkbox = getSettingControl('Live Grid Snapping') as HTMLInputElement;
-    expect(checkbox.checked).toBe(false);
+  /** Every toggle in the panel, with the setting it writes. */
+  const TOGGLES: Array<[string, keyof AppSettings]> = [
+    ['Live Grid Snapping', 'liveGridSnap'],
+    ['Snap to Origin', 'snapToOrigin'],
+    ['Surface Anchors', 'enableSurfaceAnchors'],
+    ['Fractional Face Anchors', 'enableFractionalAnchors'],
+    ['Show Candidate Indicators', 'showSnapCandidates'],
+    ['Golden Ratio Anchors', 'enableGoldenRatioAnchors'],
+    ['Feature Anchors', 'enableFeatureAnchors'],
+    ['Layout Snaps', 'enableLayoutSnaps'],
+    ['Equal Spacing Snaps', 'enableEqualSpacingSnap'],
+    ['Distribution Snaps', 'enableDistributionSnap'],
+    ['Pattern Snaps', 'enablePatternSnap'],
+    ['Axis Edge/Center Snaps', 'enableAxisLegacySnaps'],
+    ['Match Same Dimensions Only', 'dimensionSnapSameTypeOnly']
+  ];
+
+  it.each(TOGGLES)('%s writes its own setting and no other', (label, key) => {
+    // Each row is wired by hand, so the thing worth checking is that every
+    // one of them reaches for the right key.
+    const onChange = renderSection({ [key]: false } as Partial<AppSettings>);
+    fireEvent.click(control(label));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(key, true);
   });
 
-  it('calls onSettingChange when live grid snapping toggled', () => {
-    const onChange = vi.fn();
-    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
-    fireEvent.click(getSettingControl('Live Grid Snapping'));
-    expect(onChange).toHaveBeenCalledWith('liveGridSnap', true);
+  it.each(TOGGLES)('%s can be turned off again', (label, key) => {
+    const onChange = renderSection({ [key]: true } as Partial<AppSettings>);
+    fireEvent.click(control(label));
+    expect(onChange).toHaveBeenCalledWith(key, false);
   });
 
-  it('renders snap to origin checkbox', () => {
-    render(<SnappingSection formData={defaultFormData} onSettingChange={vi.fn()} />);
-    const checkbox = getSettingControl('Snap to Origin') as HTMLInputElement;
-    expect(checkbox.checked).toBe(true);
+  it('falls back to sensible defaults when a setting has never been chosen', () => {
+    // An older preferences file will not have these keys at all, and the
+    // panel must still show what the app is actually doing.
+    renderSection({ snapToOrigin: undefined, liveGridSnap: undefined });
+    expect(control('Snap to Origin').checked).toBe(true);
+    expect(control('Live Grid Snapping').checked).toBe(false);
   });
 
-  it('calls onSettingChange when snap to origin toggled', () => {
-    const onChange = vi.fn();
-    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
-    fireEvent.click(getSettingControl('Snap to Origin'));
-    expect(onChange).toHaveBeenCalledWith('snapToOrigin', false);
-  });
+  describe('the presets', () => {
+    it('records which preset was chosen', () => {
+      const onChange = renderSection();
+      fireEvent.change(control('Advanced Snap Preset'), { target: { value: 'layout' } });
+      expect(onChange).toHaveBeenCalledWith('advancedSnapPreset', 'layout');
+    });
 
-  it('renders match same dimensions only checkbox', () => {
-    render(<SnappingSection formData={defaultFormData} onSettingChange={vi.fn()} />);
-    const checkbox = getSettingControl('Match Same Dimensions Only') as HTMLInputElement;
-    expect(checkbox.checked).toBe(false);
-  });
+    it('simple keeps the everyday anchors and puts the rest away', () => {
+      // Someone who has not asked for layout tooling should not be met with
+      // guides appearing from everywhere.
+      const onChange = renderSection();
+      fireEvent.change(control('Advanced Snap Preset'), { target: { value: 'simple' } });
 
-  it('calls onSettingChange when match same dimensions toggled', () => {
-    const onChange = vi.fn();
-    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
-    fireEvent.click(getSettingControl('Match Same Dimensions Only'));
-    expect(onChange).toHaveBeenCalledWith('dimensionSnapSameTypeOnly', true);
-  });
+      expect(settingFrom(onChange, 'enableSurfaceAnchors')).toBe(true);
+      expect(settingFrom(onChange, 'enableFractionalAnchors')).toBe(true);
+      expect(settingFrom(onChange, 'enableGoldenRatioAnchors')).toBe(false);
+      expect(settingFrom(onChange, 'enableFeatureAnchors')).toBe(false);
+      expect(settingFrom(onChange, 'enableLayoutSnaps')).toBe(false);
+      expect(settingFrom(onChange, 'showSnapCandidates')).toBe(false);
+    });
 
-  it('defaults snap sensitivity to "normal" when undefined', () => {
-    const formData = { ...defaultFormData, snapSensitivity: undefined as never };
-    render(<SnappingSection formData={formData} onSettingChange={vi.fn()} />);
-    const select = getSettingControl('Snap Sensitivity') as HTMLInputElement;
-    expect(select.value).toBe('normal');
-  });
+    it('layout turns everything on, indicators included', () => {
+      const onChange = renderSection();
+      fireEvent.change(control('Advanced Snap Preset'), { target: { value: 'layout' } });
 
-  it('renders all sensitivity options', () => {
-    render(<SnappingSection formData={defaultFormData} onSettingChange={vi.fn()} />);
-    expect(screen.getByText('Tight (precise)')).toBeInTheDocument();
-    expect(screen.getByText('Normal')).toBeInTheDocument();
-    expect(screen.getByText('Loose (easier)')).toBeInTheDocument();
-  });
+      for (const key of [
+        'enableSurfaceAnchors',
+        'enableFractionalAnchors',
+        'enableGoldenRatioAnchors',
+        'enableFeatureAnchors',
+        'enableLayoutSnaps',
+        'enableEqualSpacingSnap',
+        'enableDistributionSnap',
+        'enablePatternSnap',
+        'enableAxisLegacySnaps',
+        'showSnapCandidates'
+      ]) {
+        expect(settingFrom(onChange, key)).toBe(true);
+      }
+    });
 
-  it('renders advanced preset control with precision default', () => {
-    render(<SnappingSection formData={defaultFormData} onSettingChange={vi.fn()} />);
-    const select = getSettingControl('Advanced Snap Preset') as HTMLInputElement;
-    expect(select.value).toBe('precision');
-  });
+    it('precision keeps the measured anchors and drops the decorative ones', () => {
+      const onChange = renderSection();
+      fireEvent.change(control('Advanced Snap Preset'), { target: { value: 'precision' } });
 
-  it('calls onSettingChange when advanced preset changes', () => {
-    const onChange = vi.fn();
-    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
-    fireEvent.change(getSettingControl('Advanced Snap Preset'), { target: { value: 'layout' } });
-    expect(onChange).toHaveBeenCalledWith('advancedSnapPreset', 'layout');
-    expect(onChange).toHaveBeenCalledWith('enableGoldenRatioAnchors', true);
-  });
+      expect(settingFrom(onChange, 'enableFeatureAnchors')).toBe(true);
+      expect(settingFrom(onChange, 'enableLayoutSnaps')).toBe(true);
+      expect(settingFrom(onChange, 'enableEqualSpacingSnap')).toBe(true);
+      // A golden-ratio line is a composition aid, not a measurement.
+      expect(settingFrom(onChange, 'enableGoldenRatioAnchors')).toBe(false);
+      expect(settingFrom(onChange, 'enableDistributionSnap')).toBe(false);
+      expect(settingFrom(onChange, 'enablePatternSnap')).toBe(false);
+    });
 
-  it('calls onSettingChange when surface anchors toggled', () => {
-    const onChange = vi.fn();
-    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
-    fireEvent.click(getSettingControl('Surface Anchors'));
-    expect(onChange).toHaveBeenCalledWith('enableSurfaceAnchors', false);
-  });
-
-  it('calls onSettingChange when fractional anchors toggled', () => {
-    const onChange = vi.fn();
-    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
-    fireEvent.click(getSettingControl('Fractional Face Anchors'));
-    expect(onChange).toHaveBeenCalledWith('enableFractionalAnchors', false);
-  });
-
-  it('calls onSettingChange when candidate indicators toggled', () => {
-    const onChange = vi.fn();
-    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
-    fireEvent.click(getSettingControl('Show Candidate Indicators'));
-    expect(onChange).toHaveBeenCalledWith('showSnapCandidates', true);
-  });
-
-  it('calls onSettingChange when golden ratio anchors toggled', () => {
-    const onChange = vi.fn();
-    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
-    fireEvent.click(getSettingControl('Golden Ratio Anchors'));
-    expect(onChange).toHaveBeenCalledWith('enableGoldenRatioAnchors', true);
-  });
-
-  it('calls onSettingChange when feature anchors toggled', () => {
-    const onChange = vi.fn();
-    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
-    fireEvent.click(getSettingControl('Feature Anchors'));
-    expect(onChange).toHaveBeenCalledWith('enableFeatureAnchors', false);
-  });
-
-  it('calls onSettingChange when layout snaps toggled', () => {
-    const onChange = vi.fn();
-    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
-    fireEvent.click(getSettingControl('Layout Snaps'));
-    expect(onChange).toHaveBeenCalledWith('enableLayoutSnaps', false);
-  });
-
-  it('calls onSettingChange when equal spacing snaps toggled', () => {
-    const onChange = vi.fn();
-    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
-    fireEvent.click(getSettingControl('Equal Spacing Snaps'));
-    expect(onChange).toHaveBeenCalledWith('enableEqualSpacingSnap', false);
-  });
-
-  it('calls onSettingChange when distribution snaps toggled', () => {
-    const onChange = vi.fn();
-    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
-    fireEvent.click(getSettingControl('Distribution Snaps'));
-    expect(onChange).toHaveBeenCalledWith('enableDistributionSnap', false);
-  });
-
-  it('calls onSettingChange when pattern snaps toggled', () => {
-    const onChange = vi.fn();
-    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
-    fireEvent.click(getSettingControl('Pattern Snaps'));
-    expect(onChange).toHaveBeenCalledWith('enablePatternSnap', false);
-  });
-
-  it('calls onSettingChange when axis edge/center snaps toggled', () => {
-    const onChange = vi.fn();
-    render(<SnappingSection formData={defaultFormData} onSettingChange={onChange} />);
-    fireEvent.click(getSettingControl('Axis Edge/Center Snaps'));
-    expect(onChange).toHaveBeenCalledWith('enableAxisLegacySnaps', false);
+    it('leaves the legacy axis snaps on whichever preset is chosen', () => {
+      // They are what plain axis-aligned dragging rests on, so no preset may
+      // quietly take them away.
+      for (const preset of ['simple', 'precision', 'layout'] as const) {
+        const onChange = renderSection();
+        fireEvent.change(control('Advanced Snap Preset'), { target: { value: preset } });
+        expect(settingFrom(onChange, 'enableAxisLegacySnaps')).toBe(true);
+        cleanup();
+      }
+    });
   });
 });

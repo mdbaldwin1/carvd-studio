@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 import { useProjectStore } from '../store/projectStore';
 import { useUIStore } from '../store/uiStore';
+import { useCameraStore } from '../store/cameraStore';
 
 // Mock fileFormat
 vi.mock('../utils/fileFormat', () => ({
@@ -246,6 +247,32 @@ describe('useAutoRecovery', () => {
       vi.useRealTimers();
     });
 
+    it('keeps the recovery deadline while dirty project and camera state keep changing', async () => {
+      vi.useFakeTimers();
+      try {
+        useProjectStore.setState({ isDirty: true });
+        renderHook(() => useAutoRecovery());
+        for (let step = 1; step <= 3; step++) {
+          await act(async () => {
+            await vi.advanceTimersByTimeAsync(30000);
+          });
+          act(() => {
+            useProjectStore.setState({ projectName: `Working ${step}` });
+            useCameraStore
+              .getState()
+              .setCameraState({ position: { x: step, y: 4, z: 5 }, target: { x: 0, y: 0, z: 0 } });
+          });
+        }
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(30000);
+        });
+        expect(window.electronAPI.saveRecoveryFile).toHaveBeenCalledOnce();
+        expect(serializeProject).toHaveBeenLastCalledWith(expect.objectContaining({ projectName: 'Working 3' }));
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
     it('does not save when project is clean', async () => {
       vi.useFakeTimers();
       useProjectStore.setState({ isDirty: false });
@@ -259,6 +286,43 @@ describe('useAutoRecovery', () => {
       expect(window.electronAPI.saveRecoveryFile).not.toHaveBeenCalled();
       vi.useRealTimers();
     });
+  });
+
+  it('drains recovery writes before close deletion and prevents later timer resurrection', async () => {
+    vi.useFakeTimers();
+    try {
+      useProjectStore.setState({ isDirty: true });
+      let finishWrite!: () => void;
+      vi.mocked(window.electronAPI.saveRecoveryFile).mockImplementationOnce(
+        () =>
+          new Promise<string>((resolve) => {
+            finishWrite = () => resolve('saved');
+          })
+      );
+      const { result } = renderHook(() => useAutoRecovery());
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(120000);
+      });
+      expect(window.electronAPI.saveRecoveryFile).toHaveBeenCalledOnce();
+      const sessionFile = vi.mocked(window.electronAPI.saveRecoveryFile).mock.calls[0][0];
+      let closing!: Promise<unknown>;
+      act(() => {
+        closing = result.current.prepareRecoveryForClose();
+      });
+      await flushPromises();
+      expect(window.electronAPI.deleteRecoveryFile).not.toHaveBeenCalled();
+      await act(async () => {
+        finishWrite();
+        await closing;
+      });
+      expect(window.electronAPI.deleteRecoveryFile).toHaveBeenCalledExactlyOnceWith(sessionFile);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(240000);
+      });
+      expect(window.electronAPI.saveRecoveryFile).toHaveBeenCalledOnce();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   describe('clearRecovery', () => {

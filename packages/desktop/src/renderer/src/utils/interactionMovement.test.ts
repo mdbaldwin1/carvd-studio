@@ -3,6 +3,7 @@ import type { GroupMember, Part } from '../types';
 import {
   applyGroundConstraintToDelta,
   resolveConstrainedMoveDelta,
+  resolveCanvasPartDragFallback,
   resolveGroupReleaseMove,
   resolveMoveSelection,
   resolveResizeReleaseMove,
@@ -61,6 +62,33 @@ const groupMembers: GroupMember[] = [
 ];
 
 describe('interactionMovement', () => {
+  it('keeps or restores group ownership before using the direct-part canvas fallback', () => {
+    expect(
+      resolveCanvasPartDragFallback({
+        isSelectedGroupHit: true,
+        activeMoveOwner: 'group'
+      })
+    ).toBe('keep-group-owner');
+    expect(
+      resolveCanvasPartDragFallback({
+        isSelectedGroupHit: true,
+        activeMoveOwner: null
+      })
+    ).toBe('start-group-owner');
+    expect(
+      resolveCanvasPartDragFallback({
+        isSelectedGroupHit: true,
+        activeMoveOwner: 'part'
+      })
+    ).toBe('start-group-owner');
+    expect(
+      resolveCanvasPartDragFallback({
+        isSelectedGroupHit: false,
+        activeMoveOwner: null
+      })
+    ).toBe('start-part-owner');
+  });
+
   it('uses the full transform selection to resolve affected parts and anchor', () => {
     const result = resolveMoveSelection(
       {
@@ -113,7 +141,7 @@ describe('interactionMovement', () => {
     const raisedParts: Part[] = [
       {
         ...parts[0],
-        position: { x: 0, y: 0.25, z: 0 },
+        position: { x: 0, y: 1, z: 0 },
         thickness: 2
       },
       {
@@ -125,7 +153,7 @@ describe('interactionMovement', () => {
 
     const constrained = applyGroundConstraintToDelta(raisedParts, ['p-parent', 'p-a1'], { x: 1, y: -1, z: 2 });
 
-    expect(constrained).toEqual({ x: 1, y: 0.75, z: 2 });
+    expect(constrained).toEqual({ x: 1, y: 0, z: 2 });
   });
 
   it('clamps overlap-prone movement to a safe grounded delta', () => {
@@ -265,6 +293,34 @@ describe('interactionMovement', () => {
 
     expect(result.position.y).toBeGreaterThanOrEqual(1);
     expect(result.delta).toEqual({ x: 1, y: 0, z: 0 });
+  });
+
+  it.each([-5, -3.75])('allows withdrawing and reseating an underside assembly at Y=%s', (y) => {
+    const part = {
+      ...parts[0],
+      id: 'underside',
+      length: 8,
+      width: 8,
+      thickness: 0.75,
+      rotation: { x: 0, y: 0, z: -90 },
+      position: { x: -0.625, y: -3.75, z: 0 }
+    };
+    const position = { ...part.position, y };
+    const preview = resolveSinglePartPreviewMove({
+      part,
+      projectParts: [part],
+      proposedPosition: position,
+      proposedDelta: { x: 0, y: y - part.position.y, z: 0 }
+    });
+    expect(preview.position).toEqual(position);
+    const release = resolveSinglePartReleaseMove({
+      part,
+      projectParts: [part],
+      proposedPosition: preview.position,
+      preventOverlap: true
+    });
+    expect(release.position).toEqual(position);
+    expect(release.collisionBlocked).toBe(false);
   });
 
   it('resolves a resize release position through the ground constraint', () => {

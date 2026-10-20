@@ -1,5 +1,5 @@
+import { formatStockMeasurement } from '@renderer/utils/stockMeasurements';
 import { Stock } from '../../types';
-import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { type KeyboardEvent } from 'react';
 
 interface StockListItemProps {
@@ -31,8 +31,8 @@ export function StockListItem({ stock, units, selected, highlighted = false, onC
       <div className="flex flex-col min-w-0">
         <span className="text-xs whitespace-nowrap overflow-hidden text-ellipsis">{stock.name}</span>
         <span className="text-[10px] text-text-muted">
-          {formatMeasurementWithUnit(stock.length, units)} × {formatMeasurementWithUnit(stock.width, units)} ×{' '}
-          {formatMeasurementWithUnit(stock.thickness, units)}
+          {formatStockMeasurement(stock.length, stock, units)} × {formatStockMeasurement(stock.width, stock, units)} ×{' '}
+          {formatStockMeasurement(stock.thickness, stock, units)}
         </span>
       </div>
     </li>

@@ -1,3 +1,4 @@
+import { createEmptyReferenceInteractionState } from '../store/interactionStore';
 import { describe, expect, it } from 'vitest';
 import type { Part } from '../types';
 import {
@@ -28,9 +29,11 @@ describe('interactionOverlay', () => {
   it('resolves move preview positions for affected parts', () => {
     const preview = resolvePartInteractionPreview(part(), {
       kind: 'move',
+      moveOwner: 'part',
       affectedPartIds: ['part-1'],
       primaryPartId: 'part-1',
-      delta: { x: 2, y: 3, z: 4 }
+      delta: { x: 2, y: 3, z: 4 },
+      referenceState: createEmptyReferenceInteractionState()
     });
 
     expect(preview.position).toEqual({ x: 2, y: 3.5, z: 4 });
@@ -45,7 +48,8 @@ describe('interactionOverlay', () => {
       primaryPartId: 'part-1',
       handle: { x: 1, y: 0, z: 1, type: 'edge-y' },
       dimensions: { length: 12, width: 6, thickness: 1 },
-      position: { x: 1, y: 0.5, z: 1 }
+      position: { x: 1, y: 0.5, z: 1 },
+      referenceState: createEmptyReferenceInteractionState()
     });
 
     expect(preview.position).toEqual({ x: 1, y: 0.5, z: 1 });
@@ -80,6 +84,7 @@ describe('interactionOverlay', () => {
   it('shows reference indicators during an active session when candidate relations exist', () => {
     const moveSession = {
       kind: 'move' as const,
+      moveOwner: 'part' as const,
       affectedPartIds: ['p1'],
       primaryPartId: 'p1',
       delta: { x: 1, y: 0, z: 0 },

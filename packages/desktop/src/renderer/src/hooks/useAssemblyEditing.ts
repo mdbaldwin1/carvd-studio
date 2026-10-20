@@ -15,6 +15,8 @@ import { v4 as uuidv4 } from 'uuid';
 import { hasUnsavedChanges } from '../utils/fileOperations';
 import { logger } from '../utils/logger';
 import { getFeatureLimits, getBlockedMessage } from '../utils/featureLimits';
+import { clonePartFeaturesForCopy, getAssemblyPartCopyMap, normalizePart } from '../utils/partFeatures';
+import { validateDowelRelationships } from '../utils/dowelJointUtils';
 
 interface UseAssemblyEditingResult {
   // State
@@ -97,7 +99,10 @@ function assemblyToEditableParts(
   }
 
   // Create parts with new IDs and resolved stock references
-  const parts: Part[] = assembly.parts.map((cp) => {
+  const newIds = assembly.parts.map(() => uuidv4());
+  const copyMap = getAssemblyPartCopyMap(assembly.parts, newIds);
+  const jointIds = new Map<string, string>();
+  const parts: Part[] = assembly.parts.map((cp, index) => {
     // Resolve the stockId
     let resolvedStockId: string | null = cp.stockId;
     if (cp.stockId && stockIdResolutionMap.has(cp.stockId)) {
@@ -105,8 +110,8 @@ function assemblyToEditableParts(
       resolvedStockId = resolved || null;
     }
 
-    return {
-      id: uuidv4(),
+    return normalizePart({
+      id: newIds[index],
       name: cp.name,
       length: cp.length,
       width: cp.width,
@@ -123,8 +128,9 @@ function assemblyToEditableParts(
       color: cp.color,
       notes: cp.notes,
       extraLength: cp.extraLength,
-      extraWidth: cp.extraWidth
-    };
+      extraWidth: cp.extraWidth,
+      features: clonePartFeaturesForCopy(cp.features, copyMap, jointIds)
+    });
   });
 
   // Create groups with new IDs
@@ -232,6 +238,12 @@ export function useAssemblyEditing(): UseAssemblyEditingResult {
     if (!editingAssemblyId) {
       logger.error('[saveAndExit] No editingAssemblyId');
       showToast('No assembly to save', 'warning');
+      return;
+    }
+
+    const dowelErrors = validateDowelRelationships(useProjectStore.getState().parts);
+    if (dowelErrors.length > 0) {
+      showToast(`Cannot save assembly: ${dowelErrors.join(' ')}`, 'error');
       return;
     }
 

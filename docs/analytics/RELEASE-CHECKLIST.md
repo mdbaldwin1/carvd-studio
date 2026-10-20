@@ -24,7 +24,7 @@ In the Dev project, intentionally perform each trigger once. For every row in th
 - [ ] Check prohibited examples are absent. Inspect PostHog-added `$` properties separately.
 - [ ] Confirm the event occurs once at the documented successful/failed boundary and not on canceled or rejected operations.
 
-Explicitly exercise: a settings grant (the only `analytics_consent_changed` source); verify onboarding grant and all denials emit no consent-change event; both onboarding-completion sources; start-screen/menu/template creation; initial/manual/auto/save-as; successful and failed cut list; every export type success/failure; every checkout surface/license mode; successful activation; representative page routes; both download platforms at every location; every website checkout location; and a Lemon Squeezy test-mode purchase. For each desktop event verify trusted `$os` and `app_version` exist and cannot be spoofed from renderer properties.
+Explicitly exercise: a settings grant (the only `analytics_consent_changed` source); verify onboarding grant and all denials emit no consent-change event; both onboarding-completion sources; start-screen/menu/template creation; initial/manual/auto/save-as; successful and failed cut list; every export type success/failure; every checkout surface/license mode; successful activation; Part Cuts opened from Properties and the context menu; successful Part Cuts saves across representative operation-count buckets; representative page routes; every download platform at every location; every website checkout location; and a Lemon Squeezy test-mode purchase. For each desktop event verify trusted `$os` and `app_version` exist and cannot be spoofed from renderer properties.
 
 ## Desktop privacy and resilience
 
@@ -35,6 +35,7 @@ Explicitly exercise: a settings grant (the only `analytics_consent_changed` sour
 - [ ] Restart online: queued UUIDs deliver exactly once with the same installation identity.
 - [ ] In a packaged build, revoke while offline: queued events and installation identity are synchronously deleted; relaunch remains denied and core workflows remain available.
 - [ ] Malicious/unknown property injection is stripped or rejects the event; raw delivered JSON contains no injected key.
+- [ ] Custom Cuts events contain only the cataloged source/count bucket and never include part names, IDs, cut types, labels, dimensions, targets, or parameters.
 - [ ] Packaged app exposes no analytics test-control IPC or preload methods.
 
 ## Website behavior

@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
+import type { RectCutFeature } from '../../types';
+import { describe, expect, it, vi } from 'vitest';
 
 // Use real Three.js so rotation math actually works in getPartAABB tests
 vi.unmock('three');
@@ -12,7 +13,8 @@ import {
   setWorkspaceCursor,
   getPartAABB,
   bindWindowPointerSession,
-  createPointerRafQueue
+  createPointerRafQueue,
+  getPlaneSnapAxes
 } from './workspaceUtils';
 import { createGeometryCache } from '../../interaction/geometry/cache';
 import { createTestPart } from '../../../../../tests/helpers/factories';
@@ -22,6 +24,12 @@ import { createTestPart } from '../../../../../tests/helpers/factories';
 // ============================================================
 
 describe('workspaceUtils', () => {
+  it('keeps snaps in the visible plane for straight-on views', () => {
+    expect(getPlaneSnapAxes({ x: 0, y: -1, z: 0 })).toEqual({ x: true, y: false, z: true });
+    expect(getPlaneSnapAxes({ x: 1, y: 0, z: 0 })).toEqual({ x: false, y: true, z: true });
+    expect(getPlaneSnapAxes({ x: 0, y: 0, z: -1 })).toEqual({ x: true, y: true, z: false });
+    expect(getPlaneSnapAxes({ x: 0.6, y: 0.8, z: 0 })).toEqual({ x: true, y: true, z: true });
+  });
   describe('LIGHTING_PRESETS', () => {
     it('defines all four lighting modes', () => {
       expect(LIGHTING_PRESETS.default).toBeDefined();
@@ -196,6 +204,31 @@ describe('workspaceUtils', () => {
     });
   });
 
+  it('flushes the last pointer sample before release even when no animation frame ran', () => {
+    let callback: (() => void) | undefined;
+    const target = {
+      requestAnimationFrame: vi.fn((cb: () => void) => {
+        callback = cb;
+        return 1;
+      }),
+      cancelAnimationFrame: vi.fn()
+    };
+    const apply = vi.fn();
+    const queue = createPointerRafQueue(target, apply);
+    queue.schedule({ clientX: 10 } as PointerEvent);
+    queue.schedule({ clientX: 90 } as PointerEvent);
+    queue.flush();
+    expect(apply).toHaveBeenCalledExactlyOnceWith({ clientX: 90 });
+    expect(target.cancelAnimationFrame).toHaveBeenCalledWith(1);
+    callback?.();
+    queue.flush();
+    expect(apply).toHaveBeenCalledTimes(1);
+    queue.schedule({ clientX: 100 } as PointerEvent);
+    queue.cancel();
+    queue.flush();
+    expect(apply).toHaveBeenCalledTimes(1);
+  });
+
   // Right-click target globals were removed in Phase 3b cleanup — context
   // menu routing now flows through the session controller and hit-test
   // service. See ADR-002 + ADR-003.
@@ -334,6 +367,38 @@ describe('workspaceUtils', () => {
       expect(aabb.maxY).toBeCloseTo(4);
       expect(aabb.minZ).toBeCloseTo(0);
       expect(aabb.maxZ).toBeCloseTo(4);
+    });
+
+    it('accounts for feature-backed shapes', () => {
+      const part = {
+        position: { x: 10, y: 2, z: -3 },
+        rotation: { x: 0, y: 0, z: 0 },
+        length: 24,
+        width: 12,
+        thickness: 0.75,
+        features: [
+          {
+            id: 'feature-1',
+            kind: 'rect_cut',
+            version: 1 as const,
+            enabled: true,
+            target: { type: 'corner', corner: 'front_left_corner' },
+            reference: { primaryFrom: 'min', secondaryFrom: 'min' },
+            cutType: 'corner_notch',
+            parameters: {
+              size: { length: 2, width: 2 },
+              depthMode: 'through'
+            },
+            placement: { x: 0, z: 0 }
+          } satisfies RectCutFeature
+        ]
+      };
+
+      const aabb = getPartAABB(part);
+      expect(aabb.minX).toBeCloseTo(-2);
+      expect(aabb.maxX).toBeCloseTo(22);
+      expect(aabb.minZ).toBeCloseTo(-9);
+      expect(aabb.maxZ).toBeCloseTo(3);
     });
 
     it('can derive local bounds from the geometry bundle cache', () => {

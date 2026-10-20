@@ -12,12 +12,17 @@ import { useSelectionStore } from '../../store/selectionStore';
 import { useSnapStore } from '../../store/snapStore';
 import { useUIStore } from '../../store/uiStore';
 import { useCameraStore } from '../../store/cameraStore';
+import { hasRenderablePartFeatures } from '../../utils/partFeatureGeometry';
+import { getPartShape } from '../../utils/partShape';
 import { Part } from './Part';
 import { InstancedParts } from './InstancedParts';
 import { useWorkspaceSceneGraph } from '../../interaction/useWorkspaceSceneGraph';
+import { getDowelVisualizations } from '../../utils/dowelJointUtils';
+import { DowelVisualizations } from './DowelVisualizations';
 
 export function PartsRenderer() {
   const parts = useProjectStore((s) => s.parts);
+  const stocks = useProjectStore((s) => s.stocks);
   const selectedPartIds = useSelectionStore((s) => s.selectedPartIds);
   const selectedGroupIds = useSelectionStore((s) => s.selectedGroupIds);
   const hoveredPartId = useSelectionStore((s) => s.hoveredPartId);
@@ -66,6 +71,15 @@ export function PartsRenderer() {
       }
     }
 
+    // Feature-bearing parts use the dedicated geometry path instead of instancing.
+    // Round parts do too: the instanced draw shares one unit cube, which cannot
+    // represent a dowel.
+    for (const part of parts) {
+      if (hasRenderablePartFeatures(part) || getPartShape(part, stocks) === 'round') {
+        individualIds.add(part.id);
+      }
+    }
+
     // Group-selected parts: stay instanced (no individual rendering needed).
     // ADR-008: descendantPartIds comes from the scene graph adapter — same
     // semantics as legacy getAllDescendantPartIds, memoized once per scene
@@ -83,6 +97,7 @@ export function PartsRenderer() {
     return { individualPartIdSet: individualIds };
   }, [
     parts,
+    stocks,
     selectedPartIds,
     selectedGroupIds,
     hoveredPartId,
@@ -119,6 +134,8 @@ export function PartsRenderer() {
     }
     return { instancedParts: instanced, individualParts: individual };
   }, [parts, individualPartIdSet, displayMode]);
+  // Keep legacy joint overlays visible until converted to ordinary dowel parts.
+  const dowelVisualizations = useMemo(() => getDowelVisualizations(parts), [parts]);
 
   return (
     <>
@@ -133,6 +150,7 @@ export function PartsRenderer() {
           isStockHighlighted={!!selectedSidebarStockId && part.stockId === selectedSidebarStockId}
         />
       ))}
+      <DowelVisualizations visualizations={dowelVisualizations} />
     </>
   );
 }

@@ -2,7 +2,7 @@ import { Billboard, Line, Text } from '@react-three/drei';
 import { Suspense } from 'react';
 import { memo } from 'react';
 import * as THREE from 'three';
-import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { formatReadableMeasurement } from '../../utils/fractions';
 import labelFontUrl from '../../assets/fonts/NotoSans-Variable.ttf?url';
 
 const NOOP_RAYCAST: THREE.Object3D['raycast'] = () => {};
@@ -59,7 +59,7 @@ export const DimensionLabel = memo(
     ];
     const offsetEnd: [number, number, number] = [end[0] + offsetVec[0], end[1] + offsetVec[1], end[2] + offsetVec[2]];
     const labelPos: [number, number, number] = [midX + offsetVec[0], midY + offsetVec[1], midZ + offsetVec[2]];
-    const labelText = formatMeasurementWithUnit(value, units);
+    const labelText = formatReadableMeasurement(value, units);
     const lineLength = Math.sqrt(
       (offsetEnd[0] - offsetStart[0]) ** 2 + (offsetEnd[1] - offsetStart[1]) ** 2 + (offsetEnd[2] - offsetStart[2]) ** 2
     );

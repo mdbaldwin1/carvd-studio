@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useSyncExternalStore } from 'react';
 import { Stock } from '../types';
 import { logger } from '../utils/logger';
+import { resolveStockForm } from '../../../shared/stock';
 
 // Singleton state for stock library (shared across all hook instances)
 let stockLibraryState: Stock[] = [];
@@ -25,6 +26,19 @@ function getStockLibraryLoadingSnapshot() {
   return stockLibraryLoading;
 }
 
+/**
+ * Fill in fields the stored library predates.
+ *
+ * The stock library lives in electron-store with no schema version and no
+ * migration hook, so an install that predates a field hands back records
+ * missing it. Normalising here is the only chance to catch that before the
+ * value reaches the rest of the app as undefined.
+ */
+function normalizeStoredStock(library: unknown): Stock[] {
+  if (!Array.isArray(library)) return [];
+  return (library as Stock[]).map((stock) => ({ ...stock, form: resolveStockForm(stock) }));
+}
+
 // Initialize the singleton listener (called once)
 function initStockLibrarySingleton() {
   if (stockLibraryInitialized) return;
@@ -34,7 +48,7 @@ function initStockLibrarySingleton() {
   window.electronAPI
     .getPreference('stockLibrary')
     .then((library) => {
-      stockLibraryState = (library as Stock[]) || [];
+      stockLibraryState = normalizeStoredStock(library);
       stockLibraryLoading = false;
       notifyStockSubscribers();
     })
@@ -48,7 +62,7 @@ function initStockLibrarySingleton() {
   // Set up singleton listener for cross-instance changes
   window.electronAPI.onSettingsChanged((changes) => {
     if ('stockLibrary' in changes) {
-      stockLibraryState = (changes.stockLibrary as Stock[]) || [];
+      stockLibraryState = normalizeStoredStock(changes.stockLibrary);
       notifyStockSubscribers();
     }
   });
@@ -75,7 +89,9 @@ export function useStockLibrary() {
     const unsubscribe = subscribeToStockLibrary(() => {
       setIsLoading(getStockLibraryLoadingSnapshot());
     });
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   // Save stock library whenever it changes

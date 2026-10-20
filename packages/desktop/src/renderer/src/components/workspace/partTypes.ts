@@ -58,6 +58,12 @@ export const HANDLE_POSITIONS: HandlePosition[] = [
   { x: 1, y: 1, z: 0, type: 'edge-z' }
 ];
 
+/** Round blanks can be cut to length, but their diameter is fixed by stock. */
+export const LENGTH_HANDLE_POSITIONS: HandlePosition[] = [
+  { x: -1, y: 0, z: 0, type: 'edge-y' },
+  { x: 1, y: 0, z: 0, type: 'edge-y' }
+];
+
 export const HANDLE_SIZE = 0.45; // Slightly larger for better visibility
 
 // Resize handle colors aligned to Twilight Studio theme tokens
@@ -85,7 +91,27 @@ export const ROTATION_COLORS = {
 // Squared to avoid sqrt per part each render
 export const GRAIN_ARROW_MAX_DISTANCE_SQ = 150 * 150;
 
-// Snap to grid helper
-export const snapToGrid = (value: number): number => {
-  return Math.round(value / GRID_SIZE) * GRID_SIZE;
+/**
+ * Round to the project's grid.
+ *
+ * The increment is passed in rather than read from the module constant: the
+ * project carries a Grid Size that the maker chose, and dragging, resizing and
+ * the drawn grid all have to mean the same thing by it. GRID_SIZE remains the
+ * default so a caller that has no project in hand still behaves as before.
+ */
+export const snapToGrid = (value: number, gridSize: number = GRID_SIZE): number => {
+  const increment = gridSize > 0 ? gridSize : GRID_SIZE;
+  return Math.round(value / increment) * increment;
 };
+
+export const resolveLiveGridReleasePosition = (
+  position: { x: number; y: number; z: number },
+  snappedAxes: { x: boolean; y: boolean; z: boolean },
+  liveGridSnap: boolean,
+  gridSize: number = GRID_SIZE,
+  activeAxes = { x: true, y: true, z: true }
+): { x: number; y: number; z: number } => ({
+  x: !activeAxes.x || snappedAxes.x || !liveGridSnap ? position.x : snapToGrid(position.x, gridSize),
+  y: !activeAxes.y || snappedAxes.y || !liveGridSnap ? position.y : snapToGrid(position.y, gridSize),
+  z: !activeAxes.z || snappedAxes.z || !liveGridSnap ? position.z : snapToGrid(position.z, gridSize)
+});

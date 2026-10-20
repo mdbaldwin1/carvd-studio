@@ -34,7 +34,7 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
   const [isLoading, setIsLoading] = useState(false);
 
   // Use individual selectors to avoid creating new object references
-  const projectName = useProjectStore((s) => s.name);
+  const projectName = useProjectStore((s) => s.projectName);
   const parts = useProjectStore((s) => s.parts);
   const licenseMode = useLicenseStore((s) => s.licenseMode);
   const canUseCustomTemplates = getFeatureLimits(licenseMode).canUseCustomTemplates;
@@ -148,7 +148,7 @@ export function TemplateBrowserModal({ isOpen, onClose, onCreateProject }: Templ
     // Get the full project state (reuse projectStore from license check above)
     const fullProject: Project = {
       version: '1.0',
-      name: projectState.name,
+      name: projectState.projectName,
       stocks: projectState.stocks,
       parts: projectState.parts,
       groups: projectState.groups,

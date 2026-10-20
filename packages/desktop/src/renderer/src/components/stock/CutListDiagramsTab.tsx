@@ -12,7 +12,7 @@ import { getAncestorGroupIds } from '../../utils/interactionSelection';
 import { showSavedFileToast } from '../../utils/fileToast';
 import { logger } from '../../utils/logger';
 import { analytics } from '../../utils/analytics';
-import { formatMeasurementWithUnit } from '../../utils/fractions';
+import { formatFabricationMeasurement as formatMeasurementWithUnit } from '../../utils/fractions';
 import { CutList, CutPlacement, StockBoard } from '../../types';
 import { DropdownButton, DropdownItem } from '../common/DropdownButton';
 import { StockBoardDiagram } from './StockBoardDiagram';
@@ -34,16 +34,22 @@ export function CutListDiagramsTab({
   const [zoom, setZoom] = useState(1);
   const [selectedPlacement, setSelectedPlacement] = useState<CutPlacement | null>(null);
 
-  // Group boards by stock
+  // Group boards by stock. Round stock is left out: a cutting diagram for a
+  // dowel is a 36" by 3/8" sliver that tells you nothing you could not read
+  // off the cut list, and drawing it squeezes the real diagrams.
   const boardsByStock = useMemo(() => {
+    const rodStockIds = new Set(
+      cutList.statistics.byStock.filter((summary) => summary.form === 'rod').map((summary) => summary.stockId)
+    );
     const map = new Map<string, StockBoard[]>();
     for (const board of cutList.stockBoards) {
+      if (rodStockIds.has(board.stockId)) continue;
       const existing = map.get(board.stockId) || [];
       existing.push(board);
       map.set(board.stockId, existing);
     }
     return map;
-  }, [cutList.stockBoards]);
+  }, [cutList.stockBoards, cutList.statistics.byStock]);
 
   const handleExportPdf = useCallback(async () => {
     // Check license limits for PDF export
@@ -127,9 +133,15 @@ export function CutListDiagramsTab({
     <>
       <div className="cut-list-diagrams-tab flex flex-col flex-1 min-h-0 overflow-hidden">
         <div className="flex items-center justify-between py-2 px-0 mb-2 shrink-0">
-          <span className="text-[12px] text-text-muted">
-            {cutList.stockBoards.length} board{cutList.stockBoards.length !== 1 ? 's' : ''} needed
-          </span>
+          <div className="flex flex-col gap-0.5">
+            <span className="text-[12px] text-text-muted">
+              {cutList.stockBoards.length} board{cutList.stockBoards.length !== 1 ? 's' : ''} needed
+            </span>
+            <span className="text-[11px] text-text-muted">
+              Select a board for part dimensions and detail. Diagrams show blank breakdown only; apply operations after
+              cutting blanks to size.
+            </span>
+          </div>
           <DropdownButton label="Download" icon={<Download size={14} />} items={downloadItems} />
         </div>
 
@@ -173,11 +185,21 @@ export function CutListDiagramsTab({
             <div className="flex-1 min-h-0 flex flex-col gap-3 px-5 py-4 bg-bg-alt">
               <div className="flex items-center gap-2">
                 <span className="text-xs text-text-muted">Zoom</span>
-                <Button size="sm" variant="secondary" onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  aria-label="Zoom out"
+                  onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}
+                >
                   <Minus size={14} />
                 </Button>
                 <span className="min-w-14 text-center text-xs font-medium">{Math.round(zoom * 100)}%</span>
-                <Button size="sm" variant="secondary" onClick={() => setZoom((z) => Math.min(4, z + 0.25))}>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  aria-label="Zoom in"
+                  onClick={() => setZoom((z) => Math.min(4, z + 0.25))}
+                >
                   <Plus size={14} />
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setZoom(1)}>

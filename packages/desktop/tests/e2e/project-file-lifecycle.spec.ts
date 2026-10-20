@@ -1,3 +1,4 @@
+import { waitForJsonFile } from './helpers/files';
 import { expect, test } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
@@ -9,6 +10,7 @@ import {
   launchElectronApp,
   queueOpenPaths,
   queueSavePath,
+  renameProjectFromHeader,
   waitForAppReady,
   type RunningElectronApp
 } from './helpers/electron-app';
@@ -25,6 +27,27 @@ test.describe('project file lifecycle', () => {
     await closeElectronApp(running);
   });
 
+  test('renames the project from the header, which is the only naming UI', async () => {
+    const { window } = running;
+
+    // The New Project dialog has no name field: a project is Untitled until
+    // the first save takes its name from the file, and this editor is how it
+    // is named before then.
+    await renameProjectFromHeader(window, 'Renamed From Header');
+
+    expect((await getProjectSnapshot(window)).projectName).toBe('Renamed From Header');
+    await expect(window.locator('.project-name')).toContainText('Renamed From Header');
+
+    // Escape abandons an edit rather than committing a half-typed name.
+    await window.locator('.project-name').click();
+    const input = window.locator('.header-name-editor input');
+    await expect(input).toBeVisible();
+    await input.fill('Abandoned');
+    await input.press('Escape');
+
+    expect((await getProjectSnapshot(window)).projectName).toBe('Renamed From Header');
+  });
+
   test('saves, opens, records recents, and saves as a new project file', async () => {
     const { window, userDataDir } = running;
     const firstPath = path.join(userDataDir, 'lifecycle-original.carvd');
@@ -33,11 +56,12 @@ test.describe('project file lifecycle', () => {
     await addPartFromSidebar(window);
     await queueSavePath(window, firstPath);
     await pressShortcut(window, 's');
-    await expect.poll(() => fs.existsSync(firstPath), { timeout: 5000 }).toBe(true);
-
-    const firstFile = readCarvdFile(firstPath);
-    expect(firstFile.project.name).toBe('lifecycle-original');
-    expect(firstFile.parts).toHaveLength(1);
+    // File creation precedes completion of the asynchronous write on Windows.
+    await expect(() => {
+      const firstFile = readCarvdFile(firstPath);
+      expect(firstFile.project.name).toBe('lifecycle-original');
+      expect(firstFile.parts).toHaveLength(1);
+    }).toPass({ timeout: 5000 });
     await expect.poll(async () => window.evaluate(() => window.electronAPI.getRecentProjects())).toContain(firstPath);
 
     await window.getByRole('button', { name: 'Carvd Studio home' }).click();
@@ -50,11 +74,57 @@ test.describe('project file lifecycle', () => {
 
     await queueSavePath(window, secondPath);
     await pressShortcut(window, 's', { shift: true });
-    await expect.poll(() => fs.existsSync(secondPath), { timeout: 5000 }).toBe(true);
-    expect(readCarvdFile(secondPath).project.name).toBe('lifecycle-renamed');
+    await expect(() => {
+      expect(readCarvdFile(secondPath).project.name).toBe('lifecycle-renamed');
+    }).toPass({ timeout: 5000 });
     await expect
       .poll(async () => window.evaluate(() => window.electronAPI.getRecentProjects()))
       .toEqual(expect.arrayContaining([secondPath, firstPath]));
+  });
+
+  test('savepoint Undo protects unsaved changes on native close and Redo returns clean', async () => {
+    const { window, userDataDir } = running;
+    const filePath = path.join(userDataDir, 'undo-savepoint.carvd');
+    await addPartFromSidebar(window);
+    await queueSavePath(window, filePath);
+    await pressShortcut(window, 's');
+    await waitForJsonFile(filePath);
+    await expect.poll(() => window.evaluate(() => window.useProjectStore.getState().isDirty)).toBe(false);
+
+    await renameProjectFromHeader(window, 'Saved renamed project');
+    await pressShortcut(window, 's');
+    // The existing file can be truncated while the asynchronous save rewrites
+    // it. Retry the complete read/parse/assertion until the new save is visible.
+    await expect(async () => {
+      expect(readCarvdFile(filePath).project.name).toBe('Saved renamed project');
+    }).toPass({ timeout: 30000 });
+    await expect.poll(() => window.evaluate(() => window.useProjectStore.getState().isDirty)).toBe(false);
+    await expect(window.locator('.dirty-indicator')).toHaveCount(0);
+    const savedFile = fs.readFileSync(filePath, 'utf8');
+
+    await pressShortcut(window, 'z');
+    await expect.poll(() => window.evaluate(() => window.useProjectStore.getState().isDirty)).toBe(true);
+    await expect(window.locator('.dirty-indicator')).toBeVisible();
+    await expect.poll(async () => (await getProjectSnapshot(window)).projectName).toBe('undo-savepoint');
+    await running.electronApp.evaluate(({ BrowserWindow }) => {
+      const editor = BrowserWindow.getAllWindows().find(
+        (candidate) => !candidate.webContents.getURL().includes('splash')
+      );
+      if (!editor) throw new Error('Missing editor window');
+      editor.close();
+    });
+    const dialog = window.getByRole('alertdialog', { name: 'Unsaved Changes' });
+    await expect(dialog).toBeVisible();
+    await dialog.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    expect(window.isClosed()).toBe(false);
+    expect(fs.readFileSync(filePath, 'utf8')).toBe(savedFile);
+
+    await pressShortcut(window, 'z', { shift: true });
+    await expect.poll(async () => (await getProjectSnapshot(window)).projectName).toBe('Saved renamed project');
+    await expect.poll(() => window.evaluate(() => window.useProjectStore.getState().isDirty)).toBe(false);
+    await expect(window.locator('.dirty-indicator')).toHaveCount(0);
+    expect(fs.readFileSync(filePath, 'utf8')).toBe(savedFile);
   });
 
   test('unsaved home dialog supports cancel, discard, and save branches', async () => {
@@ -81,7 +151,7 @@ test.describe('project file lifecycle', () => {
     await window.getByRole('button', { name: 'Carvd Studio home' }).click();
     await expect(dialog).toBeVisible();
     await dialog.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect.poll(() => fs.existsSync(savedPath), { timeout: 5000 }).toBe(true);
+    await waitForJsonFile(savedPath, 5000);
     await expect(window.locator('.start-screen')).toBeVisible();
     expect(readCarvdFile(savedPath).parts).toHaveLength(1);
   });
@@ -92,7 +162,7 @@ test.describe('project file lifecycle', () => {
 
     await queueSavePath(window, projectPath);
     await pressShortcut(window, 's');
-    await expect.poll(() => fs.existsSync(projectPath), { timeout: 5000 }).toBe(true);
+    await waitForJsonFile(projectPath, 5000);
 
     await window.getByRole('button', { name: 'Project Settings' }).click();
     const settings = window.getByRole('dialog', { name: 'Project Settings' });

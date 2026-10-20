@@ -1,8 +1,10 @@
 import type { GroupMember } from '../types';
 
 export interface InteractionSelectionInput {
-  selectedPartIds: string[];
-  selectedGroupIds: string[];
+  // Read-only: these resolvers only ever iterate the ids, and callers hold
+  // them as readonly arrays.
+  selectedPartIds: readonly string[];
+  selectedGroupIds: readonly string[];
   editingGroupId: string | null;
 }
 
@@ -15,22 +17,22 @@ export interface InteractionSelectionEntity {
 export type MeasurementSelectionEntity = InteractionSelectionEntity;
 export type ReferenceSelectionEntity = InteractionSelectionEntity;
 
-let descendantPartCacheMembersRef: WeakRef<GroupMember[]> | null = null;
+let descendantPartCacheMembersRef: WeakRef<readonly GroupMember[]> | null = null;
 let descendantPartCache = new Map<string, string[]>();
 
-function ensureDescendantPartCache(groupMembers: GroupMember[]) {
+function ensureDescendantPartCache(groupMembers: readonly GroupMember[]) {
   if (!descendantPartCacheMembersRef || descendantPartCacheMembersRef.deref() !== groupMembers) {
     descendantPartCacheMembersRef = new WeakRef(groupMembers);
     descendantPartCache = new Map();
   }
 }
 
-export function getContainingGroupId(partId: string, groupMembers: GroupMember[]): string | null {
+export function getContainingGroupId(partId: string, groupMembers: readonly GroupMember[]): string | null {
   const member = groupMembers.find((gm) => gm.memberType === 'part' && gm.memberId === partId);
   return member ? member.groupId : null;
 }
 
-export function getAllDescendantPartIds(groupId: string, groupMembers: GroupMember[]): string[] {
+export function getAllDescendantPartIds(groupId: string, groupMembers: readonly GroupMember[]): string[] {
   ensureDescendantPartCache(groupMembers);
   const cached = descendantPartCache.get(groupId);
   if (cached) return cached;
@@ -58,7 +60,7 @@ export function getAllDescendantPartIds(groupId: string, groupMembers: GroupMemb
   return partIds;
 }
 
-export function getAllDescendantGroupIds(groupId: string, groupMembers: GroupMember[]): string[] {
+export function getAllDescendantGroupIds(groupId: string, groupMembers: readonly GroupMember[]): string[] {
   const groupIds: string[] = [groupId];
   const members = groupMembers.filter((gm) => gm.groupId === groupId);
   for (const member of members) {
@@ -69,7 +71,7 @@ export function getAllDescendantGroupIds(groupId: string, groupMembers: GroupMem
   return groupIds;
 }
 
-export function getAncestorGroupIds(partId: string, groupMembers: GroupMember[]): string[] {
+export function getAncestorGroupIds(partId: string, groupMembers: readonly GroupMember[]): string[] {
   const ancestors: string[] = [];
   let currentId: string | null = partId;
   let currentType: 'part' | 'group' = 'part';
@@ -85,7 +87,7 @@ export function getAncestorGroupIds(partId: string, groupMembers: GroupMember[])
   return ancestors;
 }
 
-export function getAncestorGroupIdsForGroup(groupId: string, groupMembers: GroupMember[]): string[] {
+export function getAncestorGroupIdsForGroup(groupId: string, groupMembers: readonly GroupMember[]): string[] {
   const ancestors: string[] = [];
   let currentGroupId: string | null = groupId;
 
@@ -102,7 +104,7 @@ export function getAncestorGroupIdsForGroup(groupId: string, groupMembers: Group
 export function isDescendantOfGroup(
   potentialDescendantId: string,
   potentialAncestorId: string,
-  groupMembers: GroupMember[]
+  groupMembers: readonly GroupMember[]
 ): boolean {
   if (potentialDescendantId === potentialAncestorId) return true;
   return getAllDescendantGroupIds(potentialAncestorId, groupMembers).includes(potentialDescendantId);
@@ -110,7 +112,7 @@ export function isDescendantOfGroup(
 
 export function resolveExplicitSelectedPartIds(
   selection: Pick<InteractionSelectionInput, 'selectedPartIds' | 'selectedGroupIds'>,
-  groupMembers: GroupMember[]
+  groupMembers: readonly GroupMember[]
 ): string[] {
   const partIds = new Set(selection.selectedPartIds);
   for (const groupId of selection.selectedGroupIds) {
@@ -121,8 +123,8 @@ export function resolveExplicitSelectedPartIds(
 }
 
 export function resolveSelectedGroupIdsWithDescendants(
-  selectedGroupIds: string[],
-  groupMembers: GroupMember[]
+  selectedGroupIds: readonly string[],
+  groupMembers: readonly GroupMember[]
 ): string[] {
   const groupIds = new Set<string>();
   for (const groupId of selectedGroupIds) {
@@ -134,7 +136,7 @@ export function resolveSelectedGroupIdsWithDescendants(
 
 export function resolveTransformSelectedPartIds(
   selection: InteractionSelectionInput,
-  groupMembers: GroupMember[]
+  groupMembers: readonly GroupMember[]
 ): string[] {
   const partIds = new Set(resolveExplicitSelectedPartIds(selection, groupMembers));
 
@@ -152,7 +154,7 @@ export function resolveTransformSelectedPartIds(
   return [...partIds];
 }
 
-function filterRootGroupIds(groupIds: string[], groupMembers: GroupMember[]): string[] {
+function filterRootGroupIds(groupIds: readonly string[], groupMembers: readonly GroupMember[]): string[] {
   return groupIds.filter(
     (groupId) =>
       !groupIds.some(
@@ -163,7 +165,7 @@ function filterRootGroupIds(groupIds: string[], groupMembers: GroupMember[]): st
 
 export function resolveSelectionEntities(
   selection: Pick<InteractionSelectionInput, 'selectedPartIds' | 'selectedGroupIds'>,
-  groupMembers: GroupMember[]
+  groupMembers: readonly GroupMember[]
 ): InteractionSelectionEntity[] {
   const rootSelectedGroupIds = filterRootGroupIds(selection.selectedGroupIds, groupMembers);
 
@@ -188,14 +190,14 @@ export function resolveSelectionEntities(
 
 export function resolveMeasurementSelectionEntities(
   selection: Pick<InteractionSelectionInput, 'selectedPartIds' | 'selectedGroupIds'>,
-  groupMembers: GroupMember[]
+  groupMembers: readonly GroupMember[]
 ): MeasurementSelectionEntity[] {
   return resolveSelectionEntities(selection, groupMembers);
 }
 
 export function resolveReferenceEntities(
   referencePartIds: string[],
-  groupMembers: GroupMember[]
+  groupMembers: readonly GroupMember[]
 ): ReferenceSelectionEntity[] {
   const referencePartIdSet = new Set(referencePartIds);
   if (referencePartIdSet.size === 0) return [];

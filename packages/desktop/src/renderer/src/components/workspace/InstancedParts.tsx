@@ -268,17 +268,24 @@ export function InstancedParts({ parts, totalPartCount }: InstancedPartsProps) {
       if (isInSelectedGroup) {
         // Group already selected — don't change selection, just prepare for group drag
         if (e.point) {
-          startGroupDrag(e.point, e.nativeEvent.clientX, e.nativeEvent.clientY);
+          startGroupDrag(e.point, e.nativeEvent.clientX, e.nativeEvent.clientY, partId);
         }
         return;
       }
 
-      // Normal click: select and store drag intent for individual Part pop-out
+      // An initially-unselected group must claim this gesture before the
+      // canvas drag-start fallback can route it through direct-part mate logic.
       if (ctx.groupToSelectOnClick) {
         selectGroup(ctx.groupToSelectOnClick);
-      } else {
-        selectPart(partId);
+        setSelectedSidebarStockId(null);
+        if (e.point) {
+          startGroupDrag(e.point, e.nativeEvent.clientX, e.nativeEvent.clientY, partId);
+        }
+        return;
       }
+
+      // Ungrouped parts keep the direct-part pop-out drag path.
+      selectPart(partId);
       setSelectedSidebarStockId(null);
 
       // Store drag intent so the individual Part component can pick up the drag
@@ -305,6 +312,8 @@ export function InstancedParts({ parts, totalPartCount }: InstancedPartsProps) {
   const handleClick = useCallback(
     (e: ThreeEvent<MouseEvent>) => {
       e.stopPropagation();
+      // Releasing a drag over a part behind the moved part is not a selection click.
+      if (e.delta > 3) return;
       if (e.instanceId === undefined) return;
 
       const partId = partIdByIndex[e.instanceId];

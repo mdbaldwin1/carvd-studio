@@ -8,7 +8,7 @@ interface AppWordmarkProps {
 export function AppWordmark({ className, alt = 'Carvd Studio' }: AppWordmarkProps) {
   return (
     <img
-      src="/branding/CarvdStudio.svg"
+      src="./branding/CarvdStudio.svg"
       alt={alt}
       className={cn('select-none object-contain object-left', className)}
       draggable={false}

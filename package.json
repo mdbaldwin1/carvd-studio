@@ -45,9 +45,9 @@
     "@typescript-eslint/typescript-estree": {
       "minimatch": "9.0.7"
     },
-    "@xmldom/xmldom": "0.8.12",
+    "@xmldom/xmldom": "0.8.15",
     "app-builder-lib": {
-      "minimatch": "10.2.3"
+      "minimatch": "10.2.5"
     },
     "electron-winstaller": {
       "lodash": "4.18.1"
@@ -65,19 +65,24 @@
       "minimatch": "3.1.5"
     },
     "jsdom": {
-      "undici": "7.24.0"
+      "undici": "7.29.1"
     },
     "jspdf": {
-      "dompurify": "3.3.2"
+      "dompurify": "3.4.16"
     },
     "lodash": "4.18.1",
     "lodash-es": "4.18.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "tar": "7.5.13",
+    "tar": "7.5.22",
     "vitest-axe": {
       "lodash-es": "4.18.1"
-    }
+    },
+    "fast-uri@>=3 <4": "3.1.8",
+    "fflate@>=0.6 <0.7": "0.6.11",
+    "fflate@>=0.8 <0.9": "0.8.3",
+    "js-yaml@>=4 <5": "4.3.2",
+    "brace-expansion@>=2 <3": "2.1.7"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -93,6 +98,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.2.7",
     "prettier": "^3.8.1",
+    "three-mesh-bvh": "^0.9.7",
     "vite": "^8.0.5"
   },
   "optionalDependencies": {

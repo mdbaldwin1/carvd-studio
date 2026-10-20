@@ -1,3 +1,4 @@
+import { MIN_DIMENSION_INCHES } from '../constants';
 import * as THREE from 'three';
 import type { AppSettings, Part, SnapLine, Stock } from '../types';
 import type { HandlePosition } from '../components/workspace/partTypes';
@@ -12,6 +13,7 @@ import {
 import { resolveReferenceEntities } from './interactionSelection';
 import type { InteractionSelectionEntity } from './interactionSelection';
 import { solveResizeReferencePreview, type ReferenceRelation } from './referenceRelations';
+import { isStockDimensionFixed } from '../../../shared/stock';
 
 type Vec3 = { x: number; y: number; z: number };
 type Dimensions = { length: number; width: number; thickness: number };
@@ -93,24 +95,61 @@ export function solveResizePreview(params: {
   };
 
   if (handlePos.type === 'corner') {
-    newLength = Math.min(maxLength, Math.max(0.5, startingDimensions.length + localDelta.x * handlePos.x));
-    newThickness = Math.min(maxThickness, Math.max(0.25, startingDimensions.thickness + localDelta.y * handlePos.y));
-    newWidth = Math.min(maxWidth, Math.max(0.5, startingDimensions.width + localDelta.z * handlePos.z));
+    newLength = Math.min(
+      maxLength,
+      Math.max(MIN_DIMENSION_INCHES, startingDimensions.length + localDelta.x * handlePos.x)
+    );
+    newThickness = Math.min(
+      maxThickness,
+      Math.max(MIN_DIMENSION_INCHES, startingDimensions.thickness + localDelta.y * handlePos.y)
+    );
+    newWidth = Math.min(
+      maxWidth,
+      Math.max(MIN_DIMENSION_INCHES, startingDimensions.width + localDelta.z * handlePos.z)
+    );
     resizingDimensions.length = true;
     resizingDimensions.thickness = true;
     resizingDimensions.width = true;
   } else {
     if (handlePos.x !== 0) {
-      newLength = Math.min(maxLength, Math.max(0.5, startingDimensions.length + localDelta.x * handlePos.x));
+      newLength = Math.min(
+        maxLength,
+        Math.max(MIN_DIMENSION_INCHES, startingDimensions.length + localDelta.x * handlePos.x)
+      );
       resizingDimensions.length = true;
     }
     if (handlePos.y !== 0) {
-      newThickness = Math.min(maxThickness, Math.max(0.25, startingDimensions.thickness + localDelta.y * handlePos.y));
+      newThickness = Math.min(
+        maxThickness,
+        Math.max(MIN_DIMENSION_INCHES, startingDimensions.thickness + localDelta.y * handlePos.y)
+      );
       resizingDimensions.thickness = true;
     }
     if (handlePos.z !== 0) {
-      newWidth = Math.min(maxWidth, Math.max(0.5, startingDimensions.width + localDelta.z * handlePos.z));
+      newWidth = Math.min(
+        maxWidth,
+        Math.max(MIN_DIMENSION_INCHES, startingDimensions.width + localDelta.z * handlePos.z)
+      );
       resizingDimensions.width = true;
+    }
+  }
+
+  // Ripping makes a board narrower; nothing makes a dowel thinner. A round
+  // part's diameter therefore belongs to its stock, so every handle on it
+  // resizes length alone. An insert is fixed in every direction -- a #20
+  // biscuit is a #20 biscuit -- so no handle on one changes anything.
+  if (assignedStock) {
+    if (isStockDimensionFixed(assignedStock, 'length')) {
+      newLength = assignedStock.length;
+      resizingDimensions.length = false;
+    }
+    if (isStockDimensionFixed(assignedStock, 'width')) {
+      newWidth = assignedStock.width;
+      resizingDimensions.width = false;
+    }
+    if (isStockDimensionFixed(assignedStock, 'thickness')) {
+      newThickness = assignedStock.thickness;
+      resizingDimensions.thickness = false;
     }
   }
 

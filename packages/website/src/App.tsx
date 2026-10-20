@@ -28,6 +28,8 @@ const CutListsPage = lazy(() => import("./pages/docs/CutListsPage"));
 const AssembliesPage = lazy(() => import("./pages/docs/AssembliesPage"));
 const TemplatesPage = lazy(() => import("./pages/docs/TemplatesPage"));
 const SnappingPage = lazy(() => import("./pages/docs/SnappingPage"));
+const PartCutsPage = lazy(() => import("./pages/docs/PartCutsPage"));
+const JointRecipesPage = lazy(() => import("./pages/docs/JointRecipesPage"));
 const JoineryPage = lazy(() => import("./pages/docs/JoineryPage"));
 const ShortcutsPage = lazy(() => import("./pages/docs/ShortcutsPage"));
 const SettingsPage = lazy(() => import("./pages/docs/SettingsPage"));
@@ -60,6 +62,8 @@ function App() {
             <Route path="templates" element={<TemplatesPage />} />
             <Route path="snapping" element={<SnappingPage />} />
             <Route path="joinery" element={<JoineryPage />} />
+            <Route path="part-cuts" element={<PartCutsPage />} />
+            <Route path="joint-recipes" element={<JointRecipesPage />} />
             <Route path="shortcuts" element={<ShortcutsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="requirements" element={<RequirementsPage />} />

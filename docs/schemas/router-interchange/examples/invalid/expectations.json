@@ -1,0 +1,19 @@
+{
+  "profile-bad-segment.json": { "schemaValid": false, "runtimeValid": false },
+  "profile-extra-property.json": {
+    "schemaValid": false,
+    "runtimeValid": false
+  },
+  "profile-forward-version.json": {
+    "schemaValid": false,
+    "runtimeValid": false
+  },
+  "profile-off-axis.json": { "schemaValid": true, "runtimeValid": false },
+  "profile-wrong-revision.json": { "schemaValid": true, "runtimeValid": false },
+  "tool-envelope-version.json": { "schemaValid": false, "runtimeValid": false },
+  "tool-manufacturer-metadata.json": {
+    "schemaValid": false,
+    "runtimeValid": false
+  },
+  "tool-section-overlap.json": { "schemaValid": true, "runtimeValid": false }
+}

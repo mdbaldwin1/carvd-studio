@@ -1,31 +1,20 @@
 // Core domain types for Carvd Studio
 
-export interface Stock {
+import type { StockForm, StockShape } from '../../shared/stock';
+
+export type { StockForm, StockGrainDirection, StockPricingUnit, StockShape } from '../../shared/stock';
+
+export interface Stock extends StockShape {
   id: string;
-  name: string;
-  length: number;
-  width: number;
-  thickness: number;
-  grainDirection: 'length' | 'width' | 'none';
-  pricingUnit: 'board_foot' | 'per_item'; // how this stock is priced
-  pricePerUnit: number;
-  color: string; // display color for parts using this stock
 }
 
 // Embedded stock snapshot for assemblies (allows assemblies to be self-contained)
-export interface EmbeddedStock {
-  name: string;
-  length: number;
-  width: number;
-  thickness: number;
-  grainDirection: 'length' | 'width' | 'none';
-  pricingUnit: 'board_foot' | 'per_item';
-  pricePerUnit: number;
-  color: string;
-}
+export type EmbeddedStock = StockShape;
 
 // A part template within an assembly (position relative to assembly origin)
 export interface AssemblyPart {
+  /** Stable identity within this assembly; absent in legacy templates. */
+  localId?: string;
   // All Part fields except id (will be generated on placement) and position (stored as relative)
   name: string;
   length: number;
@@ -34,12 +23,14 @@ export interface AssemblyPart {
   relativePosition: { x: number; y: number; z: number }; // position relative to assembly origin
   rotation: Rotation3D;
   stockId: string | null;
+  blankShape?: 'domino' | 'biscuit' | 'round';
   grainSensitive: boolean;
   grainDirection: 'length' | 'width';
   color: string;
   notes?: string;
   extraLength?: number;
   extraWidth?: number;
+  features?: PartFeature[];
   // Embedded stock snapshot - allows assembly to recreate stock if original is unavailable
   embeddedStock?: EmbeddedStock;
 }
@@ -93,6 +84,404 @@ export interface Rotation3D {
   z: RotationAngle;
 }
 
+export type PartFeatureId = string;
+export type PartFeatureVersion = 1;
+export type PartFeatureKind = 'end_cut' | 'rect_cut' | 'circular_cut' | 'rounded_cut' | 'routed_path' | 'edge_profile';
+
+export type FaceTarget = 'left_end' | 'right_end' | 'top_face' | 'bottom_face' | 'front_face' | 'back_face';
+
+export type EdgeTarget =
+  | 'top_front_edge'
+  | 'top_back_edge'
+  | 'top_left_edge'
+  | 'top_right_edge'
+  | 'bottom_front_edge'
+  | 'bottom_back_edge'
+  | 'bottom_left_edge'
+  | 'bottom_right_edge'
+  | 'front_left_edge'
+  | 'front_right_edge'
+  | 'back_left_edge'
+  | 'back_right_edge';
+
+export type CornerTarget = 'front_left_corner' | 'front_right_corner' | 'back_left_corner' | 'back_right_corner';
+
+export type PartFeatureTarget =
+  | { type: 'face'; face: FaceTarget }
+  | { type: 'edge'; edge: EdgeTarget }
+  | { type: 'corner'; corner: CornerTarget };
+
+export interface PartFeatureReference {
+  primaryFrom: 'min' | 'center' | 'max';
+  secondaryFrom?: 'min' | 'center' | 'max';
+  tertiaryFrom?: 'min' | 'center' | 'max';
+}
+
+// Feature metadata is open-ended, but the shapes we read back in code are
+// named here so callers get types instead of `unknown`.
+export interface PartFeatureMetadata {
+  dowelJoint?: DowelJointMetadata;
+  [key: string]: unknown;
+}
+
+export interface PartFeatureBase {
+  id: PartFeatureId;
+  kind: PartFeatureKind;
+  version: PartFeatureVersion;
+  enabled: boolean;
+  label?: string;
+  metadata?: PartFeatureMetadata;
+  target: PartFeatureTarget;
+  reference: PartFeatureReference;
+}
+
+export interface EndCutFeature extends PartFeatureBase {
+  kind: 'end_cut';
+  // left/right ends take mitre/bevel/compound cuts; front/back faces take
+  // long-edge (rip) bevels, which only use the vertical angle.
+  target: { type: 'face'; face: 'left_end' | 'right_end' | 'front_face' | 'back_face' };
+  cutType: 'mitre' | 'bevel' | 'compound';
+  lengthMode: 'long_point' | 'short_point' | 'centerline';
+  parameters: {
+    horizontalAngle: number;
+    horizontalFlip?: boolean;
+    verticalAngle?: number;
+    verticalFlip?: boolean;
+    /**
+     * The band across the thickness the cut runs in, measured up from the
+     * bottom face. Absent means the whole thickness, which is every ordinary
+     * mitre there is.
+     *
+     * A secret mitred dovetail's mitre is not ordinary: it runs on the outer
+     * sliver only, and behind it sit the rebate and the pins the mitre is
+     * there to hide.
+     */
+    band?: { from: number; to: number };
+    reference?: {
+      mode: 'long_point' | 'short_point' | 'centerline';
+      value: number;
+    };
+  };
+}
+
+export interface RectCutFeature extends PartFeatureBase {
+  kind: 'rect_cut';
+  cutType:
+    | 'corner_notch'
+    | 'edge_notch'
+    | 'cutout'
+    | 'dado'
+    | 'stopped_dado'
+    | 'rabbet'
+    | 'groove'
+    | 'stopped_groove'
+    | 'half_lap'
+    | 'mortise'
+    | 'tenon';
+  parameters: {
+    size: {
+      length: number;
+      width: number;
+    };
+    /** Explicit cross-board span; absent preserves legacy full-width stopped dados. */
+    stoppedSpan?: boolean;
+    depthMode: 'through' | 'blind';
+    depth?: number;
+    /**
+     * How far the pocket's ends lean off square, in degrees.
+     *
+     * The one cut a woodworking tool makes that a router table cannot: a
+     * dovetail's walls splay so the joint cannot be drawn apart, and it is
+     * the splay that does the holding. Positive leans the ends outward with
+     * depth, so the pocket is wider at the floor than at the mouth -- a tail
+     * socket. Absent or zero is an ordinary square-walled pocket.
+     *
+     * Only the ends of the pocket's length lean; its width stays square.
+     * This is the undercut a dovetail bit leaves as it is plunged -- a
+     * sliding dovetail's housing, wider at its floor than at its mouth. For
+     * the flare of a through dovetail's tails, see `taperAngle`.
+     */
+    wallAngle?: number;
+    /**
+     * The same lean, taken on the other pair of walls: how far the pocket's
+     * long sides lean off square through the depth, in degrees.
+     *
+     * A pocket has two pairs of walls and they lean independently, so both
+     * angles are needed to describe one. It is the pin board of a through
+     * dovetail that wants this one: its sockets are bored through the
+     * thickness rather than sawn along the length, so the flare that
+     * receives the tails runs down the depth of the cut instead of across
+     * its face. Positive widens toward the floor, as `wallAngle` does.
+     */
+    sideWallAngle?: number;
+    /**
+     * How far the pocket's long sides lean off parallel, in degrees.
+     *
+     * Where `wallAngle` leans the walls through the thickness, this leans
+     * them within the face: the footprint is a trapezoid rather than a
+     * rectangle, and the walls stay square to the surface. That is the shape
+     * of a through or half-blind dovetail, whose tails are cut right through
+     * the board and hold by flaring across the joint line, not by
+     * undercutting into it. Positive widens the pocket toward the far end of
+     * its length; negative narrows it. Absent or zero is a parallel pocket.
+     *
+     * The taper only runs this way round -- the width varying along the
+     * length, never the reverse -- because a rect cut has no rotation within
+     * the face to turn it by. A joint that needs the transpose is one whose
+     * sockets are spaced along the cut's own length, which so far is only
+     * the pins of a secret mitred dovetail, hidden behind its mitre.
+     */
+    taperAngle?: number;
+    /**
+     * The inside corners a rotating bit leaves behind.
+     *
+     * A pocket chopped with a hollow chisel has square corners. One routed
+     * has corners radiused to the bit -- and since a mortise is usually cut
+     * with a bit its own width, its ends come out half-round. Absent or zero
+     * means square, which is what a chisel or a hand-squared pocket gives.
+     */
+    cornerRadius?: number;
+  };
+  placement: {
+    x: number;
+    z: number;
+  };
+}
+
+export type CircularPattern =
+  | { type: 'linear'; count: number; spacing: number; direction: number }
+  | {
+      type: 'grid';
+      rows: number;
+      columns: number;
+      rowSpacing: number;
+      columnSpacing: number;
+      rotation: number;
+    }
+  | { type: 'circular'; count: number; radius: number; startAngle: number };
+
+export interface DowelJointMetadata {
+  jointId: string;
+  matePartId: string;
+  memberIndex: number;
+  dowelDiameter: number;
+  dowelLength: number;
+  embedmentDepth: number;
+}
+
+export interface CircularCutFeature extends PartFeatureBase {
+  kind: 'circular_cut';
+  target: { type: 'face'; face: FaceTarget };
+  cutType: 'round_hole' | 'countersink' | 'counterbore';
+  placement: { primary: number; secondary: number; rotation: number };
+  parameters: {
+    diameter: number;
+    depthMode: 'through' | 'blind';
+    depth?: number;
+    tilt: number;
+    direction: number;
+    countersink?: { majorDiameter: number; includedAngle: number };
+    counterbore?: { diameter: number; depth: number };
+  };
+  pattern?: CircularPattern;
+}
+
+export interface RoundedCutFeature extends PartFeatureBase {
+  kind: 'rounded_cut';
+  target: { type: 'face'; face: FaceTarget };
+  cutType: 'rounded_slot' | 'rounded_rectangle';
+  placement: { primary: number; secondary: number; rotation: number };
+  parameters: {
+    length: number;
+    width: number;
+    cornerRadius: number;
+    /** Circular plate-joiner blade; its arc lies in the board plane, not across the kerf. */
+    plateJoiner?: boolean;
+    depthMode: 'through' | 'blind';
+    depth?: number;
+  };
+}
+
+export interface RoutedPathPoint {
+  /** Coordinate along the selected face's primary axis. */
+  primary: number;
+  /** Coordinate along the selected face's secondary axis. */
+  secondary: number;
+  /** Optional face-plane fillet radius. Omitted or zero keeps the corner sharp. */
+  cornerRadius?: number;
+}
+
+export type RouterBit =
+  | { profile: 'straight'; diameter: number; includedAngle?: never }
+  | { profile: 'mortising'; diameter: number; includedAngle?: never }
+  | { profile: 'spiral_upcut'; diameter: number; includedAngle?: never }
+  | { profile: 'spiral_downcut'; diameter: number; includedAngle?: never }
+  | { profile: 'compression'; diameter: number; includedAngle?: never }
+  | { profile: 'surfacing'; diameter: number; includedAngle?: never }
+  | { profile: 'core_box'; diameter: number; includedAngle?: never }
+  | { profile: 'ball_nose'; diameter: number; includedAngle?: never }
+  | { profile: 'v_bit'; diameter: number; includedAngle: number }
+  | { profile: 'engraving'; diameter: number; includedAngle: number }
+  | { profile: 'dovetail'; diameter: number; shankDiameter: number; includedAngle: number }
+  | { profile: 't_slot'; diameter: number; shankDiameter: number; cutterHeight: number; includedAngle?: never }
+  | { profile: 'keyhole'; diameter: number; shankDiameter: number; cutterHeight: number; includedAngle?: never };
+
+/** A router bit swept along a face-local polyline. */
+export interface RoutedPathFeature extends PartFeatureBase {
+  kind: 'routed_path';
+  target: { type: 'face'; face: FaceTarget };
+  path: {
+    points: RoutedPathPoint[];
+    /** Close the final segment back to the first point. */
+    closed?: boolean;
+  };
+  bit: RouterBit;
+  parameters: {
+    depthMode: 'through' | 'blind';
+    depth?: number;
+  };
+}
+
+export type EdgeProfile = 'roundover' | 'cove' | 'chamfer' | 'rabbet' | 'bead' | 'ogee' | 'thumbnail' | 'custom';
+
+export interface RouterProfilePoint {
+  u: number;
+  v: number;
+}
+
+export type RouterProfileSegment =
+  | { kind: 'line'; to: RouterProfilePoint }
+  | {
+      kind: 'cubicBezier';
+      control1: RouterProfilePoint;
+      control2: RouterProfilePoint;
+      to: RouterProfilePoint;
+    }
+  | { kind: 'arc'; to: RouterProfilePoint; radius: number; clockwise: boolean }
+  | {
+      kind: 'ellipseArc';
+      to: RouterProfilePoint;
+      radiusU: number;
+      radiusV: number;
+      clockwise: boolean;
+    };
+
+export interface RouterProfileDefinition {
+  version: 1;
+  /** Deterministic checksum of all definition content except this field. */
+  revision?: string;
+  id: string;
+  name: string;
+  family: string;
+  source: 'generic' | 'manufacturer';
+  manufacturer?: string;
+  sku?: string;
+  sourceUrl?: string;
+  parameters: Record<string, number | string>;
+  boundary: {
+    start: RouterProfilePoint;
+    segments: RouterProfileSegment[];
+  };
+}
+
+/** Physical router tooling is separate from its idealized cut-envelope profile. */
+export interface RouterToolDefinition {
+  version: 1;
+  /** Deterministic checksum of all definition content except this field. */
+  revision?: string;
+  id: string;
+  name: string;
+  source: 'generic' | 'manufacturer';
+  manufacturer?: string;
+  sku?: string;
+  sourceUrl?: string;
+  /** Profile family this tool is capable of producing. */
+  profileFamily: string;
+  /** Optionally restrict the tool to one exact canonical profile. */
+  routerProfileId?: string;
+  /** Immutable profiles this physical tool is certified to produce. */
+  producedProfiles?: RouterToolProducedProfile[];
+  cutterDiameter: number;
+  shankDiameter: number;
+  cuttingHeight: number;
+  neckDiameter?: number;
+  bearingDiameter?: number;
+  /**
+   * Optional precise axial envelope. Offsets are measured from the cutter tip
+   * toward the collet; bearings below the tip may use negative offsets.
+   */
+  envelopeVersion?: 1;
+  sections?: RouterToolAxialSection[];
+  /** Tip-to-end physical length, when known. */
+  overallLength?: number;
+  /** Minimum shank length that must remain captured by the collet. */
+  safeColletInsertion?: number;
+}
+
+export interface RouterToolProducedProfile {
+  profileId: string;
+  profileRevision: string;
+  profileSnapshot: RouterProfileDefinition;
+  nominalSize?: number;
+  applicability?: {
+    /** Explicitly permits uniform scaling of the certified profile geometry. */
+    scalable: boolean;
+    minScale?: number;
+    maxScale?: number;
+  };
+}
+
+export interface RouterCatalogDefinition {
+  version: 1;
+  id: string;
+  name: string;
+  source: 'generic' | 'manufacturer';
+  manufacturer?: string;
+  sourceUrl?: string;
+  profiles: RouterProfileDefinition[];
+  tools: RouterToolDefinition[];
+}
+
+export type RouterToolSectionRole = 'cutter' | 'neck' | 'shank' | 'bearing';
+
+export interface RouterToolAxialSection {
+  role: RouterToolSectionRole;
+  start: number;
+  end: number;
+  diameter: number;
+  /** Required when a bearing intentionally occupies the same axial span as another section. */
+  stackable?: boolean;
+}
+
+/** A bearing-guided router profile applied continuously along one stock edge. */
+export interface EdgeProfileFeature extends PartFeatureBase {
+  kind: 'edge_profile';
+  target: { type: 'edge'; edge: EdgeTarget };
+  profile: EdgeProfile;
+  /** Library identity used to refresh the embedded definition while authoring. */
+  routerProfileId?: string;
+  routerProfileRevision?: string;
+  /** Immutable-at-use definition so project geometry survives library edits or deletion. */
+  routerProfileSnapshot?: RouterProfileDefinition;
+  routerToolId?: string;
+  routerToolRevision?: string;
+  routerToolSnapshot?: RouterToolDefinition;
+  parameters: {
+    /** Primary profile size: radius for curved profiles, width for chamfers/rabbets. */
+    size: number;
+    /** Secondary cut depth used by rabbets and decorative profiles. */
+    depth: number;
+  };
+}
+
+export type PartFeature =
+  | EndCutFeature
+  | RectCutFeature
+  | CircularCutFeature
+  | RoundedCutFeature
+  | RoutedPathFeature
+  | EdgeProfileFeature;
+
 export interface Part {
   id: string;
   name: string;
@@ -102,6 +491,8 @@ export interface Part {
   position: { x: number; y: number; z: number };
   rotation: Rotation3D; // degrees around each axis
   stockId: string | null; // assigned stock (null = unassigned)
+  /** Explicit factory blank; absent keeps existing rectangular project geometry. */
+  blankShape?: 'domino' | 'biscuit' | 'round';
   grainSensitive: boolean;
   grainDirection: 'length' | 'width'; // which way the grain runs on this part
   color: string; // inherited from stock when assigned
@@ -109,6 +500,7 @@ export interface Part {
   // Joinery adjustments - extra material for cut list (not shown in 3D view)
   extraLength?: number; // additional length for cut list (e.g., tenon material)
   extraWidth?: number; // additional width for cut list (e.g., dado insertion depth)
+  features?: PartFeature[];
   // Glue-up panel flag - wide panels made by edge-gluing multiple boards
   glueUpPanel?: boolean;
   // Ignore overlap flag - builder is aware of intentional overlap (e.g., shelf notched for legs)
@@ -263,6 +655,7 @@ export interface SnapLine {
     | 'face'
     | 'surface-anchor'
     | 'surface-fraction'
+    | 'joinery'
     | 'feature'
     | 'equal-spacing'
     | 'dimension-match'
@@ -327,16 +720,30 @@ export interface ReferenceRuler {
 export interface PartValidationIssue {
   partId: string;
   partName: string;
-  type: 'no_stock' | 'exceeds_dimensions' | 'exceeds_thickness' | 'grain_mismatch';
+  type:
+    | 'no_stock'
+    | 'exceeds_dimensions'
+    | 'exceeds_thickness'
+    | 'stock_thickness_mismatch'
+    | 'purchased_size_mismatch'
+    | 'grain_mismatch'
+    | 'grain_cut_direction'
+    | 'joint_fit'
+    | 'feature_validation';
   message: string;
   severity: 'error' | 'warning';
   canBypass?: boolean; // true for glue-up panels exceeding width
+  /** The operation at fault, so an issue can be opened straight in the cuts editor. */
+  featureId?: string;
 }
 
 // Represents a single part's cut instructions
 export interface CutInstruction {
+  stage?: 'post_glue_up' | 'post_purchase'; // Absent means a stock blank; retained for legacy cut lists.
   partId: string;
   partName: string;
+  finishedLength?: number; // Modeled envelope before authored cuts; excludes blank allowance.
+  finishedWidth?: number;
   cutLength: number; // length + extraLength
   cutWidth: number; // width + extraWidth
   thickness: number;
@@ -346,7 +753,14 @@ export interface CutInstruction {
   canRotate: boolean; // true if part can be rotated for optimization
   isGlueUp: boolean; // true if this is a glue-up panel
   boardsNeeded?: number; // number of boards for glue-up panels
+  features?: PartFeature[];
   notes?: string;
+  /**
+   * Roughly how far this part will move across the grain over a year, for the
+   * solid-wood parts wide enough for it to matter. Absent for sheet goods and
+   * for anything narrow enough that the movement disappears into the joint.
+   */
+  movementAllowance?: number;
 }
 
 // Placement of a part on a stock board for cutting
@@ -391,6 +805,9 @@ export interface StockSummary {
   actualBoardsUsed: number; // boards from optimizer (before overage rounding)
   averageUtilization: number; // average utilization across boards of this type
   wasteSquareInches: number; // total waste for this stock type
+  form: StockForm; // how this stock is bought, which sets the words used for it
+  insertsNeeded?: number; // pieces the project uses, for stock counted not cut
+  packSize?: number; // how many come in one box, for stock counted not cut
 }
 
 // Statistics for the entire cut list
@@ -407,6 +824,7 @@ export interface CutListStatistics {
 
 // The complete cut list
 export interface CutList {
+  formatVersion?: number; // Version of derived fabrication output, independent of project format.
   id: string;
   generatedAt: string; // ISO timestamp
   projectModifiedAt: string; // project modifiedAt when generated
@@ -414,6 +832,11 @@ export interface CutList {
 
   // Per-part instructions
   instructions: CutInstruction[];
+  // Finished-panel machining, performed after assembling the optimized strips.
+  // Separate from stock blanks so it never consumes stock or multiplies per strip.
+  postGlueUpInstructions?: CutInstruction[];
+  postPurchaseInstructions?: CutInstruction[];
+  validationIssues?: PartValidationIssue[];
 
   // Per-stock optimization results
   stockBoards: StockBoard[];
@@ -452,7 +875,20 @@ export interface CustomShoppingItem {
 // ============================================================
 
 // Current file format version - increment when making breaking changes
-export const CARVD_FILE_VERSION = 1;
+// Version 2 introduces part features (custom cuts). Files are written at the
+// lowest version that can represent them so plain projects stay openable in
+// older builds, while featured projects make old builds warn instead of
+// silently showing uncut boxes.
+/** Highest file version this build writes and can open. */
+export const CARVD_FILE_VERSION = 4;
+/** A project with no cuts and only sheet or board stock. */
+export const CARVD_FILE_VERSION_BASE = 1;
+/** A project that uses part cuts. */
+export const CARVD_FILE_VERSION_FEATURES = 2;
+/** A project that uses rod or insert stock. */
+export const CARVD_FILE_VERSION_STOCK_FORMS = 3;
+/** Explicit factory blanks and stopped spans require geometry-aware readers. */
+export const CARVD_FILE_VERSION_JOINERY_LAYOUT = 4;
 
 // The .carvd file format - plain JSON structure
 export interface CarvdFile {

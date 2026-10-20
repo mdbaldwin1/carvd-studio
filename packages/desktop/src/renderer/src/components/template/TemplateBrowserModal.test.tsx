@@ -88,7 +88,7 @@ describe('TemplateBrowserModal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useProjectStore.setState({
-      name: 'Test Project',
+      projectName: 'Test Project',
       parts: [],
       stocks: [],
       groups: [],
@@ -399,7 +399,11 @@ describe('TemplateBrowserModal', () => {
             length: 24,
             width: 12,
             thickness: 0.75,
+            grainSensitive: false,
             position: { x: 0, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            stockId: null,
+            grainDirection: 'length',
             color: '#c4a574'
           }
         ]
@@ -419,7 +423,7 @@ describe('TemplateBrowserModal', () => {
 
     it('saves current project as template when clicked', async () => {
       useProjectStore.setState({
-        name: 'My Project',
+        projectName: 'My Project',
         parts: [
           {
             id: 'part-1',
@@ -427,7 +431,11 @@ describe('TemplateBrowserModal', () => {
             length: 24,
             width: 12,
             thickness: 0.75,
+            grainSensitive: false,
             position: { x: 0, y: 0, z: 0 },
+            rotation: { x: 0, y: 0, z: 0 },
+            stockId: null,
+            grainDirection: 'length',
             color: '#c4a574'
           }
         ]

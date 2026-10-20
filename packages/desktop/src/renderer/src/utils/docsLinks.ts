@@ -12,6 +12,8 @@ type DocSlug =
   | 'templates'
   | 'snapping'
   | 'joinery'
+  | 'part-cuts'
+  | 'joint-recipes'
   | 'shortcuts'
   | 'settings'
   | 'requirements'
@@ -19,7 +21,9 @@ type DocSlug =
   | 'faq';
 type SettingsAnchor = 'app-settings' | 'backup-sync' | 'project-settings';
 
-export type DocsSection = DocSlug | SettingsAnchor;
+type JoineryAnchor = 'matching-cuts' | 'assembly-placement' | 'insert-sockets' | 'joint-alignment' | 'router-profiles';
+
+export type DocsSection = DocSlug | SettingsAnchor | JoineryAnchor;
 
 const DOCS_SECTION_URLS: Record<DocsSection, string> = {
   'quick-start': `${DOCS_BASE_URL}/quick-start`,
@@ -33,6 +37,13 @@ const DOCS_SECTION_URLS: Record<DocsSection, string> = {
   templates: `${DOCS_BASE_URL}/templates`,
   snapping: `${DOCS_BASE_URL}/snapping`,
   joinery: `${DOCS_BASE_URL}/joinery`,
+  'part-cuts': `${DOCS_BASE_URL}/part-cuts`,
+  'joint-recipes': `${DOCS_BASE_URL}/joint-recipes`,
+  'matching-cuts': `${DOCS_BASE_URL}/joinery#matching-cuts`,
+  'assembly-placement': `${DOCS_BASE_URL}/joinery#assembly-placement`,
+  'insert-sockets': `${DOCS_BASE_URL}/joinery#inserts`,
+  'joint-alignment': `${DOCS_BASE_URL}/snapping#joint-alignment`,
+  'router-profiles': `${DOCS_BASE_URL}/part-cuts#router-profiles`,
   shortcuts: `${DOCS_BASE_URL}/shortcuts`,
   settings: `${DOCS_BASE_URL}/settings`,
   requirements: `${DOCS_BASE_URL}/requirements`,

@@ -1,0 +1,23 @@
+{
+  "format": "carvd-router-profile",
+  "version": 1,
+  "profile": {
+    "version": 1,
+    "id": "bad",
+    "name": "Bad",
+    "family": "roundover",
+    "source": "generic",
+    "parameters": {},
+    "boundary": {
+      "start": { "u": 0, "v": 0.25 },
+      "segments": [
+        {
+          "kind": "arc",
+          "to": { "u": 0.25, "v": 0 },
+          "radius": 0,
+          "clockwise": true
+        }
+      ]
+    }
+  }
+}

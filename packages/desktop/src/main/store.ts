@@ -1,18 +1,11 @@
 import Store from 'electron-store';
 import type { AnalyticsConsent } from '../shared/analytics';
+import { resolveStockForm, type StockShape } from '../shared/stock';
 import type { QueuedAnalyticsEvent } from './analytics/analyticsQueue';
 
-// Stock type for app-level library (mirrors renderer Stock type)
-export interface StockLibraryItem {
+// Stock type for app-level library (the renderer's Stock, same shared shape)
+export interface StockLibraryItem extends StockShape {
   id: string;
-  name: string;
-  length: number;
-  width: number;
-  thickness: number;
-  grainDirection: 'length' | 'width' | 'none';
-  pricingUnit: 'board_foot' | 'per_item';
-  pricePerUnit: number;
-  color: string;
 }
 
 // Assembly types for app-level library (mirrors renderer Assembly types)
@@ -69,6 +62,7 @@ export interface StockConstraintSettings {
   constrainDimensions: boolean;
   constrainGrain: boolean;
   constrainColor: boolean;
+  preventOverlap: boolean;
 }
 
 // User template (stores the serialized project)
@@ -88,14 +82,6 @@ export interface UserTemplateItem {
   createdAt: string;
   lastUsedAt?: string; // Track when template was last used for "recently used" ordering
   project: string; // JSON-serialized Project
-}
-
-// New project setup defaults (for "remember these choices" feature)
-export interface NewProjectDefaults {
-  units: 'imperial' | 'metric';
-  addCommonMaterials: boolean;
-  selectedMaterials: string[]; // IDs of materials to add
-  skipSetupDialog: boolean; // If true, use these defaults without showing dialog
 }
 
 export interface AppPreferences {
@@ -128,10 +114,12 @@ export interface AppPreferences {
   recentProjects: string[];
   favoriteProjects: string[]; // User-favorited project paths
   stockLibrary: StockLibraryItem[];
+  routerProfileLibrary: unknown[];
+  routerToolLibrary: unknown[];
+  trustedRouterPublishers: unknown[];
   assemblyLibrary: AssemblyLibraryItem[];
   userTemplates: UserTemplateItem[];
   customColors: string[]; // User-saved custom colors (max 16)
-  newProjectDefaults: NewProjectDefaults; // Saved new project setup preferences
   windowBounds: {
     width: number;
     height: number;
@@ -149,7 +137,8 @@ const defaults: AppPreferences = {
   stockConstraints: {
     constrainDimensions: true,
     constrainGrain: true,
-    constrainColor: true
+    constrainColor: true,
+    preventOverlap: true
   },
   licenseKey: null,
   licenseEmail: null,
@@ -165,15 +154,12 @@ const defaults: AppPreferences = {
   recentProjects: [],
   favoriteProjects: [],
   stockLibrary: [],
+  routerProfileLibrary: [],
+  routerToolLibrary: [],
+  trustedRouterPublishers: [],
   assemblyLibrary: [],
   userTemplates: [],
   customColors: [],
-  newProjectDefaults: {
-    units: 'imperial',
-    addCommonMaterials: true,
-    selectedMaterials: ['default-plywood-3/4', 'default-plywood-1/2', 'default-oak-4/4', 'default-poplar-4/4'],
-    skipSetupDialog: false
-  },
   windowBounds: {
     width: 1200,
     height: 800
@@ -342,16 +328,6 @@ export function isFavoriteProject(filePath: string): boolean {
 
 export function setFavoriteProjects(filePaths: string[]): void {
   store.set('favoriteProjects', filePaths);
-}
-
-// New project defaults functions
-export function getNewProjectDefaults(): NewProjectDefaults {
-  return store.get('newProjectDefaults');
-}
-
-export function setNewProjectDefaults(defaults: Partial<NewProjectDefaults>): void {
-  const current = store.get('newProjectDefaults');
-  store.set('newProjectDefaults', { ...current, ...defaults });
 }
 
 export function getWindowBounds(): AppPreferences['windowBounds'] {
@@ -1680,7 +1656,10 @@ export function importStocks(
 
   const updatedLibrary = [...stockLibrary];
 
-  for (const stock of data.data) {
+  for (const incoming of data.data) {
+    // An export written before stock forms existed carries no form; classify
+    // it on the way in so the library never holds a record missing one.
+    const stock: StockLibraryItem = { ...incoming, form: resolveStockForm(incoming) };
     const existingIndex = updatedLibrary.findIndex((s) => s.id === stock.id);
     if (existingIndex >= 0) {
       if (options.replaceIfExists) {

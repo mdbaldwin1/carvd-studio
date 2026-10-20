@@ -1,0 +1,14 @@
+{
+  "format": "carvd-router-tool",
+  "version": 1,
+  "tool": {
+    "version": 1,
+    "id": "legacy-cove",
+    "name": "Legacy Cove Bit",
+    "source": "generic",
+    "profileFamily": "cove",
+    "cutterDiameter": 1,
+    "shankDiameter": 0.5,
+    "cuttingHeight": 0.5
+  }
+}
