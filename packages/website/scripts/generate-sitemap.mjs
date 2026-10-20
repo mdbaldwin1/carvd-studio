@@ -24,6 +24,7 @@ function xmlEscape(value) {
 }
 
 const coreRoutes = [
+  { path: "/updates/1-3-0", changefreq: "yearly", priority: "0.7" },
   { path: "/", changefreq: "weekly", priority: "1.0" },
   { path: "/features", changefreq: "monthly", priority: "0.8" },
   { path: "/pricing", changefreq: "monthly", priority: "0.9" },
