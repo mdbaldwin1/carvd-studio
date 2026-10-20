@@ -1,11 +1,18 @@
 import { lazy, Suspense } from "react";
-import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
 import { Analytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
 import HomePage from "./pages/HomePage";
 import NotFoundPage from "./pages/NotFoundPage";
 import ScrollToHash from "./components/ScrollToHash";
 import { PostHogPageviews } from "./analytics/PostHogPageviews";
+
+const LearnPage = lazy(() => import("./pages/LearnPage"));
 
 const FeaturesPage = lazy(() => import("./pages/FeaturesPage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
@@ -50,6 +57,14 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/updates/1-3-0" element={<Release130Page />} />
+          <Route path="/learn" element={<LearnPage />} />
+          <Route
+            path="/learn/desktop-shelf"
+            element={<Navigate to="/learn/heron-wall-cabinet" replace />}
+          />
+          <Route path="/learn/heron-wall-cabinet" element={<LearnPage />} />
+          <Route path="/learn/matching-joints" element={<LearnPage />} />
+          <Route path="/learn/printable-cut-list" element={<LearnPage />} />
           <Route path="/features" element={<FeaturesPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/docs" element={<DocsLayout />}>

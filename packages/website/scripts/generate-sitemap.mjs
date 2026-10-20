@@ -24,6 +24,11 @@ function xmlEscape(value) {
 }
 
 const coreRoutes = [
+  { path: "/learn", changefreq: "monthly", priority: "0.7" },
+  { path: "/learn/heron-wall-cabinet", changefreq: "monthly", priority: "0.7" },
+  { path: "/learn/matching-joints", changefreq: "monthly", priority: "0.7" },
+  { path: "/learn/printable-cut-list", changefreq: "monthly", priority: "0.7" },
+
   { path: "/updates/1-3-0", changefreq: "yearly", priority: "0.7" },
   { path: "/", changefreq: "weekly", priority: "1.0" },
   { path: "/features", changefreq: "monthly", priority: "0.8" },

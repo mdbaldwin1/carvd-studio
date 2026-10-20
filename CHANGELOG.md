@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated the one-time price for new Carvd Studio licenses to $99.99; existing licenses keep their access and free updates.
 
 ### Added
+- Free Heron oak-and-walnut cabinet design study with an editable Carvd project, cut-list report, real app views and a joinery walkthrough; replaces the desktop shelf showcase.
+- Visual tutorials for matching joints and printable cut lists on the website.
+
+
+### Added
 
 - Added a public 1.3.0 feature announcement with real app screenshots, linked from the homepage and changelog.
 
