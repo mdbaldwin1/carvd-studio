@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Updated the one-time price for new Carvd Studio licenses to $99.99; existing licenses keep their access and free updates.
+
+### Added
+
+- Added a public 1.3.0 feature announcement with real app screenshots, linked from the homepage and changelog.
+
 ## [1.3.0] - 2026-10-19
 
 ### Fixed
