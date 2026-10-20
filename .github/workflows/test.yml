@@ -36,7 +36,7 @@ jobs:
           NODE_ENV: "test"
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           files: ./packages/desktop/coverage/lcov.info
           flags: unittests
@@ -209,7 +209,7 @@ jobs:
           NODE_ENV: "test"
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           files: ./packages/website/coverage/lcov.info
           flags: website
