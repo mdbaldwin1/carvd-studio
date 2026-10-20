@@ -27,7 +27,7 @@ describe("BuyButton", () => {
   describe("rendering", () => {
     it("renders with default button text", () => {
       renderWithRouter(<BuyButton />);
-      expect(screen.getByText("Buy License - $59.99")).toBeInTheDocument();
+      expect(screen.getByText("Buy License - $99.99")).toBeInTheDocument();
     });
 
     it("renders with custom children", () => {
