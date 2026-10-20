@@ -36,6 +36,12 @@ export default function Footer() {
               Documentation
             </a>
             <a
+              href="/learn"
+              className="inline-flex min-h-11 items-center rounded-md px-2 py-1 font-medium text-text transition-colors hover:text-highlight"
+            >
+              Free plans & tutorials
+            </a>
+            <a
               href="/support"
               className="inline-flex min-h-11 items-center rounded-md px-2 py-1 font-medium text-text transition-colors hover:text-highlight"
             >

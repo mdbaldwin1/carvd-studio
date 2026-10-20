@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "project": {
+    "name": "Desktop Shelf - Free Carvd Project",
+    "createdAt": "2026-10-20T12:00:00Z",
+    "modifiedAt": "2026-10-20T12:00:00Z",
+    "units": "imperial",
+    "gridSize": 0.0625,
+    "kerfWidth": 0.125,
+    "overageFactor": 0.1,
+    "projectNotes": "Free desktop shelf planning example. Overall 24 x 8 x 8 inches. Actual material thickness 3/4 inch. Back rail fits between sides, flush with the rear edge and underside of top. Check actual thickness and adjust before cutting. Light desktop storage only; no load rating. Hardware is not modeled. See carvd-studio.com/learn/desktop-shelf for printable guide. Stock price is unset; enter your local price.",
+    "stockConstraints": {
+      "constrainDimensions": true,
+      "constrainGrain": true,
+      "constrainColor": true,
+      "preventOverlap": true
+    }
+  },
+  "parts": [
+    {
+      "id": "top",
+      "name": "Top",
+      "length": 24,
+      "width": 8,
+      "thickness": 0.75,
+      "position": {
+        "x": 0,
+        "y": 7.625,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 0
+      },
+      "stockId": "plywood",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#b58b61",
+      "notes": "See printable guide for assembly. Dimensions assume actual 3/4-inch material."
+    },
+    {
+      "id": "left",
+      "name": "Left side",
+      "length": 7.25,
+      "width": 8,
+      "thickness": 0.75,
+      "position": {
+        "x": -11.625,
+        "y": 3.625,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 90
+      },
+      "stockId": "plywood",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#b58b61",
+      "notes": "See printable guide for assembly. Dimensions assume actual 3/4-inch material."
+    },
+    {
+      "id": "right",
+      "name": "Right side",
+      "length": 7.25,
+      "width": 8,
+      "thickness": 0.75,
+      "position": {
+        "x": 11.625,
+        "y": 3.625,
+        "z": 0
+      },
+      "rotation": {
+        "x": 0,
+        "y": 0,
+        "z": 90
+      },
+      "stockId": "plywood",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#b58b61",
+      "notes": "See printable guide for assembly. Dimensions assume actual 3/4-inch material."
+    },
+    {
+      "id": "back",
+      "name": "Back rail",
+      "length": 22.5,
+      "width": 2,
+      "thickness": 0.75,
+      "position": {
+        "x": 0,
+        "y": 6.25,
+        "z": 3.625
+      },
+      "rotation": {
+        "x": 90,
+        "y": 0,
+        "z": 0
+      },
+      "stockId": "plywood",
+      "grainSensitive": true,
+      "grainDirection": "length",
+      "color": "#b58b61",
+      "notes": "See printable guide for assembly. Dimensions assume actual 3/4-inch material."
+    }
+  ],
+  "stocks": [
+    {
+      "id": "plywood",
+      "name": "3/4-inch plywood - enter local price",
+      "length": 48,
+      "width": 24,
+      "thickness": 0.75,
+      "grainDirection": "length",
+      "pricingUnit": "per_item",
+      "pricePerUnit": 0,
+      "color": "#b58b61"
+    }
+  ],
+  "groups": [],
+  "groupMembers": []
+}

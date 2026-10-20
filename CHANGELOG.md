@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- Free desktop shelf project and printable guide, plus visual tutorials for matching joints and printable cut lists on the website.
+
+
+### Added
 
 - Added a public 1.3.0 feature announcement with real app screenshots, linked from the homepage and changelog.
 

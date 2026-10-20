@@ -7,6 +7,8 @@ import NotFoundPage from "./pages/NotFoundPage";
 import ScrollToHash from "./components/ScrollToHash";
 import { PostHogPageviews } from "./analytics/PostHogPageviews";
 
+const LearnPage = lazy(() => import("./pages/LearnPage"));
+
 const FeaturesPage = lazy(() => import("./pages/FeaturesPage"));
 const PricingPage = lazy(() => import("./pages/PricingPage"));
 const DownloadPage = lazy(() => import("./pages/DownloadPage"));
@@ -50,6 +52,10 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/updates/1-3-0" element={<Release130Page />} />
+          <Route path="/learn" element={<LearnPage />} />
+          <Route path="/learn/desktop-shelf" element={<LearnPage />} />
+          <Route path="/learn/matching-joints" element={<LearnPage />} />
+          <Route path="/learn/printable-cut-list" element={<LearnPage />} />
           <Route path="/features" element={<FeaturesPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/docs" element={<DocsLayout />}>
