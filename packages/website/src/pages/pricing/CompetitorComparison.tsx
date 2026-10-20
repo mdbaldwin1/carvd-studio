@@ -125,7 +125,7 @@ export default function CompetitorComparison() {
                 Carvd Studio
               </td>
               <td className="border-b border-border p-4 text-center font-bold text-primary max-md:p-2 max-md:text-sm">
-                $59.99 once
+                $99.99 once
               </td>
               <td className="border-b border-border p-4 text-center font-bold text-success max-md:p-2 max-md:text-sm">
                 ✓ Yes
@@ -164,8 +164,8 @@ export default function CompetitorComparison() {
           </h3>
           <p className="text-sm text-text-muted">
             Cabinet Vision and SketchList 3D are woodworking-focused, but their
-            subscription costs add up fast. In one year, you'd pay more than 10x
-            the cost of Carvd Studio.
+            subscription costs add up over time. Carvd Studio offers a one-time
+            purchase with free lifetime updates.
           </p>
         </div>
       </div>
