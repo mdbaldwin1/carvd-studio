@@ -42,11 +42,11 @@ const tutorials = [
     steps: [
       [
         "Match the stock to your material",
-        "Assign stock to every part. Enter the actual board or panel dimensions and your local material price. Unassigned parts block generation; the free shelf project starts with stock assigned and its price unset.",
+        "Assign stock to every part. Enter the actual board or panel dimensions and your local material price. Unassigned parts block generation; Heron starts with stock assigned. Its library prices are placeholders, not a quote.",
       ],
       [
         "Account for the saw cut",
-        "Check Kerf Width in your cut-list settings against your blade. The shelf example starts at 1/8 inch. Check the Overage Factor too: it adds purchasing allowance for defects and mistakes.",
+        "Check Kerf Width in your cut-list settings against your blade. Heron starts at 1/8 inch. Check the Overage Factor too: it adds purchasing allowance for defects and mistakes.",
       ],
       [
         "Generate and review",
@@ -64,13 +64,15 @@ const tutorials = [
 export default function LearnPage() {
   const { pathname } = useLocation();
   const tutorial = tutorials.find((item) => pathname === `/learn/${item.slug}`);
-  const shelf = pathname === "/learn/desktop-shelf";
+  const heron = pathname === "/learn/heron-wall-cabinet";
   const title =
     tutorial?.title ??
-    (shelf ? "Free desktop shelf plan" : "Small projects. Useful skills.");
+    (heron
+      ? "Heron: an oak-and-walnut wall cabinet"
+      : "Small projects. Useful skills.");
   const description =
     tutorial?.description ??
-    "Download a free desktop shelf project and printable plan, then learn to plan joints and generate cutting diagrams in Carvd Studio.";
+    "Explore Heron, a free editable wall cabinet design with dovetails, a fluted oak door and a downloadable cut-list report. Built in Carvd Studio.";
   return (
     <div className="site-shell">
       <SEO title={title} description={description} path={pathname} />
@@ -89,103 +91,201 @@ export default function LearnPage() {
           {!tutorial && (
             <section className="site-section mb-8 overflow-hidden">
               <img
-                src="/screenshots/desktop-shelf-plan.svg"
-                alt="Illustrated four-part desktop shelf with a top, two sides and rear rail"
-                width="1000"
-                height="520"
+                src="/screenshots/heron-front.png"
+                alt="Heron in Carvd Studio: an oak wall cabinet with open shelves, a walnut-framed fluted door and two walnut drawer fronts"
+                width="3024"
+                height="1742"
                 className="w-full"
               />
               <div className="p-8 max-sm:p-5">
+                <p className="mb-3 text-sm font-semibold tracking-widest text-highlight">
+                  HERON / FREE DESIGN STUDY
+                </p>
                 <h2 className="mb-3 text-3xl font-bold">
-                  Make room for the little things.
+                  A small cabinet. Plenty to explore.
                 </h2>
                 <p className="mb-5 text-text-muted">
-                  A compact shelf for notebooks and desk supplies: 24 inches
-                  wide, 8 inches deep and 8 inches high. Four plywood parts, an
-                  editable model and a two-page printable guide. Free to
-                  download, adapt and share with credit to Carvd Studio. No
-                  email signup.
+                  Warm white oak, dark walnut and an asymmetric arrangement of
+                  open shelves and closed storage. Heron brings together 29
+                  parts and 92 cut operations in a 36 × 24 × 10-inch cabinet.
+                  Every board and cut is editable. No email signup.
                 </p>
                 <div className="flex flex-wrap gap-3">
                   <Button asChild>
-                    <a href="/downloads/desktop-shelf-guide.pdf" download>
-                      Download printable plan (PDF)
+                    <a href="/downloads/heron-wall-cabinet.carvd" download>
+                      Download the Carvd project
                     </a>
                   </Button>
                   <Button asChild variant="outline">
-                    <a href="/downloads/desktop-shelf.carvd" download>
-                      Download editable project
+                    <a href="/downloads/heron-design-report.pdf" download>
+                      Download cut-list report (PDF)
                     </a>
                   </Button>
                 </div>
-                {!shelf && (
+                <p className="mt-5 text-sm text-text-muted">
+                  An editable design study, not a shop-tested construction plan.
+                  Hardware and mounting details need to be specified before
+                  fabrication. Free to download, adapt and share with credit to
+                  Carvd Studio.
+                </p>
+                {!heron && (
                   <p className="mt-5">
                     <Link
-                      to="/learn/desktop-shelf"
+                      to="/learn/heron-wall-cabinet"
                       className="text-highlight underline"
                     >
-                      See the cut list and project details →
+                      Explore the joinery and walkthrough →
                     </Link>
                   </p>
                 )}
               </div>
             </section>
           )}
-          {shelf && (
-            <section className="site-section mb-8 p-8 max-sm:p-5">
-              <h2 className="mb-4 text-2xl font-bold">
-                Four parts. One small panel.
-              </h2>
-              <div className="overflow-x-auto">
-                <table className="mb-6 w-full text-left text-sm [&_th]:p-3 [&_td]:p-3 [&_tr]:border-b [&_tr]:border-border">
-                  <caption className="mb-3 text-left text-text-muted">
-                    Cut dimensions in inches, assuming actual 3/4-inch plywood.
-                  </caption>
-                  <thead>
-                    <tr>
-                      <th scope="col">Part</th>
-                      <th scope="col">Quantity</th>
-                      <th scope="col">Length × width × thickness</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr>
-                      <th scope="row">Top</th>
-                      <td>1</td>
-                      <td>24 × 8 × 3/4</td>
-                    </tr>
-                    <tr>
-                      <th scope="row">Sides</th>
-                      <td>2</td>
-                      <td>7 1/4 × 8 × 3/4</td>
-                    </tr>
-                    <tr>
-                      <th scope="row">Back rail</th>
-                      <td>1</td>
-                      <td>22 1/2 × 2 × 3/4</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <p className="mb-4 text-text-muted">
-                Start with a 24 × 48-inch plywood panel. The PDF includes a
-                suggested layout allowing 1/8-inch kerf, assembly guidance and a
-                front view. Measure your plywood first: if its thickness is t,
-                the sides become 8 − t inches long and the rail becomes 24 − 2t.
-                Update the model dimensions and positions to match.
-              </p>
-              <p className="mb-4 text-text-muted">
-                Use the PDF on its own, or open the .carvd file in Carvd Studio
-                to explore the model and make your own cut list. Stock pricing
-                is unset so you can enter your local cost. Hardware is not
-                modeled.
-              </p>
-              <p className="text-sm text-text-muted">
-                This is a planning example for light desktop storage, not a
-                physically tested or load-rated design. Check your material,
-                joints and fasteners before building.
-              </p>
-            </section>
+          {heron && (
+            <>
+              <section className="site-section mb-8 p-8 max-sm:p-5">
+                <h2 className="mb-4 text-2xl font-bold">
+                  Designed board by board in Carvd.
+                </h2>
+                <p className="mb-4 text-text-muted">
+                  Heron was created by interacting with the desktop app: naming
+                  stock, placing boards, laying out cuts and inspecting the
+                  assembly. The contrast comes from a light oak case and panel
+                  against the walnut door frame and drawer fronts.
+                </p>
+                <ul className="list-disc space-y-2 pl-5 text-text-muted">
+                  <li>Through-dovetailed case corners and housed shelves.</li>
+                  <li>
+                    A mortise-and-tenon door frame with a floating,
+                    shallow-fluted oak panel.
+                  </li>
+                  <li>
+                    Half-blind drawer dovetails, captured plywood bottoms and
+                    recessed finger pulls.
+                  </li>
+                  <li>
+                    Complementary 45-degree French cleats and a lower wall
+                    spacer.
+                  </li>
+                </ul>
+              </section>
+              <figure className="site-section mb-8 overflow-hidden">
+                <img
+                  src="/screenshots/heron-ghost.png"
+                  alt="Heron in Ghost view, revealing case dovetails, shelves and the drawer boxes through the assembled cabinet"
+                  width="3024"
+                  height="1742"
+                  loading="lazy"
+                  className="w-full"
+                />
+                <figcaption className="p-4 text-sm text-text-muted">
+                  Ghost view exposes the arrangement of the internal parts
+                  without changing the model.
+                </figcaption>
+              </figure>
+              <section className="site-section mb-8 p-8 max-sm:p-5">
+                <h2 className="mb-5 text-2xl font-bold">
+                  Explore the model in four steps.
+                </h2>
+                <ol className="list-decimal space-y-4 pl-5 text-text-muted">
+                  <li>
+                    <strong>Open the project.</strong> Use Carvd Studio 1.3 or
+                    later. The file contains named stock and separate cabinet,
+                    door and drawer groups. Keep Prevent Overlap enabled in
+                    Project Settings.
+                  </li>
+                  <li>
+                    <strong>Inspect the assembly.</strong> Orbit the cabinet,
+                    switch to Ghost view and select an individual part. Check
+                    the door reveals, drawer clearances and the orientation of
+                    the cleat halves.
+                  </li>
+                  <li>
+                    <strong>Explore a joint.</strong> Select a drawer side and
+                    open Edit Part Cuts. Inspect the dovetail profile, bottom
+                    groove and rear housing. The cuts remain editable; use a
+                    copy of the project to try variations.
+                  </li>
+                  <li>
+                    <strong>Make your own cutting plan.</strong> Enter your
+                    actual stock sizes, prices and saw kerf, then generate a
+                    fresh cut list. Start with the blanks, then review the
+                    listed secondary operations. The included report is a
+                    snapshot of this model.
+                  </li>
+                </ol>
+              </section>
+              <figure className="site-section mb-8 overflow-hidden">
+                <img
+                  src="/screenshots/heron-drawer-cuts.png"
+                  alt="Carvd Part Cuts workspace showing the maple drawer side with dovetail cuts, bottom groove and back housing"
+                  width="3024"
+                  height="1742"
+                  loading="lazy"
+                  className="w-full"
+                />
+                <figcaption className="p-4 text-sm text-text-muted">
+                  A drawer side in the Part Cuts workspace. Each operation can
+                  be inspected individually.
+                </figcaption>
+              </figure>
+              <section className="site-section mb-8 p-8 max-sm:p-5">
+                <h2 className="mb-4 text-2xl font-bold">
+                  Dimensions and review notes.
+                </h2>
+                <div className="overflow-x-auto">
+                  <table className="mb-5 w-full text-left text-sm [&_th]:p-3 [&_td]:p-3 [&_tr]:border-b [&_tr]:border-border">
+                    <caption className="mb-3 text-left text-text-muted">
+                      Nominal model dimensions, in inches. These describe the
+                      design, not machining tolerances.
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Detail</th>
+                        <th scope="col">Dimensions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <th scope="row">Case</th>
+                        <td>36 wide × 24 high × 10 deep; pull adds 1/2</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Door / opening</th>
+                        <td>21 1/2 × 17 / 21 3/4 × 17 1/4</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Drawer fronts / openings</th>
+                        <td>16 5/8 × 4 1/4 / 16 7/8 × 4 1/2</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Door and drawer-front reveals</th>
+                        <td>1/8 on each side</td>
+                      </tr>
+                      <tr>
+                        <th scope="row">Oak panel / groove span</th>
+                        <td>18 3/4 × 14 3/8 / 19 × 14 1/2</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p className="mb-4 text-text-muted">
+                  Fit the nominal joints to your actual material and cutters on
+                  scrap. The solid oak panel must float in the frame; verify
+                  seasonal movement for the wood and environment. Glue the
+                  panel's central seam, not its edges into the grooves. Some
+                  thin parts require preparation from thicker stock.
+                </p>
+                <p className="text-text-muted">
+                  Before building, specify inset-door hinges and a catch, drawer
+                  runners and stops, back attachment, and a structural
+                  connection from the cabinet cleat to the solid case. Do not
+                  rely on the 1/4-inch back alone to carry the cabinet. Hardware
+                  and fastener holes are not modeled; no load rating is
+                  assigned. Report prices are library placeholders.
+                </p>
+              </section>
+            </>
           )}
           {tutorial && (
             <>
@@ -259,8 +359,8 @@ export default function LearnPage() {
                 <Link to="/download">Try Carvd Studio</Link>
               </Button>
               <Button asChild variant="outline">
-                <Link to={tutorial ? "/learn/desktop-shelf" : "/pricing"}>
-                  {tutorial ? "Get the free shelf project" : "See pricing"}
+                <Link to={tutorial ? "/learn/heron-wall-cabinet" : "/pricing"}>
+                  {tutorial ? "Get the free Heron project" : "See pricing"}
                 </Link>
               </Button>
             </div>
