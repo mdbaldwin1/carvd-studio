@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added a public 1.3.0 feature announcement with real app screenshots, linked from the homepage and changelog.
+
 ### Fixed
 
 - Keep Escape dismissal available immediately when the lighting popup opens or rerenders.

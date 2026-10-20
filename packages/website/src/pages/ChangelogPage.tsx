@@ -67,6 +67,12 @@ export default function ChangelogPage() {
               .
             </p>
 
+            <a
+              href="/updates/1-3-0"
+              className="site-section mb-12 block p-6 text-accent underline underline-offset-4"
+            >
+              Explore the 1.3.0 highlights with screenshots →
+            </a>
             <div className="grid gap-16">
               {versions.map((version) => (
                 <section

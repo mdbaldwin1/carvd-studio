@@ -15,6 +15,8 @@ const PrivacyPolicyPage = lazy(() => import("./pages/PrivacyPolicyPage"));
 const TermsPage = lazy(() => import("./pages/TermsPage"));
 const ChangelogPage = lazy(() => import("./pages/ChangelogPage"));
 
+const Release130Page = lazy(() => import("./pages/Release130Page"));
+
 // Docs pages
 const DocsLayout = lazy(() => import("./pages/docs/DocsLayout"));
 const DocsIndexPage = lazy(() => import("./pages/docs/DocsIndexPage"));
@@ -47,6 +49,7 @@ function App() {
       <Suspense fallback={null}>
         <Routes>
           <Route path="/" element={<HomePage />} />
+          <Route path="/updates/1-3-0" element={<Release130Page />} />
           <Route path="/features" element={<FeaturesPage />} />
           <Route path="/pricing" element={<PricingPage />} />
           <Route path="/docs" element={<DocsLayout />}>

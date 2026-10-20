@@ -61,6 +61,18 @@ export default function HomePage() {
       <Header />
 
       <main id="main-content" className="flex-1">
+        <div className="container pt-6">
+          <a
+            href="/updates/1-3-0"
+            className="site-section block px-5 py-4 text-center text-text transition-colors hover:text-highlight"
+          >
+            <strong>New in 1.3.0:</strong> Part cuts, matching joinery, and more
+            detailed shop reports.{" "}
+            <span className="underline underline-offset-4">
+              See what’s new →
+            </span>
+          </a>
+        </div>
         {/* Hero Section */}
         <section className="container py-16 text-center max-md:py-12 max-sm:py-8">
           <div className="mx-auto max-w-4xl">
