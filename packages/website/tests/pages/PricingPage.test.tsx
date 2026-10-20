@@ -30,7 +30,7 @@ describe("PricingPage", () => {
     it("renders pricing badge", () => {
       renderPricingPage();
       expect(
-        screen.getByText(/Less Than 6 Months of Subscription Software/i),
+        screen.getByText(/One Payment\. Every Project\./i),
       ).toBeInTheDocument();
     });
   });
@@ -38,7 +38,7 @@ describe("PricingPage", () => {
   describe("pricing card", () => {
     it("displays the price", () => {
       renderPricingPage();
-      const priceElements = screen.getAllByText(/\$59\.99/i);
+      const priceElements = screen.getAllByText(/\$99\.99/i);
       expect(priceElements.length).toBeGreaterThan(0);
     });
 
@@ -70,7 +70,11 @@ describe("PricingPage", () => {
       expect(
         screen.getByText(/Real-time material cost tracking/i),
       ).toBeInTheDocument();
-      expect(screen.getByText(/Free lifetime updates/i)).toBeInTheDocument();
+      expect(
+        screen.getByText("Free lifetime updates with new features", {
+          exact: true,
+        }),
+      ).toBeInTheDocument();
       expect(screen.getByText(/Install on up to 3 devices/i)).toHaveTextContent(
         /Mac, Windows & Linux/i,
       );
@@ -112,14 +116,14 @@ describe("PricingPage", () => {
     it("renders break-even heading", () => {
       renderPricingPage();
       expect(
-        screen.getByText(/The Break-Even Point\? 6 Months\./i),
+        screen.getByText(/One Payment\. Long-Term Value\./i),
       ).toBeInTheDocument();
     });
 
     it("renders subscription comparison card", () => {
       renderPricingPage();
-      // "Monthly Subscription" may appear multiple times (heading and card)
-      const monthlySubTexts = screen.getAllByText(/Monthly Subscription/i);
+      // "Example Subscription" may appear multiple times (heading and card)
+      const monthlySubTexts = screen.getAllByText(/Example Subscription/i);
       expect(monthlySubTexts.length).toBeGreaterThan(0);
       // $10/mo may also appear multiple times
       const priceTexts = screen.getAllByText(/\$10\/mo/i);
@@ -128,7 +132,7 @@ describe("PricingPage", () => {
 
     it("renders savings callout", () => {
       renderPricingPage();
-      expect(screen.getByText(/Save \$540 over 5 years/i)).toBeInTheDocument();
+      expect(screen.getByText(/Save \$500 over 5 years/i)).toBeInTheDocument();
     });
   });
 
