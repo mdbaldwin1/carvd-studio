@@ -1,3 +1,4 @@
+import { waitForJsonFile } from './helpers/files';
 import { expect, test } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
@@ -94,7 +95,7 @@ test.describe('native import/export round trips', () => {
     const settings = window.getByRole('dialog', { name: 'App Settings' });
     await settings.getByRole('tab', { name: 'Data & License' }).click();
     await settings.getByRole('button', { name: 'Export' }).click();
-    await expect.poll(() => fs.existsSync(backupPath), { timeout: 5000 }).toBe(true);
+    await waitForJsonFile(backupPath, 5000);
     expect(readJson(backupPath)).toMatchObject({
       version: 1,
       data: {
@@ -143,7 +144,7 @@ async function assertStockRoundTrip(window: import('@playwright/test').Page, out
   await dialog.getByRole('button', { name: /E2E Native Export Walnut/ }).click();
   await queueSavePath(window, stockPath);
   await dialog.getByRole('button', { name: 'Export', exact: true }).click();
-  await expect.poll(() => fs.existsSync(stockPath), { timeout: 5000 }).toBe(true);
+  await waitForJsonFile(stockPath, 5000);
   expect(readJson(stockPath)).toMatchObject({ type: 'stocks', data: [expect.objectContaining({ name: stock.name })] });
 
   await window.evaluate(() => window.electronAPI.setPreference('stockLibrary', []));
@@ -161,7 +162,7 @@ async function assertAssemblyRoundTrip(window: import('@playwright/test').Page, 
   await dialog.getByRole('button', { name: /E2E Native Export Assembly/ }).click();
   await queueSavePath(window, assemblyPath);
   await dialog.getByRole('button', { name: 'Export', exact: true }).click();
-  await expect.poll(() => fs.existsSync(assemblyPath), { timeout: 5000 }).toBe(true);
+  await waitForJsonFile(assemblyPath, 5000);
   expect(readJson(assemblyPath)).toMatchObject({
     type: 'assembly',
     data: expect.objectContaining({ name: assembly.name }),
@@ -182,7 +183,7 @@ async function assertTemplateRoundTrip(window: import('@playwright/test').Page, 
   await openTemplatesScreen(window);
   await queueSavePath(window, templatePath);
   await window.getByLabel(`Export ${template.name}`, { exact: true }).click();
-  await expect.poll(() => fs.existsSync(templatePath), { timeout: 5000 }).toBe(true);
+  await waitForJsonFile(templatePath, 5000);
   expect(readJson(templatePath)).toMatchObject({
     type: 'template',
     data: expect.objectContaining({ name: template.name })

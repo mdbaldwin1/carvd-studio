@@ -1,3 +1,4 @@
+import { MIN_DIMENSION_INCHES } from '../../constants';
 /**
  * Component to render distance indicators between selected parts and reference parts.
  * Shows edge-to-edge gaps (cyan) and edge alignment offsets (yellow).
@@ -186,8 +187,7 @@ export function ReferenceDistanceIndicators({ data }: ReferenceDistanceIndicator
           : activeSession.handle.z;
 
     if (ruler.editMode === 'resize-size') {
-      nextDimensions[axisToDimensionKey] =
-        axisToDimensionKey === 'thickness' ? Math.max(0.25, newDist) : Math.max(0.5, newDist);
+      nextDimensions[axisToDimensionKey] = Math.max(MIN_DIMENSION_INCHES, newDist);
     } else if (ruler.editMode === 'resize-gap' && sessionRelation && handleAxisValue !== 0) {
       const movement = calculateMoveDeltaForReferenceRelation(sessionRelation, newDist);
       if (!movement) {
@@ -196,8 +196,7 @@ export function ReferenceDistanceIndicators({ data }: ReferenceDistanceIndicator
       }
       const faceMovement = ruler.axis === 'x' ? movement.x : ruler.axis === 'y' ? movement.y : movement.z;
       const nextDimensionValue = activeSession.dimensions[axisToDimensionKey] + handleAxisValue * faceMovement;
-      nextDimensions[axisToDimensionKey] =
-        axisToDimensionKey === 'thickness' ? Math.max(0.25, nextDimensionValue) : Math.max(0.5, nextDimensionValue);
+      nextDimensions[axisToDimensionKey] = Math.max(MIN_DIMENSION_INCHES, nextDimensionValue);
     } else {
       setEditingId(null);
       return;
@@ -237,6 +236,7 @@ export function ReferenceDistanceIndicators({ data }: ReferenceDistanceIndicator
           position={[activeRuler.labelPosition.x, activeRuler.labelPosition.y + 0.9, activeRuler.labelPosition.z]}
           center
           occlude={displayMode === 'solid'}
+          zIndexRange={[0, 50]}
           style={{ pointerEvents: 'none' }}
         >
           <div className="rounded-[6px] border border-white/18 bg-[rgba(15,20,30,0.85)] px-2.5 py-1 text-[11px] font-medium text-white/92 shadow-[0_4px_14px_rgba(0,0,0,0.25)] whitespace-nowrap">
@@ -295,7 +295,13 @@ export function ReferenceDistanceIndicators({ data }: ReferenceDistanceIndicator
             />
 
             {/* Distance label */}
-            <Html position={labelPosition} center occlude={displayMode === 'solid'} style={{ pointerEvents: 'auto' }}>
+            <Html
+              position={labelPosition}
+              center
+              occlude={displayMode === 'solid'}
+              zIndexRange={[0, 50]}
+              style={{ pointerEvents: 'auto' }}
+            >
               {!labelLayout.get(ruler.id)?.visible ? null : isEditing ? (
                 <Input
                   type="text"

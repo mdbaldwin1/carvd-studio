@@ -35,6 +35,7 @@ function createStockSummary(overrides: Partial<StockSummary> = {}): StockSummary
   return {
     stockId: 's1',
     stockName: 'Plywood',
+    form: 'sheet',
     boardsNeeded: 2,
     boardFeet: 16,
     cost: 100,
@@ -136,9 +137,9 @@ describe('ShoppingListTab', () => {
       expect(screen.getByText('Plywood')).toBeInTheDocument();
     });
 
-    it('renders quantity with board label', () => {
+    it('renders quantity with sheet label', () => {
       render(<ShoppingListTab {...defaultProps} />);
-      expect(screen.getByText(/Buy: 2 boards/)).toBeInTheDocument();
+      expect(screen.getByText(/Buy: 2 sheets/)).toBeInTheDocument();
     });
 
     it('renders price per unit', () => {
@@ -254,6 +255,7 @@ describe('ShoppingListTab', () => {
       render(<ShoppingListTab {...defaultProps} />);
       const checkboxes = screen.getAllByRole('checkbox');
       expect(checkboxes[0]).not.toBeChecked();
+      expect(screen.getByRole('checkbox', { name: 'Mark Plywood as purchased' })).toBeInTheDocument();
     });
 
     it('toggles checkbox on click', () => {
@@ -262,6 +264,19 @@ describe('ShoppingListTab', () => {
       fireEvent.click(checkbox);
       expect(checkbox).toBeChecked();
     });
+  });
+
+  it('gives every custom-item field a stable accessible name', async () => {
+    const user = userEvent.setup();
+    render(<ShoppingListTab {...defaultProps} />);
+
+    await user.click(screen.getByRole('button', { name: '+ Add Item' }));
+
+    expect(screen.getByRole('textbox', { name: 'Item name' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Description (optional)' })).toBeInTheDocument();
+    expect(screen.getByRole('spinbutton', { name: 'Quantity' })).toBeInTheDocument();
+    expect(screen.getByRole('spinbutton', { name: 'Unit price' })).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: 'Category' })).toBeInTheDocument();
   });
 
   describe('high utilization warnings', () => {
@@ -369,7 +384,7 @@ describe('ShoppingListTab', () => {
       expect(screen.getByText(/2 stock types/)).toBeInTheDocument();
     });
 
-    it('uses singular board for quantity 1', () => {
+    it('uses singular sheet for quantity 1', () => {
       const cutList = createCutList({
         statistics: {
           ...createCutList().statistics,
@@ -377,7 +392,7 @@ describe('ShoppingListTab', () => {
         }
       });
       render(<ShoppingListTab {...defaultProps} cutList={cutList} />);
-      expect(screen.getByText(/Buy: 1 board$/)).toBeInTheDocument();
+      expect(screen.getByText(/Buy: 1 sheet$/)).toBeInTheDocument();
     });
   });
 });

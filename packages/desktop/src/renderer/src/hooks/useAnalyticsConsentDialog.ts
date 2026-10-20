@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { AnalyticsConsent } from '../../shared/analytics';
+import type { AnalyticsConsent } from '../../../shared/analytics';
 
 interface UseAnalyticsConsentDialogOptions {
   isLicenseLoading: boolean;

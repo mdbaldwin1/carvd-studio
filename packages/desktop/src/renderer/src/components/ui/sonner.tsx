@@ -8,7 +8,7 @@ import { useAppSettingsStore } from '../../store/appSettingsStore';
  * through. Trigger toasts via `useUIStore.getState().showToast(message, type?)`.
  */
 function Toaster() {
-  const theme = useAppSettingsStore((s) => s.theme) as 'dark' | 'light';
+  const theme = useAppSettingsStore((s) => s.settings.theme);
 
   return (
     <SonnerToaster

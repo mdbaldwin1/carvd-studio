@@ -44,6 +44,7 @@ const mockPart: Part = {
   position: { x: 0, y: 0, z: 0 },
   rotation: { x: 0, y: 0, z: 0 },
   stockId: 'stock-1',
+  grainSensitive: false,
   grainDirection: 'length',
   color: '#c4a574'
 };
@@ -61,6 +62,10 @@ const mockStock: Stock = {
 };
 
 const mockCutList: CutList = {
+  id: 'cut-list-1',
+  projectModifiedAt: '2024-01-01T00:00:00.000Z',
+  bypassedIssues: [],
+  kerfWidth: 0.125,
   instructions: [
     {
       partId: 'part-1',
@@ -71,6 +76,7 @@ const mockCutList: CutList = {
       stockId: 'stock-1',
       stockName: 'Plywood 3/4"',
       grainSensitive: true,
+      canRotate: true,
       isGlueUp: false,
       notes: ''
     },
@@ -83,6 +89,7 @@ const mockCutList: CutList = {
       stockId: 'stock-1',
       stockName: 'Plywood 3/4"',
       grainSensitive: true,
+      canRotate: true,
       isGlueUp: false,
       notes: ''
     }
@@ -95,6 +102,8 @@ const mockCutList: CutList = {
       stockWidth: 48,
       boardIndex: 1,
       utilizationPercent: 65.5,
+      usedArea: 3018.24,
+      wasteArea: 1589.76,
       placements: [
         {
           partId: 'part-1',
@@ -113,6 +122,7 @@ const mockCutList: CutList = {
     totalParts: 2,
     totalStockBoards: 1,
     totalBoardFeet: 4.5,
+    totalWasteSquareInches: 1589.76,
     wastePercentage: 34.5,
     estimatedCost: 50,
     totalWasteCost: 17.25,
@@ -120,6 +130,7 @@ const mockCutList: CutList = {
       {
         stockId: 'stock-1',
         stockName: 'Plywood 3/4"',
+        form: 'sheet' as const,
         stockLength: 96,
         stockWidth: 48,
         stockThickness: 0.75,
@@ -127,6 +138,7 @@ const mockCutList: CutList = {
         actualBoardsUsed: 1,
         boardFeet: 4.5,
         linearFeet: 0,
+        wasteSquareInches: 1589.76,
         cost: 50,
         averageUtilization: 65.5,
         pricingUnit: 'per_item',
@@ -170,7 +182,7 @@ describe('CutListModal', () => {
       updateCustomShoppingItem: vi.fn(),
       deleteCustomShoppingItem: vi.fn(),
       projectName: 'Test Project',
-      notes: ''
+      projectNotes: ''
     });
     useUIStore.setState({
       showToast: vi.fn()
@@ -258,6 +270,41 @@ describe('CutListModal', () => {
       expect(setCutList).toHaveBeenCalledWith(mockCutList);
     });
 
+    it('blocks generation and shows issue list for invalid saved operations', () => {
+      useProjectStore.setState({
+        parts: [
+          {
+            ...mockPart,
+            features: [
+              {
+                id: 'feature-1',
+                kind: 'rect_cut',
+                version: 1 as const,
+                enabled: true,
+                label: 'Oversized cutout',
+                target: { type: 'face', face: 'top_face' },
+                reference: { primaryFrom: 'min' },
+                cutType: 'cutout',
+                parameters: {
+                  size: { length: 30, width: 4 },
+                  depthMode: 'through'
+                },
+                placement: { x: 0, z: 0 }
+              }
+            ]
+          }
+        ]
+      });
+
+      render(<CutListModal {...defaultProps} />);
+
+      fireEvent.click(screen.getByText('Generate Cut List'));
+
+      expect(generateOptimizedCutList).not.toHaveBeenCalled();
+      expect(screen.getByText('Issues Found')).toBeInTheDocument();
+      expect(screen.getByText(/Oversized cutout/)).toBeInTheDocument();
+    });
+
     it('records the generated cut-list result with coarse counts', () => {
       render(<CutListModal {...defaultProps} />);
 
@@ -318,8 +365,8 @@ describe('CutListModal', () => {
       render(<CutListModal {...defaultProps} />);
 
       expect(screen.getByText('Parts')).toBeInTheDocument();
-      expect(screen.getByText('Boards')).toBeInTheDocument();
-      expect(screen.getByText('Board Feet')).toBeInTheDocument();
+      expect(screen.getByText('Boards Used')).toBeInTheDocument();
+      expect(screen.getByText('Purchase Board Feet')).toBeInTheDocument();
       expect(screen.getByText('Waste')).toBeInTheDocument();
       expect(screen.getByText('Est. Cost')).toBeInTheDocument();
     });
@@ -351,6 +398,7 @@ describe('CutListModal', () => {
       fireEvent.mouseDown(screen.getByRole('tab', { name: /Cutting Diagrams/i }));
 
       expect(screen.getByText('1 board needed')).toBeInTheDocument();
+      expect(screen.getByText(/Diagrams show blank breakdown only/)).toBeInTheDocument();
     });
 
     it('switches to Shopping List tab', () => {
@@ -372,9 +420,10 @@ describe('CutListModal', () => {
 
       expect(screen.getByText('Qty')).toBeInTheDocument();
       expect(screen.getByText('Part Name')).toBeInTheDocument();
-      expect(screen.getByText('Cut Length')).toBeInTheDocument();
-      expect(screen.getByText('Cut Width')).toBeInTheDocument();
+      expect(screen.getByText('Blank Length')).toBeInTheDocument();
+      expect(screen.getByText('Blank Width')).toBeInTheDocument();
       expect(screen.getByText('Stock')).toBeInTheDocument();
+      expect(screen.getByText('Operations / Notes')).toBeInTheDocument();
     });
 
     it('shows stock name in parts list', () => {
@@ -546,6 +595,8 @@ describe('CutListModal', () => {
       render(<CutListModal {...defaultProps} />);
 
       expect(screen.getByText('Regenerate')).toBeInTheDocument();
+      expect(screen.queryByRole('tab', { name: /Parts List/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /^Download$/ })).not.toBeInTheDocument();
     });
   });
 
@@ -635,6 +686,7 @@ describe('CutListModal', () => {
           stockId: 'stock-1',
           stockName: 'Plywood 3/4"',
           grainSensitive: true,
+          canRotate: true,
           isGlueUp: false,
           notes: ''
         },
@@ -647,6 +699,7 @@ describe('CutListModal', () => {
           stockId: 'stock-1',
           stockName: 'Plywood 3/4"',
           grainSensitive: true,
+          canRotate: true,
           isGlueUp: false,
           notes: ''
         },
@@ -659,6 +712,7 @@ describe('CutListModal', () => {
           stockId: 'stock-1',
           stockName: 'Plywood 3/4"',
           grainSensitive: true,
+          canRotate: true,
           isGlueUp: false,
           notes: ''
         }
@@ -718,7 +772,7 @@ describe('CutListModal', () => {
       });
 
       useProjectStore.setState({
-        parts: [{ ...mockPart, stockId: undefined }], // Part without stock
+        parts: [{ ...mockPart, stockId: null }], // Part without stock
         stocks: [mockStock]
       });
 
@@ -883,6 +937,7 @@ describe('CutListModal', () => {
           stockId: 'stock-1',
           stockName: 'Plywood 3/4"',
           grainSensitive: false,
+          canRotate: true,
           isGlueUp: true,
           notes: 'Glue up 8 boards'
         }
@@ -1155,7 +1210,7 @@ describe('CutListModal', () => {
 
     it('passes project notes when available', async () => {
       mockExportProjectReportToPdf.mockResolvedValueOnce({ success: true });
-      useProjectStore.setState({ notes: 'Build notes here' });
+      useProjectStore.setState({ projectNotes: 'Build notes here' });
 
       render(<CutListModal {...defaultProps} />);
 
@@ -1190,9 +1245,9 @@ describe('CutListModal', () => {
       });
     });
 
-    it('uses "Untitled Project" when projectName is null', async () => {
+    it('uses "Untitled Project" when projectName is empty', async () => {
       mockExportProjectReportToPdf.mockResolvedValueOnce({ success: true });
-      useProjectStore.setState({ projectName: null });
+      useProjectStore.setState({ projectName: '' });
 
       render(<CutListModal {...defaultProps} />);
 
@@ -1253,6 +1308,29 @@ describe('CutListModal', () => {
   });
 
   describe('stale cut list regeneration', () => {
+    it('refreshes outdated instructions once on opening and again after closing', () => {
+      useProjectStore.setState({ cutList: { ...mockCutList, isStale: true } });
+      const { rerender } = render(<CutListModal {...defaultProps} />);
+      expect(generateOptimizedCutList).toHaveBeenCalledTimes(1);
+      rerender(<CutListModal {...defaultProps} />);
+      expect(generateOptimizedCutList).toHaveBeenCalledTimes(1);
+      rerender(<CutListModal {...defaultProps} isOpen={false} />);
+      rerender(<CutListModal {...defaultProps} />);
+      expect(generateOptimizedCutList).toHaveBeenCalledTimes(2);
+    });
+
+    it('shows blocking errors instead of outdated instructions and prevents export', () => {
+      useProjectStore.setState({
+        parts: [{ ...mockPart, stockId: null }],
+        cutList: { ...mockCutList, isStale: true }
+      });
+      render(<CutListModal {...defaultProps} />);
+      expect(generateOptimizedCutList).not.toHaveBeenCalled();
+      expect(screen.getByText('Issues Found')).toBeInTheDocument();
+      expect(screen.queryByRole('tab', { name: /Parts List/ })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Download Project Report' })).toBeDisabled();
+    });
+
     it('regenerates cut list when Regenerate button is clicked', () => {
       useProjectStore.setState({
         cutList: { ...mockCutList, isStale: true }

@@ -48,7 +48,11 @@ export interface UserTemplate extends TemplateMetadata {
   type: 'user';
   createdAt: string;
   lastUsedAt?: string; // Track when template was last used for "recently used" ordering
-  project: Project;
+  /**
+   * JSON-serialized Project, exactly as the main-process store holds it.
+   * Every consumer parses this; it is not a Project object.
+   */
+  project: string;
 }
 
 /**

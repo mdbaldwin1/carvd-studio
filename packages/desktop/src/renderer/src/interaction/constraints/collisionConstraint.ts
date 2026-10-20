@@ -1,5 +1,5 @@
 // ADR-006: Collision constraint. Wraps the existing
-// `resolveSafeTranslationDelta` overlap-prevention utility so multiple
+// `resolveSafeDragTranslationDelta` overlap-prevention utility so multiple
 // transform paths (single-part drag release, group drag release) share the
 // same code path through the pipeline.
 //
@@ -7,7 +7,7 @@
 // When the host opts out of overlap prevention (preventOverlap === false),
 // the constraint is a passthrough.
 
-import { resolveSafeTranslationDelta } from '../../utils/overlapPolicy';
+import { resolveSafeDragTranslationDelta } from '../../utils/overlapPolicy';
 import type { CandidateTransform, Constraint, ConstraintBlocker, ConstraintResult, ConstraintWarning } from './types';
 
 export const collisionConstraint: Constraint = {
@@ -34,15 +34,16 @@ export const collisionConstraint: Constraint = {
       return { adjusted: candidate, blockers, warnings };
     }
 
-    // resolveSafeTranslationDelta takes the COMMITTED parts (pre-gesture
+    // resolveSafeDragTranslationDelta takes the COMMITTED parts (pre-gesture
     // positions) and a proposed delta. The candidate's `delta` is the
     // proposed translation; we pass parts from project state at their
     // current (committed) positions.
-    const safeDelta = resolveSafeTranslationDelta(
+    const safeDelta = resolveSafeDragTranslationDelta(
       [...ctx.project.parts],
       movingIds,
       candidate.delta,
-      ctx.geometryCache
+      ctx.geometryCache,
+      candidate.mateHostPartId ?? ctx.project.mateHostPartId
     );
 
     if (safeDelta === null) {
@@ -98,7 +99,8 @@ export const collisionConstraint: Constraint = {
       adjusted: {
         kind: 'move',
         delta: { x: dx, y: dy, z: dz },
-        positions: adjustedPositions
+        positions: adjustedPositions,
+        mateHostPartId: candidate.mateHostPartId
       } satisfies CandidateTransform,
       blockers,
       warnings

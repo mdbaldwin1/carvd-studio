@@ -2,7 +2,7 @@ import { STOCK_COLORS } from '@renderer/constants';
 import { Part, Stock } from '@renderer/types';
 import { formatMeasurementWithUnit } from '@renderer/utils/fractions';
 import { getPartBounds } from '@renderer/utils/snapToPartsUtil';
-import { partsOverlap, wouldOverlapWithAny } from '@renderer/utils/overlapPolicy';
+import { partsOverlap, wouldTransformedPartsOverlap } from '@renderer/utils/overlapPolicy';
 
 export function getConstraintWarnings(part: Part, stocks: Stock[], units: 'imperial' | 'metric'): string[] {
   const warnings: string[] = [];
@@ -84,18 +84,21 @@ export function getOverlappingParts(part: Part, parts: Part[]): string[] {
 
 export function wouldPartOverlap(part: Part, newPosition: Part['position'], parts: Part[]): boolean {
   const testPart: Part = { ...part, position: newPosition };
-  return wouldOverlapWithAny(testPart, parts);
+  return wouldTransformedPartsOverlap(parts, new Map([[part.id, testPart]]));
 }
 
 export function buildStockDataFromUpdates(updates: Partial<Stock>, colorIndex: number): Partial<Stock> {
   return {
     name: updates.name || 'New Stock',
+    form: updates.form,
+    insertKind: updates.insertKind,
+    packSize: updates.packSize,
     length: updates.length || 96,
     width: updates.width || 48,
     thickness: updates.thickness || 0.75,
     grainDirection: updates.grainDirection || 'length',
     pricingUnit: updates.pricingUnit || 'per_item',
-    pricePerUnit: updates.pricePerUnit || 50,
+    pricePerUnit: updates.pricePerUnit ?? 50,
     color: updates.color || STOCK_COLORS[colorIndex % STOCK_COLORS.length]
   };
 }

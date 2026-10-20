@@ -47,10 +47,28 @@ describe('HierarchicalPartsList', () => {
       length: 24,
       width: 12,
       thickness: 0.75,
-      x: 0,
-      y: 0,
-      z: 0,
-      color: '#c4a574'
+      position: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      stockId: null,
+      grainSensitive: false,
+      grainDirection: 'length',
+      color: '#c4a574',
+      features: [
+        {
+          id: 'feature-1',
+          kind: 'end_cut',
+          version: 1 as const,
+          enabled: true,
+          label: 'Frame mitre',
+          target: { type: 'face', face: 'left_end' },
+          reference: { primaryFrom: 'min' },
+          cutType: 'mitre',
+          lengthMode: 'long_point',
+          parameters: {
+            horizontalAngle: 45
+          }
+        }
+      ]
     },
     {
       id: 'part-2',
@@ -58,9 +76,10 @@ describe('HierarchicalPartsList', () => {
       length: 36,
       width: 18,
       thickness: 0.75,
-      x: 0,
-      y: 0,
-      z: 0,
+      position: { x: 0, y: 0, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+      grainSensitive: false,
+      grainDirection: 'length',
       color: '#a5784c',
       stockId: 'stock-1'
     }
@@ -118,11 +137,34 @@ describe('HierarchicalPartsList', () => {
   });
 
   describe('rendering', () => {
+    it('preserves fitted decimal dimensions in the part tooltip', () => {
+      useProjectStore.setState({
+        parts: [
+          { ...mockParts[0], name: 'Wooden T-slot runner', length: 4, width: 0.47, thickness: 0.1675, features: [] }
+        ]
+      });
+      render(<HierarchicalPartsList {...defaultProps} />);
+      expect(screen.getByTitle(/Wooden T-slot runner/)).toHaveAttribute(
+        'title',
+        'Wooden T-slot runner\n4" × 0.47" × 0.1675"'
+      );
+    });
+
     it('renders parts list', () => {
       render(<HierarchicalPartsList {...defaultProps} />);
 
       expect(screen.getByText('Side Panel')).toBeInTheDocument();
       expect(screen.getByText('Top Panel')).toBeInTheDocument();
+    });
+
+    it('selects two separate pieces without modifier keys and removes only the unchecked piece', () => {
+      render(<HierarchicalPartsList {...defaultProps} />);
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Select Side Panel' }));
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Select Top Panel' }));
+      expect(useSelectionStore.getState().selectedPartIds).toEqual(['part-1', 'part-2']);
+      fireEvent.click(screen.getByRole('checkbox', { name: 'Select Side Panel' }));
+      expect(useSelectionStore.getState().selectedPartIds).toEqual(['part-2']);
+      expect(defaultProps.onPartClick).not.toHaveBeenCalled();
     });
 
     it('shows empty message when no parts', () => {
@@ -147,6 +189,13 @@ describe('HierarchicalPartsList', () => {
 
       expect(duplicateButtons).toHaveLength(2);
       expect(deleteButtons).toHaveLength(2);
+    });
+
+    it('shows operation badges and summaries for feature-bearing parts', () => {
+      render(<HierarchicalPartsList {...defaultProps} />);
+
+      expect(screen.getByText('Ops 1')).toBeInTheDocument();
+      expect(screen.getByText('Frame mitre')).toBeInTheDocument();
     });
   });
 

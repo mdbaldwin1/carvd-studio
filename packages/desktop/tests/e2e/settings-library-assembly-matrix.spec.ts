@@ -120,8 +120,8 @@ test.describe('settings, library, and assembly flows', () => {
     await dialog.locator('input[type="text"]').nth(2).fill('60');
     await dialog.locator('input[type="text"]').nth(3).fill('30');
     await dialog.locator('input[type="text"]').nth(4).fill('0.5');
-    await dialog.locator('select').first().selectOption('width');
-    await dialog.locator('select').nth(1).selectOption('board_foot');
+    await dialog.getByLabel('Grain Direction').selectOption('width');
+    await dialog.getByLabel('Pricing Unit').selectOption('board_foot');
     await dialog.locator('input[type="number"]').fill('8.75');
     await dialog.getByRole('button', { name: 'Create', exact: true }).click();
 

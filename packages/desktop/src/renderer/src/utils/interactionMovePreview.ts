@@ -1,12 +1,14 @@
 import type { AppSettings, Part, SnapGuide, SnapLine } from '../types';
-import { createAxisSnapWinners } from './snapPriority';
+import { createAxisSnapWinners, tryApplyAxisSnap } from './snapPriority';
 import { applyGroupAxisCandidate } from './groupDragSnapArbitration';
 import { createPartSnapContext, createGroupProxySnapContext, detectFaceSnapForContext } from './interactionSnapContext';
 import { solveDeltaSnapStages, solvePositionSnapStages, type LatchedFaceSnapState } from './interactionSnap';
+import type { SnapStage } from './snapPriority';
 import {
   createGuideSnapLine,
   createOriginSnapLine,
   getPartBoundsAtPosition,
+  type MateSnapResult,
   type PartBounds,
   type SnapResult
 } from './snapToPartsUtil';
@@ -23,18 +25,12 @@ export interface MovePreviewResult {
 export interface PartMovePreviewResult extends MovePreviewResult {
   position: Position3D;
   nextLatchedFaceSnap: LatchedFaceSnapState | null;
+  mateHostPartId?: string;
+  mateConflict?: { candidateCount: number; maxDisagreement: number };
 }
 
 export interface GroupMovePreviewResult extends MovePreviewResult {
   delta: Position3D;
-}
-
-function getSnappedAxes(snapLines: SnapLine[]) {
-  return {
-    x: snapLines.some((line) => line.axis === 'x'),
-    y: snapLines.some((line) => line.axis === 'y'),
-    z: snapLines.some((line) => line.axis === 'z')
-  };
 }
 
 export function solvePartMoveSnapPreview(params: {
@@ -66,6 +62,7 @@ export function solvePartMoveSnapPreview(params: {
 
   let nextPosition = { ...position };
   let nextLatchedFaceSnap = latchedFaceSnap;
+  let mateResult: MateSnapResult | undefined;
   const snapLines: SnapLine[] = [];
   const winners = createAxisSnapWinners();
   const snapWouldRestoreDragOrigin = (axis: Axis, nextValue: number) =>
@@ -145,9 +142,31 @@ export function solvePartMoveSnapPreview(params: {
             enableFeatureAnchors: settings.enableFeatureAnchors ?? true,
             applyAxisPosition,
             detectors: {
+              mate: () => {
+                // Group release/store collision solving does not carry a
+                // single host identity. Suppress holistic socket mating for
+                // multi-selection so preview and commit cannot disagree.
+                mateResult =
+                  movingPartIds.length === 1
+                    ? initialContext.advancedDetectors.mate()
+                    : {
+                        adjustedPosition: nextPosition,
+                        snappedX: false,
+                        snappedY: false,
+                        snappedZ: false,
+                        snapLines: []
+                      };
+                return mateResult;
+              },
               surface: () => getSnapContext().advancedDetectors.surface(),
               fraction: () => getSnapContext().advancedDetectors.fraction(),
-              feature: () => getSnapContext().advancedDetectors.feature(),
+              feature: () => {
+                // This context is built with a resolveFeatureStage, so the
+                // staged form is what comes back; the bare form only occurs
+                // for contexts created without a resolver.
+                const detected = getSnapContext().advancedDetectors.feature();
+                return 'stage' in detected ? detected : { result: detected, stage: 'feature' as SnapStage };
+              },
               axis: getSnapContext().advancedDetectors.axis
                 ? () => getSnapContext().advancedDetectors.axis!()
                 : undefined
@@ -156,11 +175,55 @@ export function solvePartMoveSnapPreview(params: {
         : undefined
   });
 
+  // A socket mate is a holistic fit: a face-constrained drag may only expose
+  // the insertion axis to ordinary snap arbitration, but the mate detector
+  // still needs to center the cross-section on the socket's inactive axes.
+  // Apply all of the mate's constrained axes together, including unchanged
+  // cross-section axes. Normal stage priority still protects explicit guides.
+  if (mateResult?.mateHostPartId) {
+    const mateSnappedAxes: Record<Axis, boolean> = {
+      x: mateResult.snappedX,
+      y: mateResult.snappedY,
+      z: mateResult.snappedZ
+    };
+    for (const axis of ['x', 'y', 'z'] as const) {
+      if (!mateSnappedAxes[axis]) continue;
+      const nextValue = mateResult.adjustedPosition[axis];
+      if (axis === 'y' && nextValue < worldHalfHeight) continue;
+      if (
+        tryApplyAxisSnap(
+          axis,
+          'mate',
+          winners,
+          snapLines,
+          mateResult.snapLines.filter((line) => line.axis === axis)
+        )
+      ) {
+        nextPosition = { ...nextPosition, [axis]: nextValue };
+      }
+    }
+  }
+
+  const mateHostPartId = mateResult?.mateHostPartId;
+  const mateWasRejectedOnAnyAxis =
+    !!mateResult &&
+    ((mateResult.snappedX && winners.x !== 'mate') ||
+      (mateResult.snappedY && winners.y !== 'mate') ||
+      (mateResult.snappedZ && winners.z !== 'mate'));
   return {
     position: nextPosition,
     nextLatchedFaceSnap,
     snapLines,
-    snappedAxes: getSnappedAxes(snapLines)
+    // Holistic mates may accept axes without a dedicated visual line. Release
+    // must preserve every accepted winner so live grid snapping cannot move a
+    // valid fit away from the socket.
+    snappedAxes: {
+      x: winners.x !== null,
+      y: winners.y !== null,
+      z: winners.z !== null
+    },
+    mateHostPartId: mateHostPartId && !mateWasRejectedOnAnyAxis ? mateHostPartId : undefined,
+    mateConflict: mateResult?.mateConflict
   };
 }
 
@@ -206,13 +269,14 @@ export function solveGroupMoveSnapPreview(params: {
 
   const snapLines: SnapLine[] = [];
   const winners = createAxisSnapWinners();
+  let groupMateResult: MateSnapResult | undefined;
   let workingDelta = { ...delta };
   let movingBounds = offsetBounds(initialBounds, workingDelta);
   const getSnapContext = () =>
     createGroupProxySnapContext({
       initialBounds,
       anchorPosition,
-      delta: workingDelta,
+      delta: { ...workingDelta },
       referenceParts,
       movingPartIds,
       movingParts,
@@ -270,6 +334,10 @@ export function solveGroupMoveSnapPreview(params: {
       enableGoldenRatioAnchors: settings.enableGoldenRatioAnchors ?? false,
       enableFeatureAnchors: settings.enableFeatureAnchors ?? true,
       detectors: {
+        mate: () => {
+          groupMateResult = initialContext.advancedDetectors.mate();
+          return groupMateResult;
+        },
         surface: () => getSnapContext().advancedDetectors.surface(),
         fraction: () => getSnapContext().advancedDetectors.fraction(),
         feature: () => getSnapContext().advancedDetectors.feature() as SnapResult,
@@ -278,9 +346,31 @@ export function solveGroupMoveSnapPreview(params: {
     }
   });
 
+  // A rigid mate is holistic and all-or-nothing: the joint is a single seated
+  // position, not a per-axis preference. Letting another snap keep an axis
+  // leaves a blend of the two that seats nothing, and because the parts
+  // interlock there, that blend reads as a collision and the whole move is
+  // refused -- the assembly stops short with its joints open. Take every axis
+  // the mate asks for.
+  if (groupMateResult?.mateHostPartId) {
+    for (const axis of ['x', 'y', 'z'] as const) {
+      const mateSnapped =
+        axis === 'x' ? groupMateResult.snappedX : axis === 'y' ? groupMateResult.snappedY : groupMateResult.snappedZ;
+      if (!mateSnapped) continue;
+      workingDelta[axis] = groupMateResult.adjustedPosition[axis] - anchorPosition[axis];
+      tryApplyAxisSnap(
+        axis,
+        'mate',
+        winners,
+        snapLines,
+        groupMateResult.snapLines.filter((line) => line.axis === axis)
+      );
+    }
+  }
+
   return {
     delta: workingDelta,
     snapLines,
-    snappedAxes: getSnappedAxes(snapLines)
+    snappedAxes: { x: winners.x !== null, y: winners.y !== null, z: winners.z !== null }
   };
 }

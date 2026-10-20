@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import SEO from "../../components/SEO";
 import { createBreadcrumbSchema } from "../../utils/jsonLd";
 import DocsPrevNext from "./DocsPrevNext";
@@ -199,6 +200,33 @@ export default function TroubleshootingPage() {
         </div>
       </div>
 
+      <section id="joinery" className="site-section p-6 mt-xl scroll-mt-28">
+        <h3 className="text-2xl font-bold mb-4">Cuts and joints</h3>
+        <p className="text-muted mb-4">
+          If a cut appears on the wrong side, check its named target and
+          reference edge; rotating the camera does not rename a board’s faces.
+          If a joint will not seat, check remaining material, cross-section,
+          depth, and the meeting angle before changing its position.
+        </p>
+        <p className="text-muted">
+          Use{" "}
+          <Link
+            className="text-text underline underline-offset-4 decoration-primary"
+            to="/docs/joinery#troubleshooting"
+          >
+            joint troubleshooting
+          </Link>{" "}
+          for missing commands, interference, inserts, and changes after
+          resizing. For export problems, review{" "}
+          <Link
+            className="text-text underline underline-offset-4 decoration-primary"
+            to="/docs/cut-lists#part-cut-instructions"
+          >
+            part-cut instructions and blocking errors
+          </Link>
+          .
+        </p>
+      </section>
       <DocsPrevNext />
     </section>
   );

@@ -83,7 +83,7 @@ export function TemplatesScreen({
         project = (template as BuiltInTemplate).generate();
       } else {
         // Parse stored project JSON for user templates
-        project = JSON.parse((template as UserTemplate).project as unknown as string);
+        project = JSON.parse((template as UserTemplate).project);
         const now = new Date().toISOString();
         project.createdAt = now;
         project.modifiedAt = now;
@@ -154,7 +154,7 @@ export function TemplatesScreen({
           project = (template as BuiltInTemplate).generate();
         } else {
           // Parse stored project from user template
-          project = JSON.parse((template as UserTemplate).project as unknown as string);
+          project = JSON.parse((template as UserTemplate).project);
         }
 
         // Calculate bounding box for dimensions
@@ -252,7 +252,7 @@ export function TemplatesScreen({
   return (
     <div className="fixed inset-0 flex flex-col bg-bg z-1000">
       {/* Draggable title bar area for window movement */}
-      <div className="w-full h-[38px] shrink-0" style={{ WebkitAppRegion: 'drag' } as React.CSSProperties} />
+      <div className="w-full h-[38px] shrink-0" style={{ WebkitAppRegion: 'drag' }} />
 
       <div className="flex-1 max-w-[1200px] w-full mx-auto px-12 pb-12 flex flex-col gap-8 overflow-y-auto">
         {/* Header */}

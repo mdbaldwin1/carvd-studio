@@ -47,7 +47,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
   const licenseMode = useLicenseStore((s) => s.licenseMode);
   const showToast = useUIStore((s) => s.showToast);
   const projectName = useProjectStore((s) => s.projectName);
-  const projectNotes = useProjectStore((s) => s.notes);
+  const projectNotes = useProjectStore((s) => s.projectNotes);
   const customShoppingItems = useProjectStore((s) => s.customShoppingItems);
 
   // Get feature limits based on license mode
@@ -62,7 +62,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
     }
 
     // Validate parts first
-    const issues = validatePartsForCutList(parts, stocks);
+    const issues = validatePartsForCutList(parts, stocks, units);
     const blockingIssues = issues.filter((i) => i.severity === 'error' && !i.canBypass);
 
     if (blockingIssues.length > 0) {
@@ -76,8 +76,8 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
     }
 
     // Clear validation issues and generate
-    setValidationIssues([]);
-    const bypassedIssues = issues.filter((i) => i.canBypass);
+    setValidationIssues(issues);
+    const bypassedIssues = issues;
     const newCutList = generateOptimizedCutList(parts, stocks, kerfWidth, overageFactor, modifiedAt, bypassedIssues);
 
     setCutList(newCutList);
@@ -86,7 +86,16 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
       stock_count_bucket: bucketCount(stocks.length),
       success: true
     });
-  }, [parts, stocks, kerfWidth, overageFactor, modifiedAt, setCutList, limits.canUseOptimizer, showToast]);
+  }, [parts, stocks, units, kerfWidth, overageFactor, modifiedAt, setCutList, limits.canUseOptimizer, showToast]);
+
+  // Opening an outdated report is the sidebar's regeneration action. Attempt
+  // once per opening so validation failures do not cause repeated generation.
+  const wasOpen = React.useRef(false);
+  React.useEffect(() => {
+    const justOpened = isOpen && !wasOpen.current;
+    wasOpen.current = isOpen;
+    if (justOpened && cutList?.isStale) handleGenerate();
+  }, [isOpen, cutList?.isStale, handleGenerate]);
 
   // Export project report PDF
   const handleDownloadProjectReport = useCallback(async () => {
@@ -146,7 +155,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
         </DialogHeader>
 
         {/* No cut list - show generate UI */}
-        {!cutList && (
+        {(!cutList || hasBlockingIssues) && (
           <div className="cut-list-generate flex min-h-0 flex-1 flex-col items-center justify-center gap-4 overflow-y-auto p-10 text-center">
             <p className="text-[13px] text-text-secondary leading-relaxed max-w-[500px] mx-auto m-0">
               Generate an optimized cut list from your design. All parts must be assigned to a stock material before
@@ -182,7 +191,8 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
                     <h3 className="text-[14px] font-semibold text-text m-0 mb-2">Issues Found</h3>
                     {hasBlockingIssues && (
                       <p className="text-[12px] text-text-muted mb-2 m-0">
-                        Fix the errors below before generating. Each part must be assigned to a stock material.
+                        Fix the errors below before generating. Blank dimensions, stock assignments, and authored
+                        operations must all be valid.
                       </p>
                     )}
                     <ul className="list-none p-0 m-0">
@@ -204,8 +214,20 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
         )}
 
         {/* Cut list generated - show tabs */}
-        {cutList && (
+        {cutList && !hasBlockingIssues && (
           <>
+            {(cutList.validationIssues ?? cutList.bypassedIssues ?? []).length > 0 && (
+              <section aria-label="Fabrication warnings" className="px-6 py-2 text-warning text-sm">
+                <h3 className="font-semibold">Review before fabrication</h3>
+                <ul>
+                  {(cutList.validationIssues ?? cutList.bypassedIssues).map((issue, index) => (
+                    <li key={index}>
+                      <strong>{issue.partName}:</strong> {issue.message}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
             {/* Stale warning */}
             {cutList.isStale && (
               <div className="cut-list-stale-warning flex items-center gap-3 py-2.5 px-6 bg-warning-bg text-warning text-[13px]">
@@ -230,33 +252,35 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
             )}
 
             {/* Tab bar + content */}
-            <Tabs defaultValue="parts" className="cut-list-tabs flex min-h-0 flex-1 flex-col">
-              <TabsList className="mx-6 my-2 border-b border-border">
-                <TabsTrigger value="parts">Parts List ({cutList.instructions.length})</TabsTrigger>
-                <TabsTrigger value="diagrams">Cutting Diagrams ({cutList.stockBoards.length})</TabsTrigger>
-                <TabsTrigger value="shopping">Shopping List ({cutList.statistics.byStock.length})</TabsTrigger>
-              </TabsList>
+            {!cutList.isStale && (
+              <Tabs defaultValue="parts" className="cut-list-tabs flex min-h-0 flex-1 flex-col">
+                <TabsList className="mx-6 my-2 border-b border-border">
+                  <TabsTrigger value="parts">Parts List ({cutList.instructions.length})</TabsTrigger>
+                  <TabsTrigger value="diagrams">Cutting Diagrams ({cutList.stockBoards.length})</TabsTrigger>
+                  <TabsTrigger value="shopping">Shopping List ({cutList.statistics.byStock.length})</TabsTrigger>
+                </TabsList>
 
-              <TabsContent value="parts" className="cut-list-content overflow-hidden px-6 pt-4 pb-5">
-                <CutListPartsTab
-                  cutList={cutList}
-                  units={units}
-                  projectName={projectName || UNTITLED_PROJECT_NAME}
-                  canExportPDF={limits.canExportPDF}
-                />
-              </TabsContent>
-              <TabsContent value="diagrams" className="cut-list-content overflow-hidden px-6 pt-4 pb-5">
-                <CutListDiagramsTab cutList={cutList} units={units} canExportPDF={limits.canExportPDF} />
-              </TabsContent>
-              <TabsContent value="shopping" className="cut-list-content overflow-hidden px-6 pt-4 pb-5">
-                <ShoppingListTab
-                  cutList={cutList}
-                  units={units}
-                  projectName={projectName || UNTITLED_PROJECT_NAME}
-                  canExportPDF={limits.canExportPDF}
-                />
-              </TabsContent>
-            </Tabs>
+                <TabsContent value="parts" className="cut-list-content overflow-hidden px-6 pt-4 pb-5">
+                  <CutListPartsTab
+                    cutList={cutList}
+                    units={units}
+                    projectName={projectName || UNTITLED_PROJECT_NAME}
+                    canExportPDF={limits.canExportPDF}
+                  />
+                </TabsContent>
+                <TabsContent value="diagrams" className="cut-list-content overflow-hidden px-6 pt-4 pb-5">
+                  <CutListDiagramsTab cutList={cutList} units={units} canExportPDF={limits.canExportPDF} />
+                </TabsContent>
+                <TabsContent value="shopping" className="cut-list-content overflow-hidden px-6 pt-4 pb-5">
+                  <ShoppingListTab
+                    cutList={cutList}
+                    units={units}
+                    projectName={projectName || UNTITLED_PROJECT_NAME}
+                    canExportPDF={limits.canExportPDF}
+                  />
+                </TabsContent>
+              </Tabs>
+            )}
 
             {/* Statistics */}
             <CutListStatistics cutList={cutList} />
@@ -269,7 +293,7 @@ export function CutListModal({ isOpen, onClose }: CutListModalProps) {
               <Button
                 size="sm"
                 onClick={handleDownloadProjectReport}
-                disabled={!limits.canExportPDF}
+                disabled={!limits.canExportPDF || hasBlockingIssues || cutList.isStale}
                 title={!limits.canExportPDF ? 'Upgrade to export PDFs' : 'Download comprehensive project report'}
               >
                 <Download size={14} />

@@ -26,19 +26,23 @@ Name                                 Version    License      Source
 @react-three/fiber                   9.5.0      MIT          dependency
 class-variance-authority             0.7.1      Apache-2.0   dependency
 clsx                                 2.1.1      MIT          dependency
-electron                             40.4.1     MIT          devDependency (runtime binary)
+electron                             43.7.9     MIT          devDependency (runtime binary)
 electron-log                         5.4.3      MIT          dependency
 electron-store                       11.0.2     MIT          dependency
-electron-updater                     6.7.3      MIT          dependency
-jspdf                                4.1.0      MIT          dependency
-lucide-react                         0.564.0    ISC          dependency
+electron-updater                     6.8.9      MIT          dependency
+jspdf                                4.2.1      MIT          dependency
+lucide-react                         0.575.0    ISC          dependency
+polygon-clipping                     0.15.7     MIT          dependency
+posthog-node                         5.51.6     MIT          dependency
 react                                19.2.4     MIT          dependency
 react-dom                            19.2.4     MIT          dependency
-react-virtuoso                       4.18.1     MIT          dependency
+react-virtuoso                       4.18.4     MIT          dependency
 sonner                               2.0.7      MIT          dependency
 tailwind-merge                       3.4.1      MIT          dependency
-three                                0.182.0    MIT          dependency
-uuid                                 13.0.0     MIT          dependency
+three                                0.183.2    MIT          dependency
+three-bvh-csg                        0.0.18     MIT          dependency
+three-mesh-bvh                       0.9.7      MIT          dependency
+uuid                                 13.0.2     MIT          dependency
 zundo                                2.3.0      MIT          dependency
 zustand                              5.0.11     MIT          dependency
 
@@ -64,12 +68,16 @@ Package pages:
 - https://www.npmjs.com/package/electron-updater
 - https://www.npmjs.com/package/jspdf
 - https://www.npmjs.com/package/lucide-react
+- https://www.npmjs.com/package/polygon-clipping
+- https://www.npmjs.com/package/posthog-node
 - https://www.npmjs.com/package/react
 - https://www.npmjs.com/package/react-dom
 - https://www.npmjs.com/package/react-virtuoso
 - https://www.npmjs.com/package/sonner
 - https://www.npmjs.com/package/tailwind-merge
 - https://www.npmjs.com/package/three
+- https://www.npmjs.com/package/three-bvh-csg
+- https://www.npmjs.com/package/three-mesh-bvh
 - https://www.npmjs.com/package/uuid
 - https://www.npmjs.com/package/zundo
 - https://www.npmjs.com/package/zustand
@@ -77,7 +85,7 @@ Package pages:
 ================================================================================
 LICENSE SUMMARY (DIRECT RUNTIME PACKAGES)
 ================================================================================
-MIT: 28
+MIT: 32
 Apache-2.0: 1
 ISC: 1
 
@@ -108,3 +116,74 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+================================================================================
+CUSTOM-CUT POLYGON BOOLEAN DEPENDENCIES
+================================================================================
+
+polygon-clipping 0.15.7 (MIT)
+https://github.com/mfogel/polygon-clipping
+
+The MIT License (MIT)
+
+Copyright (c) 2018 Mike Fogel <mike@fogel.ca> - covers everything not specially attributed to others below.
+
+Copyright (c) 2016 Alexander Milevski <info@w8r.name> - covers all portions originally part of github:w8r/martinez, from which this project was forked on Febuary 2, 2018.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+splaytree 3.2.3 (MIT; transitive)
+https://github.com/w8r/splay-tree
+
+The MIT License (MIT)
+
+Copyright (c) 2019 Alexander Milevski <info@w8r.name>
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+the Software, and to permit persons to whom the Software is furnished to do so,
+subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+robust-predicates 3.0.3 (Unlicense; transitive)
+https://github.com/mourner/robust-predicates
+
+This is free and unencumbered software released into the public domain.
+
+Anyone is free to copy, modify, publish, use, compile, sell, or
+distribute this software, either in source code form or as a compiled
+binary, for any purpose, commercial or non-commercial, and by any
+means.
+
+In jurisdictions that recognize copyright laws, the author or authors
+of this software dedicate any and all copyright interest in the
+software to the public domain. We make this dedication for the benefit
+of the public at large and to the detriment of our heirs and
+successors. We intend this dedication to be an overt act of
+relinquishment in perpetuity of all present and future rights to this
+software under copyright law.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+OTHER DEALINGS IN THE SOFTWARE.
+
+For more information, please refer to <http://unlicense.org>

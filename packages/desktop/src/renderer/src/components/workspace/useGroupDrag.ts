@@ -17,6 +17,7 @@ import { snapToGrid } from './partTypes';
 import {
   bindWindowPointerSession,
   createPointerRafQueue,
+  getPlaneSnapAxes,
   pauseOrbitControls,
   resumeOrbitControls
 } from './workspaceUtils';
@@ -59,12 +60,19 @@ const _groupProjectedV = new THREE.Vector3();
 
 const DRAG_THRESHOLD_SQ = 25; // 5px squared
 
+/**
+ * Cosine of the angle within which a camera counts as looking straight down a
+ * world axis (~1.8 degrees). Inside it the drag plane snaps to that axis so
+ * motion cannot leak into the perpendicular one.
+ */
+const STRAIGHT_ON_VIEW_COSINE = 0.9995;
+
 export function useGroupDrag(
   camera: THREE.Camera,
   gl: THREE.WebGLRenderer,
   controls: THREE.EventDispatcher<object> | null
 ): {
-  startGroupDrag: (worldPoint: THREE.Vector3, screenX: number, screenY: number) => void;
+  startGroupDrag: (worldPoint: THREE.Vector3, screenX: number, screenY: number, primaryPartId?: string) => boolean;
 } {
   // Drag state refs (not React state — no re-renders needed during drag)
   const dragActiveRef = useRef(false);
@@ -95,9 +103,28 @@ export function useGroupDrag(
   );
 
   const setupDragPlane = useCallback(
-    (anchorPos: THREE.Vector3, orientationQuat?: THREE.Quaternion) => {
-      _forward.set(0, 0, -1).applyQuaternion(camera.quaternion);
-      _normal.copy(_forward).normalize();
+    (anchorPos: THREE.Vector3, orientationQuat?: THREE.Quaternion, mode: 'camera' | 'ground' = 'camera') => {
+      if (mode === 'ground') {
+        // Shift constrains a group to the floor, matching single-part drags.
+        // Without it a group dragged in an angled view slides through all
+        // three axes at once, so pushing a tenon straight in also carries the
+        // assembly down and sideways, out of reach of its own joint.
+        _normal.set(0, 1, 0);
+      } else {
+        _forward.set(0, 0, -1).applyQuaternion(camera.quaternion);
+        _normal.copy(_forward).normalize();
+        // In a straight-on view the plane must be exactly perpendicular to a
+        // world axis; the camera quaternion leaves a fraction of a degree of
+        // float noise that otherwise creeps into the axis being looked down.
+        const nx = Math.abs(_normal.x);
+        const ny = Math.abs(_normal.y);
+        const nz = Math.abs(_normal.z);
+        const dominant = Math.max(nx, ny, nz);
+        if (dominant >= STRAIGHT_ON_VIEW_COSINE) {
+          const sign = Math.sign(dominant === nx ? _normal.x : dominant === ny ? _normal.y : _normal.z) || 1;
+          _normal.set(dominant === nx ? sign : 0, dominant === ny ? sign : 0, dominant === nz ? sign : 0);
+        }
+      }
       _plane.setFromNormalAndCoplanarPoint(_normal, anchorPos);
 
       const quat = orientationQuat ?? _groupQuat.identity();
@@ -143,13 +170,37 @@ export function useGroupDrag(
         planeBasisVRef.current.copy(_normal).cross(planeBasisURef.current).normalize();
       }
 
-      planeAxesRef.current = { x: true, y: true, z: true };
+      planeAxesRef.current = getPlaneSnapAxes(_normal);
     },
     [camera]
   );
 
   const startGroupDrag = useCallback(
-    (worldPoint: THREE.Vector3, screenX: number, screenY: number) => {
+    (worldPoint: THREE.Vector3, screenX: number, screenY: number, primaryPartId?: string) => {
+      // Clean up any previous gesture before publishing this ownership claim.
+      if (cleanupRef.current) {
+        cleanupRef.current();
+      }
+
+      // Claim the selected-group gesture synchronously. The canvas drag-start
+      // fallback can then distinguish a working per-mesh owner from a missed
+      // pointer-down without briefly routing through direct-part mate logic.
+      const { selectedGroupIds, selectedPartIds, editingGroupId } = useSelectionStore.getState();
+      const { groupMembers, parts } = useProjectStore.getState();
+      const pointerDownSelection = resolveMoveSelection(
+        { selectedPartIds, selectedGroupIds, editingGroupId },
+        parts,
+        groupMembers,
+        primaryPartId
+      );
+      if (pointerDownSelection.affectedParts.length === 0) return false;
+
+      beginMoveInteractionSession({
+        affectedPartIds: pointerDownSelection.affectedPartIds,
+        primaryPartId: primaryPartId ?? pointerDownSelection.affectedParts[0]?.id ?? null,
+        moveOwner: 'group'
+      });
+
       // If a selected group is being dragged, immediately pause orbit controls so
       // camera orbit doesn't steal the gesture before drag threshold is crossed.
       pauseOrbitControls(controls);
@@ -168,6 +219,11 @@ export function useGroupDrag(
 
           dragStarted = true;
           dragActiveRef.current = true;
+          // Holding Shift as the drag begins constrains the group to the
+          // ground plane, as it does for a single part. Fixed for the whole
+          // gesture: the committed delta is measured from the anchor taken
+          // here, so swapping planes mid-drag would change what it means.
+          const planeMode: 'camera' | 'ground' = e.shiftKey ? 'ground' : 'camera';
 
           // Compute group center anchor
           const { selectedGroupIds, selectedPartIds, editingGroupId } = useSelectionStore.getState();
@@ -197,10 +253,10 @@ export function useGroupDrag(
           movingPartIdsRef.current = new Set(moveSelection.affectedPartIds);
           beginMoveInteractionSession({
             affectedPartIds: moveSelection.affectedPartIds,
-            primaryPartId: groupParts[0]?.id ?? null
+            primaryPartId: primaryPartId ?? groupParts[0]?.id ?? null,
+            moveOwner: 'group'
           });
           wasSnappedByPartsRef.current = { x: false, y: false, z: false };
-          startPointRef.current = startPoint;
           dragDebug('groupDrag:start', {
             anchorPos: { x: anchor.x, y: anchor.y, z: anchor.z },
             movingPartIds: moveSelection.affectedPartIds
@@ -225,10 +281,22 @@ export function useGroupDrag(
               'XYZ'
             );
             _groupQuat.setFromEuler(_groupEuler);
-            setupDragPlane(anchor, _groupQuat);
+            setupDragPlane(anchor, _groupQuat, planeMode);
           } else {
-            setupDragPlane(anchor);
+            setupDragPlane(anchor, undefined, planeMode);
           }
+          // The mesh hit point can lie on a face several world units away
+          // from the camera-facing drag plane. Project the original pointer
+          // onto that plane so selecting a group on this pointer-down cannot
+          // create a first-frame jump.
+          const rect = gl.domElement.getBoundingClientRect();
+          _raycaster.setFromCamera(
+            _vec2.set(((screenX - rect.left) / rect.width) * 2 - 1, -((screenY - rect.top) / rect.height) * 2 + 1),
+            camera
+          );
+          startPointRef.current = _raycaster.ray.intersectPlane(_plane, _intersection)
+            ? _intersection.clone()
+            : startPoint;
         }
 
         // Drag active — process move
@@ -249,8 +317,9 @@ export function useGroupDrag(
         const settings = useAppSettingsStore.getState().settings;
         if (settings.liveGridSnap) {
           // Quantize along virtual group drag basis instead of world axes.
-          uAmount = snapToGrid(uAmount);
-          vAmount = snapToGrid(vAmount);
+          const gridSize = useProjectStore.getState().gridSize;
+          uAmount = snapToGrid(uAmount, gridSize);
+          vAmount = snapToGrid(vAmount, gridSize);
         }
 
         const projectedDelta = _groupProjectedV
@@ -415,6 +484,7 @@ export function useGroupDrag(
         publishMoveInteractionPreview({
           delta: proposedDelta,
           snapLines,
+          moveOwner: 'group',
           referenceDistances,
           referenceState,
           publishSelectionDragDelta: true
@@ -424,7 +494,9 @@ export function useGroupDrag(
         }
       });
 
-      const handleUp = () => {
+      const handleUp = (event?: unknown) => {
+        if (event instanceof PointerEvent && event.type === 'pointerup' && dragStarted) pointerRafQueue.schedule(event);
+        pointerRafQueue.flush();
         if (!dragStarted || !lastDragPosRef.current) {
           // Click without drag — clean up
           cleanup();
@@ -509,26 +581,23 @@ export function useGroupDrag(
         pointerRafQueue.cancel();
       };
 
-      // Clean up any previous drag (safety)
-      if (cleanupRef.current) {
-        cleanupRef.current();
-      }
-
       const unbindPointerSession = bindWindowPointerSession(window, {
         onMove: handleMove,
-        onEnd: handleUp
+        onEnd: handleUp,
+        endOptions: { capture: true }
       });
       const cleanup = () => {
         unbindPointerSession();
         cleanupRef.current = null;
         resetGroupDragRefs();
-        clearTransformInteractionPreviewKeepingReferenceDistances();
+        clearTransformInteractionPreviewKeepingReferenceDistances('group');
         resumeOrbitControls(controls);
       };
 
       cleanupRef.current = cleanup;
+      return true;
     },
-    [camera.position, controls, getWorldPoint, setupDragPlane]
+    [camera, controls, getWorldPoint, gl.domElement, setupDragPlane]
   );
 
   return { startGroupDrag };

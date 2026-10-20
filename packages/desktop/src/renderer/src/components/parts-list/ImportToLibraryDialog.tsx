@@ -1,3 +1,4 @@
+import { formatStockMeasurement } from '@renderer/utils/stockMeasurements';
 /**
  * Dialog for importing project stocks/assemblies to the app library
  * Shown when opening a project that contains items not in the user's library
@@ -5,7 +6,6 @@
 
 import { useState, useEffect } from 'react';
 import { Stock, Assembly } from '../../types';
-import { formatMeasurementWithUnit } from '../../utils/fractions';
 import { useProjectStore } from '../../store/projectStore';
 import { Button } from '@renderer/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@renderer/components/ui/card';
@@ -137,9 +137,9 @@ export function ImportToLibraryDialog({
                         {stock.name}
                       </span>
                       <span className="text-xs text-text-tertiary shrink-0">
-                        {formatMeasurementWithUnit(stock.length, units)} ×{' '}
-                        {formatMeasurementWithUnit(stock.width, units)} ×{' '}
-                        {formatMeasurementWithUnit(stock.thickness, units)}
+                        {formatStockMeasurement(stock.length, stock, units)} ×{' '}
+                        {formatStockMeasurement(stock.width, stock, units)} ×{' '}
+                        {formatStockMeasurement(stock.thickness, stock, units)}
                       </span>
                     </label>
                   ))}

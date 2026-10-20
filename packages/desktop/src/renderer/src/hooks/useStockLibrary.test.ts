@@ -248,7 +248,9 @@ describe('useStockLibrary', () => {
         settingsChangedCallback!({ stockLibrary: updatedStocks });
       });
 
-      expect(result.current.stocks).toEqual(updatedStocks);
+      // The sync path normalizes too, so a record from an install that predates
+      // stock forms arrives classified rather than carrying an undefined form.
+      expect(result.current.stocks).toEqual([{ ...updatedStocks[0], form: 'sheet' }]);
     });
   });
 });

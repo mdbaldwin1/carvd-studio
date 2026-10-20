@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import type { Part } from '../types';
 import type { GeometryCache } from './geometry/cache';
+import { getPartLocalBoundingBox } from '../utils/partFeatureGeometry';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Hit target types — the discriminated union covers every interactive thing a
@@ -331,7 +332,15 @@ function rotatedBoxFallback(
     _inverseMatrix.copy(_worldMatrix).invert();
     _localRay.copy(ray).applyMatrix4(_inverseMatrix);
 
-    if (geometryCache) {
+    if (part.features && part.features.some((feature) => feature.enabled)) {
+      // Custom-cut parts: the geometry bundle's hit proxy is box-only, so use
+      // the feature-aware local box. Interior voids inside that box can still
+      // hit here, but this fallback only fires when the scene raycast (which
+      // tests the true cut geometry) already missed.
+      const featureBox = getPartLocalBoundingBox(part);
+      _localBounds.min.copy(featureBox.min);
+      _localBounds.max.copy(featureBox.max);
+    } else if (geometryCache) {
       const aabb = geometryCache.get(part).hitProxy.localAabb;
       _localBounds.min.set(aabb.min.x, aabb.min.y, aabb.min.z);
       _localBounds.max.set(aabb.max.x, aabb.max.y, aabb.max.z);

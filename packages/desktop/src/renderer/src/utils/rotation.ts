@@ -46,12 +46,32 @@ export function isAxisAlignedRotation(rotation: Rotation3D, epsilon = 1e-3): boo
 }
 
 export function rotationFromQuaternion(quaternion: THREE.Quaternion): Rotation3D {
-  _euler.setFromQuaternion(quaternion, 'XYZ');
-  return normalizeRotation({
-    x: (_euler.x * 180) / Math.PI,
-    y: (_euler.y * 180) / Math.PI,
-    z: (_euler.z * 180) / Math.PI
-  });
+  // Three's display-oriented Euler conversion switches to its gimbal-lock
+  // branch before the axes are actually singular. Near 90 degrees that drops
+  // a real angle and moves tight joint faces. Keep both angles until the
+  // rotation is numerically singular, using atan2 for the middle angle.
+  const { x: qx, y: qy, z: qz, w: qw } = quaternion;
+  const m11 = 1 - 2 * (qy * qy + qz * qz);
+  const m12 = 2 * (qx * qy - qz * qw);
+  const m13 = 2 * (qx * qz + qy * qw);
+  const m22 = 1 - 2 * (qx * qx + qz * qz);
+  const m23 = 2 * (qy * qz - qx * qw);
+  const m32 = 2 * (qy * qz + qx * qw);
+  const m33 = 1 - 2 * (qx * qx + qy * qy);
+  const cosY = Math.hypot(m11, m12);
+  const x = cosY > 1e-12 ? Math.atan2(-m23, m33) : Math.atan2(m32, m22);
+  const y = Math.atan2(m13, cosY);
+  const z = cosY > 1e-12 ? Math.atan2(-m12, m11) : 0;
+  // Positions rotate at full precision; presentation rounding must not skew
+  // their orientations or accumulate during a handle drag.
+  return normalizeRotation(
+    {
+      x: (x * 180) / Math.PI,
+      y: (y * 180) / Math.PI,
+      z: (z * 180) / Math.PI
+    },
+    12
+  );
 }
 
 export function quaternionFromRotation(rotation: Rotation3D): THREE.Quaternion {

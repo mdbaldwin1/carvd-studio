@@ -1,0 +1,19 @@
+{
+  "format": "carvd-router-tool",
+  "version": 1,
+  "tool": {
+    "version": 1,
+    "id": "bad-overlap",
+    "name": "Bad Overlap",
+    "source": "generic",
+    "profileFamily": "cove",
+    "cutterDiameter": 1,
+    "shankDiameter": 0.5,
+    "cuttingHeight": 0.5,
+    "envelopeVersion": 1,
+    "sections": [
+      { "role": "cutter", "start": 0, "end": 0.5, "diameter": 1 },
+      { "role": "shank", "start": 0.4, "end": 1, "diameter": 0.5 }
+    ]
+  }
+}

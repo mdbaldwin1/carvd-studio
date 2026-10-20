@@ -6,12 +6,41 @@ on:
   workflow_dispatch: {}
 
 jobs:
+  validate:
+    name: Required Release Validation
+    uses: ./.github/workflows/test.yml
+    secrets: inherit
+
+  release-credentials:
+    name: Verify Release Credentials
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Require signing and notarization credentials
+        shell: bash
+        env:
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          LICENSE_PRIVATE_KEY: ${{ secrets.LICENSE_PRIVATE_KEY }}
+        run: |
+          missing=0
+          for name in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_ID_PASSWORD APPLE_TEAM_ID LICENSE_PRIVATE_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing required release credential: $name"
+              missing=1
+            fi
+          done
+          exit "$missing"
+
   # ── Step 1: Determine version and create git tag ────────────────────────────
   prepare:
     name: Prepare Release
+    needs: [validate, release-credentials]
     # Skip version-bump commits to prevent infinite loops
     if: "!contains(github.event.head_commit.message, 'chore(release):')"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     outputs:
@@ -73,7 +102,11 @@ jobs:
 
           # Create tag if it doesn't already exist (idempotent)
           if git rev-parse "$TAG" &>/dev/null; then
-            echo "Tag $TAG already exists - reusing"
+            if [ "$(git rev-parse "$TAG^{commit}")" != "$(git rev-parse HEAD)" ]; then
+              echo "::error::Existing tag $TAG does not match the validated release commit"
+              exit 1
+            fi
+            echo "Tag $TAG already exists at the validated commit - reusing"
           else
             git tag "$TAG"
             git push origin "$TAG"
@@ -94,7 +127,7 @@ jobs:
             platform: mac
           - os: windows-latest
             platform: win
-          - os: ubuntu-latest
+          - os: ubuntu-24.04
             platform: linux
 
     steps:
@@ -111,32 +144,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      # Copy app-builder binary to a safe location outside node_modules.
-      # electron-builder runs "npm install --production" during packaging,
-      # which in a workspace context can delete devDependencies (including
-      # app-builder-bin) from the hoisted root node_modules.
-      - name: Prepare app-builder binary
-        id: app-builder
-        shell: bash
-        run: |
-          BINARY=$(node -p "require('app-builder-bin').appBuilderPath")
-          BASENAME=$(basename "$BINARY")
-          SAFE_PATH="${RUNNER_TEMP}/${BASENAME}"
-
-          echo "Source: $BINARY"
-          echo "Safe copy: $SAFE_PATH"
-
-          cp "$BINARY" "$SAFE_PATH"
-          chmod +x "$SAFE_PATH"
-
-          # Verify the copy executes
-          "$SAFE_PATH" --help > /dev/null 2>&1 && echo "Binary OK" || {
-            echo "ERROR: Binary copy failed to execute"
-            exit 1
-          }
-
-          echo "safe_path=$SAFE_PATH" >> $GITHUB_OUTPUT
 
       - name: Setup license key
         run: echo "${{ secrets.LICENSE_PRIVATE_KEY }}" > license-private-key.pem
@@ -180,27 +187,12 @@ jobs:
           # Output keychain path for the packaging step
           echo "path=$KEYCHAIN_PATH" >> $GITHUB_OUTPUT
 
-      # electron-builder internally runs "npm install --production" in the
-      # app directory. In an npm workspace, this detects the root workspace
-      # config and wipes devDependencies from the hoisted node_modules.
-      # Temporarily strip the workspaces field so npm treats it as standalone.
-      - name: Disable workspace detection for packaging
-        shell: bash
-        run: |
-          node -e "
-            const fs = require('fs');
-            const pkg = JSON.parse(fs.readFileSync('package.json', 'utf-8'));
-            delete pkg.workspaces;
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
-          "
-
-      - name: Install desktop runtime dependencies locally
-        working-directory: packages/desktop
-        run: npm run prepare:runtime-deps
-
+      # Package the dependencies installed by npm ci; do not resolve a second, unlocked tree.
       - name: Package app (macOS)
         if: matrix.platform == 'mac'
         env:
+          # Fail closed if notarization cannot run for a release build.
+          CARVD_REQUIRE_NOTARIZATION: "true"
           # Notarization env vars (used by scripts/notarize.cjs afterSign hook)
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
@@ -208,27 +200,24 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           CSC_KEYCHAIN: ${{ steps.keychain.outputs.path }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
         working-directory: packages/desktop
-        run: npx electron-builder@26.7.0 --mac --arm64 --x64 --publish never
+        run: npx --no-install electron-builder --mac --arm64 --x64 --publish never --config.forceCodeSigning=true
 
       - name: Package app (Windows)
         if: matrix.platform == 'win'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
         working-directory: packages/desktop
-        run: npx electron-builder@26.7.0 --win --publish never
+        run: npx --no-install electron-builder --win --publish never
 
       - name: Package app (Linux)
         if: matrix.platform == 'linux'
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CUSTOM_APP_BUILDER_PATH: ${{ steps.app-builder.outputs.safe_path }}
         working-directory: packages/desktop
-        run: npx electron-builder@26.7.0 --linux AppImage deb --x64 --publish never
+        run: npx --no-install electron-builder --linux AppImage deb --x64 --publish never
 
       - name: Verify Linux packages
         if: matrix.platform == 'linux'
@@ -241,6 +230,15 @@ jobs:
           test -x "$APPIMAGE"
           test "$(stat -c%s "$APPIMAGE")" -gt 1000000
           file "$APPIMAGE" | grep -q "ELF 64-bit.*x86-64"
+
+          # A Debian staging directory can leave this marker behind when
+          # repackaged. It makes electron-updater select DebUpdater in an AppImage.
+          APPIMAGE_CHECK_DIR="$(mktemp -d)"
+          APPIMAGE_ABSOLUTE="$(realpath "$APPIMAGE")"
+          (cd "$APPIMAGE_CHECK_DIR" && "$APPIMAGE_ABSOLUTE" --appimage-extract > /dev/null)
+          test -f "$APPIMAGE_CHECK_DIR/squashfs-root/resources/app-update.yml"
+          test ! -e "$APPIMAGE_CHECK_DIR/squashfs-root/resources/package-type"
+          rm -rf "$APPIMAGE_CHECK_DIR"
 
           test "$(stat -c%s "$DEB")" -gt 1000000
           dpkg-deb --info "$DEB" > /dev/null
@@ -264,6 +262,7 @@ jobs:
           name: windows-build
           path: |
             packages/desktop/dist/*.exe
+            packages/desktop/dist/*.exe.blockmap
             packages/desktop/dist/latest.yml
           retention-days: 7
 
@@ -283,7 +282,7 @@ jobs:
     name: Create GitHub Release
     needs: [prepare, build]
     if: needs.prepare.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
 
@@ -322,6 +321,7 @@ jobs:
             dist/mac/*.zip
             dist/mac/latest-mac.yml
             dist/win/*.exe
+            dist/win/*.exe.blockmap
             dist/win/latest.yml
             dist/linux/*.AppImage
             dist/linux/*.deb
@@ -337,7 +337,7 @@ jobs:
     name: Bump Version on Develop
     needs: [prepare, create-release]
     if: needs.prepare.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
       pull-requests: write
@@ -393,7 +393,7 @@ jobs:
     name: Release Summary
     needs: [prepare, build, create-release, bump-develop]
     if: always() && needs.prepare.outputs.should_release == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Print summary

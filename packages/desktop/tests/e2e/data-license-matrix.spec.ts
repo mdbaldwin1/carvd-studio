@@ -1,8 +1,12 @@
+import { waitForJsonFile } from './helpers/files';
 import { expect, test } from '@playwright/test';
+import fs from 'node:fs';
+import path from 'node:path';
 import {
   closeElectronApp,
   createBlankProject,
   launchElectronApp,
+  queueSavePath,
   type RunningElectronApp
 } from './helpers/electron-app';
 
@@ -27,7 +31,15 @@ test.describe('Data management and license flows', () => {
     await expect(settings.getByText('Data Management')).toBeVisible();
     await expect(settings.getByText(/free trial|free version/i)).toBeVisible();
 
+    const backupPath = path.join(running.userDataDir, 'settings-backup.carvd-backup');
+    await queueSavePath(window, backupPath);
     await settings.getByRole('button', { name: 'Export' }).click();
+    await expect(settings.getByRole('button', { name: 'Export', exact: true })).toBeEnabled();
+    await waitForJsonFile(backupPath);
+    expect(JSON.parse(fs.readFileSync(backupPath, 'utf8'))).toMatchObject({
+      version: 1,
+      data: { userTemplates: [], customColors: [] }
+    });
     await expect(settings).toBeVisible();
 
     await settings.getByRole('button', { name: 'Import' }).click();

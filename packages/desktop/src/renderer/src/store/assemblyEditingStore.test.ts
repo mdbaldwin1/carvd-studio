@@ -1,16 +1,16 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
+import {
+  createTestGroup,
+  createTestGroupMember,
+  createTestPart,
+  createTestStock
+} from '../../../../tests/helpers/factories';
 import { useAssemblyEditingStore } from './assemblyEditingStore';
 import { useProjectStore } from './projectStore';
 import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
 import { useInteractionStore } from './interactionStore';
 import { useUIStore } from './uiStore';
-import {
-  createTestPart,
-  createTestStock,
-  createTestGroup,
-  createTestGroupMember
-} from '../../../../tests/helpers/factories';
 
 const resetStores = () => {
   const store = useProjectStore.getState();
@@ -67,8 +67,8 @@ describe('assemblyEditingStore', () => {
 
     it('saves previous project state snapshot', () => {
       const projectStore = useProjectStore.getState();
-      projectStore.addPart({ name: 'Existing Part' });
-      projectStore.addStock({ name: 'Existing Stock' });
+      projectStore.addPart({ name: 'Existing Part' })!;
+      projectStore.addStock({ name: 'Existing Stock' })!;
 
       useAssemblyEditingStore
         .getState()
@@ -93,9 +93,38 @@ describe('assemblyEditingStore', () => {
       expect(state.parts[1].name).toBe('Assembly Part 2');
     });
 
+    it('preserves part features when loading assembly parts into the workspace', () => {
+      const assemblyParts = [
+        createTestPart({
+          id: 'part-1',
+          name: 'Featured Assembly Part',
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'end_cut',
+              version: 1 as const,
+              enabled: true,
+              target: { type: 'face', face: 'right_end' },
+              reference: { primaryFrom: 'max' },
+              cutType: 'bevel',
+              lengthMode: 'long_point',
+              parameters: { horizontalAngle: 0, verticalAngle: 10 }
+            }
+          ]
+        })
+      ];
+
+      useAssemblyEditingStore.getState().startEditingAssembly('assembly-123', 'Test Assembly', assemblyParts);
+
+      const loadedPart = useProjectStore.getState().parts[0];
+      expect(loadedPart.features).toHaveLength(1);
+      expect(loadedPart.features?.[0].kind).toBe('end_cut');
+      expect(loadedPart.features).not.toBe(assemblyParts[0].features);
+    });
+
     it('merges embedded stocks with existing stocks', () => {
       const projectStore = useProjectStore.getState();
-      const existingStockId = projectStore.addStock({ name: 'Existing Stock' });
+      const existingStockId = projectStore.addStock({ name: 'Existing Stock' })!;
       const embeddedStock = createTestStock({ id: 'embedded-1', name: 'Embedded Stock' });
 
       useAssemblyEditingStore
@@ -129,7 +158,7 @@ describe('assemblyEditingStore', () => {
 
     it('clears selection and UI state when entering edit mode', () => {
       const projectStore = useProjectStore.getState();
-      const partId = projectStore.addPart({ name: 'Selected Part' });
+      const partId = projectStore.addPart({ name: 'Selected Part' })!;
       useSelectionStore.getState().selectPart(partId);
       useSnapStore.getState().addToReferences([partId]);
 
@@ -206,7 +235,7 @@ describe('assemblyEditingStore', () => {
         width: 48,
         thickness: 0.75,
         color: '#c4a574'
-      });
+      })!;
 
       const partWithStock = createTestPart({ stockId, name: 'Part with Stock' });
 
@@ -245,6 +274,36 @@ describe('assemblyEditingStore', () => {
       expect(assembly!.groups[0].name).toBe('Test Group');
       expect(assembly!.groupMembers).toHaveLength(2);
     });
+
+    it('preserves part features in the saved assembly', () => {
+      useAssemblyEditingStore.getState().startEditingAssembly('assembly-123', 'Test Assembly', [
+        createTestPart({
+          name: 'Featured Part',
+          features: [
+            {
+              id: 'feature-1',
+              kind: 'rect_cut',
+              version: 1 as const,
+              enabled: true,
+              target: { type: 'corner', corner: 'front_right_corner' },
+              reference: { primaryFrom: 'max', secondaryFrom: 'min' },
+              cutType: 'corner_notch',
+              parameters: {
+                size: { length: 1, width: 1.5 },
+                depthMode: 'blind',
+                depth: 0.25
+              },
+              placement: { x: 0.5, z: 0.25 }
+            }
+          ]
+        })
+      ]);
+
+      const assembly = useAssemblyEditingStore.getState().saveEditingAssembly();
+
+      expect(assembly?.parts[0].features).toHaveLength(1);
+      expect(assembly?.parts[0].features?.[0].kind).toBe('rect_cut');
+    });
   });
 
   describe('cancelEditingAssembly', () => {
@@ -268,7 +327,7 @@ describe('assemblyEditingStore', () => {
     });
 
     it('keeps snapshot for potential restore', () => {
-      useProjectStore.getState().addPart({ name: 'Original Part' });
+      useProjectStore.getState().addPart({ name: 'Original Part' })!;
       useAssemblyEditingStore.getState().startEditingAssembly('assembly-123', 'Test', [createTestPart()]);
 
       useAssemblyEditingStore.getState().cancelEditingAssembly();
@@ -283,9 +342,9 @@ describe('assemblyEditingStore', () => {
       const projectStore = useProjectStore.getState();
 
       // Set up initial state
-      projectStore.addPart({ name: 'Part A' });
-      projectStore.addPart({ name: 'Part B' });
-      projectStore.addStock({ name: 'Stock X' });
+      projectStore.addPart({ name: 'Part A' })!;
+      projectStore.addPart({ name: 'Part B' })!;
+      projectStore.addStock({ name: 'Stock X' })!;
 
       // Enter and exit editing mode
       useAssemblyEditingStore
@@ -306,7 +365,7 @@ describe('assemblyEditingStore', () => {
     });
 
     it('clears snapshot after restore', () => {
-      useProjectStore.getState().addPart({ name: 'Original' });
+      useProjectStore.getState().addPart({ name: 'Original' })!;
       useAssemblyEditingStore.getState().startEditingAssembly('assembly-123', 'Test', [createTestPart()]);
       useAssemblyEditingStore.getState().cancelEditingAssembly();
 
@@ -316,7 +375,7 @@ describe('assemblyEditingStore', () => {
     });
 
     it('clears assembly editing state', () => {
-      useProjectStore.getState().addPart({ name: 'Original' });
+      useProjectStore.getState().addPart({ name: 'Original' })!;
       useAssemblyEditingStore.getState().startEditingAssembly('assembly-123', 'Test', [createTestPart()]);
       useAssemblyEditingStore.getState().cancelEditingAssembly();
 
@@ -330,7 +389,7 @@ describe('assemblyEditingStore', () => {
 
   describe('startFreshAfterAssemblyEdit', () => {
     it('creates a new project', () => {
-      useProjectStore.getState().addPart({ name: 'Part A' });
+      useProjectStore.getState().addPart({ name: 'Part A' })!;
       useAssemblyEditingStore.getState().startEditingAssembly('assembly-123', 'Test', [createTestPart()]);
       useAssemblyEditingStore.getState().cancelEditingAssembly();
 

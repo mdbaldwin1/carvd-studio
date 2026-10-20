@@ -75,11 +75,11 @@ export function buildMenuTemplate(): MenuItemConstructorOptions[] {
         { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },
-        { role: 'hide' },
+        { role: 'hide', label: 'Hide Carvd Studio' },
         { role: 'hideOthers' },
         { role: 'unhide' },
         { type: 'separator' },
-        { role: 'quit' }
+        { role: 'quit', label: 'Quit Carvd Studio' }
       ]
     });
   }
@@ -132,7 +132,7 @@ export function buildMenuTemplate(): MenuItemConstructorOptions[] {
         click: () => sendMenuCommand('close-project')
       },
       { type: 'separator' },
-      isMac ? { role: 'quit' } : { role: 'quit' }
+      isMac ? { role: 'quit', label: 'Quit Carvd Studio' } : { role: 'quit' }
     ]
   });
 
@@ -178,8 +178,18 @@ export function buildMenuTemplate(): MenuItemConstructorOptions[] {
         click: () => sendMenuCommand('reset-camera')
       },
       { type: 'separator' },
-      { role: 'reload' },
-      { role: 'forceReload' },
+      {
+        id: 'reload',
+        label: 'Reload',
+        accelerator: 'CmdOrCtrl+R',
+        click: () => sendMenuCommand('request-reload', false)
+      },
+      {
+        id: 'forceReload',
+        label: 'Force Reload',
+        accelerator: 'CmdOrCtrl+Shift+R',
+        click: () => sendMenuCommand('request-reload', true)
+      },
       { role: 'toggleDevTools' },
       { type: 'separator' },
       { role: 'resetZoom' },

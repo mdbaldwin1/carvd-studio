@@ -1,4 +1,4 @@
-// ADR-006: Ground clamp. No affected part may sit below ground (Y = 0). For
+// ADR-006: Ground clamp for parts starting at or above ground (Y = 0). For
 // each part in the candidate transform, computes the world-space minimum Y
 // and lifts the whole transform if any part would dip below 0.
 //
@@ -13,6 +13,12 @@ import { getPartAABB } from '../../components/workspace/workspaceUtils';
 import type { Part } from '../../types';
 import type { GeometryCache } from '../geometry/cache';
 import type { Constraint, ConstraintBlocker, ConstraintResult, ConstraintWarning } from './types';
+
+/** Authored underside assemblies may cross the work plane. Do not trap them
+ * there or teleport them to the surface when the user starts moving them. */
+export function startsBelowGround(part: Part, geometryCache: GeometryCache): boolean {
+  return getPartAABB(part, geometryCache).minY < -1e-6;
+}
 
 function clampMovePositions(
   positions: ReadonlyMap<string, { x: number; y: number; z: number }>,
@@ -33,6 +39,7 @@ function clampMovePositions(
       updated.set(partId, pos);
       continue;
     }
+    if (startsBelowGround(startingPart, geometryCache)) continue;
     // Compute the part's world-space AABB at the candidate position.
     const aabb = getPartAABB({ ...startingPart, position: pos }, geometryCache);
     if (aabb.minY < minDipBelowGround) {

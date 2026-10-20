@@ -1,7 +1,16 @@
+import { MIN_DIMENSION_INCHES } from '../../constants';
 import { Input } from '@renderer/components/ui/input';
 import { Label } from '@renderer/components/ui/label';
 import { Select } from '@renderer/components/ui/select';
 import { Stock } from '../../types';
+import {
+  INSERT_KIND_LABELS,
+  INSERT_KINDS,
+  resolveStockForm,
+  type InsertKind,
+  type StockForm
+} from '../../../../shared/stock';
+import { getInsertCatalog, type InsertCatalogEntry } from '../../../../shared/insertCatalog';
 import { ColorPicker } from '../common/ColorPicker';
 import { FractionInput } from '../common/FractionInput';
 
@@ -12,32 +21,215 @@ interface StockFormFieldsProps {
   onChange: (next: StockFormData) => void;
 }
 
+/** The catalogue's own id belongs to the catalogue, not to the user's stock. */
+function stripCatalogId(entry: InsertCatalogEntry): StockFormData {
+  const material = { ...entry } as Partial<InsertCatalogEntry>;
+  delete material.id;
+  return material as StockFormData;
+}
+
 export function StockFormFields({ formData, onChange }: StockFormFieldsProps) {
+  const form = resolveStockForm(formData);
+  const isRod = form === 'rod';
+  const isInsert = form === 'insert';
+  const insertKind: InsertKind = formData.insertKind ?? 'dowel_pin';
+  const catalog = getInsertCatalog(insertKind);
+  // A catalogue entry is identified by its size, not by id: the user may have
+  // edited the price or colour of a seeded entry, and it is still a #20.
+  // Matched within a tolerance far finer than any two sizes differ by, since
+  // metric sizes converted to inches rarely land on the same bit twice.
+  const sameSize = (a: number, b: number) => Math.abs(a - b) < 1e-6;
+  const catalogId = catalog.find(
+    (entry) =>
+      sameSize(entry.length, formData.length) &&
+      sameSize(entry.width, formData.width) &&
+      sameSize(entry.thickness, formData.thickness)
+  )?.id;
+
+  const chooseCatalogEntry = (id: string) => {
+    const entry = catalog.find((candidate) => candidate.id === id);
+    if (!entry) return;
+    // Take the whole manufactured size, not just its dimensions -- a biscuit's
+    // grain and its box quantity are part of what it is.
+    onChange({ ...formData, ...stripCatalogId(entry) });
+  };
+
+  const chooseInsertKind = (kind: InsertKind) => {
+    const first = getInsertCatalog(kind)[0];
+    if (!first) {
+      onChange({
+        ...formData,
+        form: 'insert',
+        insertKind: kind,
+        length: 2,
+        width: 0.75,
+        thickness: 0.25,
+        packSize: 1,
+        pricingUnit: 'per_item',
+        pricePerUnit: 0,
+        grainDirection: 'length'
+      });
+      return;
+    }
+    onChange({ ...formData, ...stripCatalogId(first), name: formData.name || first.name });
+  };
+
+  // Round stock is square in section, so one diameter writes both dimensions.
+  const setDiameter = (diameter: number) => onChange({ ...formData, width: diameter, thickness: diameter });
+
+  const changeForm = (next: StockForm) => {
+    if (next === 'insert') {
+      chooseInsertKind(formData.insertKind ?? 'dowel_pin');
+      return;
+    }
+    if (next !== 'rod') {
+      onChange({ ...formData, form: next });
+      return;
+    }
+    // Coming from a board, the old width and thickness describe a rectangle.
+    // Seed a plausible dowel instead of carrying a 6" "diameter" across.
+    const diameter = formData.width === formData.thickness ? formData.width : 0.375;
+    onChange({ ...formData, form: next, width: diameter, thickness: diameter, grainDirection: 'length' });
+  };
+
   return (
     <>
       <div className="flex flex-col mb-4 gap-2.5">
-        <Label>Name</Label>
-        <Input type="text" value={formData.name} onChange={(e) => onChange({ ...formData, name: e.target.value })} />
+        <Label htmlFor="stock-name">Name</Label>
+        <Input
+          id="stock-name"
+          type="text"
+          value={formData.name}
+          onChange={(e) => onChange({ ...formData, name: e.target.value })}
+        />
       </div>
 
       <div className="flex flex-col mb-4 gap-2.5">
-        <Label>Dimensions (L × W × T)</Label>
-        <div className="flex items-center gap-1">
-          <FractionInput value={formData.length} onChange={(length) => onChange({ ...formData, length })} min={1} />
-          <span>×</span>
-          <FractionInput value={formData.width} onChange={(width) => onChange({ ...formData, width })} min={1} />
-          <span>×</span>
-          <FractionInput
-            value={formData.thickness}
-            onChange={(thickness) => onChange({ ...formData, thickness })}
-            min={0.25}
-          />
+        <Label htmlFor="stock-form">Stock Type</Label>
+        <Select id="stock-form" value={form} onChange={(e) => changeForm(e.target.value as StockForm)}>
+          <option value="sheet">Sheet (plywood, MDF)</option>
+          <option value="board">Board (dimensional lumber)</option>
+          <option value="rod">Dowel (round, cut to length)</option>
+          <option value="insert">Insert (biscuit, domino, dowel pin)</option>
+        </Select>
+      </div>
+
+      {isInsert && (
+        <div className="flex gap-4">
+          <div className="flex flex-col mb-4 gap-2.5 flex-1">
+            <Label htmlFor="insert-kind">Insert Type</Label>
+            <Select
+              id="insert-kind"
+              value={insertKind}
+              onChange={(e) => chooseInsertKind(e.target.value as InsertKind)}
+            >
+              {INSERT_KINDS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {INSERT_KIND_LABELS[kind]}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className={insertKind === 'loose_tenon' ? 'hidden' : 'flex flex-col mb-4 gap-2.5 flex-1'}>
+            <Label htmlFor="insert-size">Size</Label>
+            <Select id="insert-size" value={catalogId ?? ''} onChange={(e) => chooseCatalogEntry(e.target.value)}>
+              {catalogId === undefined && <option value="">Custom size</option>}
+              {catalog.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.name}
+                </option>
+              ))}
+            </Select>
+          </div>
         </div>
-      </div>
+      )}
 
-      <div className="flex flex-col mb-4 gap-2.5">
-        <Label>Grain Direction</Label>
+      {isInsert && insertKind === 'loose_tenon' ? (
+        <div className="flex flex-col mb-4 gap-2.5">
+          <Label>Loose tenon dimensions (L × W × T)</Label>
+          <div className="flex items-center gap-1">
+            <FractionInput
+              ariaLabel="Tenon length"
+              value={formData.length}
+              onChange={(length) => onChange({ ...formData, length })}
+              min={MIN_DIMENSION_INCHES}
+            />
+            <span>×</span>
+            <FractionInput
+              ariaLabel="Tenon width"
+              value={formData.width}
+              onChange={(width) => onChange({ ...formData, width })}
+              min={MIN_DIMENSION_INCHES}
+            />
+            <span>×</span>
+            <FractionInput
+              ariaLabel="Tenon thickness"
+              value={formData.thickness}
+              onChange={(thickness) => onChange({ ...formData, thickness })}
+              min={MIN_DIMENSION_INCHES}
+            />
+          </div>
+          <p className="text-xs text-text-muted">Use the actual dimensions of your prepared tenon stock.</p>
+        </div>
+      ) : isInsert ? (
+        <div className="flex flex-col mb-4 gap-2.5">
+          <Label>Size</Label>
+          {/* A #20 biscuit is a #20 biscuit. Pick a different one to change it. */}
+          <p className="text-[12px] text-text-muted">
+            {formData.length.toFixed(3)}″ × {formData.width.toFixed(3)}″ × {formData.thickness.toFixed(3)}″ · sold{' '}
+            {formData.packSize && formData.packSize > 1 ? `${formData.packSize} to the box` : 'singly'}
+          </p>
+        </div>
+      ) : isRod ? (
+        <div className="flex gap-4">
+          <div className="flex flex-col mb-4 gap-2.5 flex-1">
+            <Label>Diameter</Label>
+            <FractionInput
+              ariaLabel="Diameter"
+              value={formData.width}
+              onChange={setDiameter}
+              min={MIN_DIMENSION_INCHES}
+            />
+          </div>
+          <div className="flex flex-col mb-4 gap-2.5 flex-1">
+            <Label>Length</Label>
+            <FractionInput
+              ariaLabel="Length"
+              value={formData.length}
+              onChange={(length) => onChange({ ...formData, length })}
+              min={MIN_DIMENSION_INCHES}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col mb-4 gap-2.5">
+          <Label>Dimensions (L × W × T)</Label>
+          <div className="flex items-center gap-1">
+            <FractionInput
+              value={formData.length}
+              onChange={(length) => onChange({ ...formData, length })}
+              min={MIN_DIMENSION_INCHES}
+            />
+            <span>×</span>
+            <FractionInput
+              value={formData.width}
+              onChange={(width) => onChange({ ...formData, width })}
+              min={MIN_DIMENSION_INCHES}
+            />
+            <span>×</span>
+            <FractionInput
+              value={formData.thickness}
+              onChange={(thickness) => onChange({ ...formData, thickness })}
+              min={MIN_DIMENSION_INCHES}
+            />
+          </div>
+        </div>
+      )}
+
+      <div className={isRod || isInsert ? 'hidden' : 'flex flex-col mb-4 gap-2.5'}>
+        <Label htmlFor="stock-grain">Grain Direction</Label>
         <Select
+          id="stock-grain"
           value={formData.grainDirection}
           onChange={(e) =>
             onChange({
@@ -54,8 +246,9 @@ export function StockFormFields({ formData, onChange }: StockFormFieldsProps) {
 
       <div className="flex gap-4">
         <div className="flex flex-col mb-4 gap-2.5 flex-1">
-          <Label>Pricing Unit</Label>
+          <Label htmlFor="stock-pricing">Pricing Unit</Label>
           <Select
+            id="stock-pricing"
             value={formData.pricingUnit}
             onChange={(e) =>
               onChange({
@@ -64,7 +257,15 @@ export function StockFormFields({ formData, onChange }: StockFormFieldsProps) {
               })
             }
           >
-            <option value="per_item">Per Sheet/Board</option>
+            <option value="per_item">
+              {isInsert
+                ? insertKind === 'loose_tenon'
+                  ? 'Per Tenon'
+                  : 'Per Box'
+                : isRod
+                  ? 'Per Rod'
+                  : 'Per Sheet/Board'}
+            </option>
             <option value="board_foot">Per Board Foot</option>
           </Select>
         </div>

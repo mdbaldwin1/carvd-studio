@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Package, RefreshCw, Layers } from "lucide-react";
 import SEO from "../../components/SEO";
 import { createBreadcrumbSchema } from "../../utils/jsonLd";
@@ -207,6 +208,63 @@ export default function PartsPage() {
         </div>
       </div>
 
+      <section id="part-cuts" className="site-section p-6 mt-xl scroll-mt-28">
+        <h3 className="text-2xl font-bold mb-4">
+          Shape a part and join it to another
+        </h3>
+        <p className="text-muted mb-4">
+          Select a single part and choose Edit Part Cuts to model end cuts,
+          tenons, dados, grooves, mortises, holes, and routing. The{" "}
+          <Link
+            className="text-text underline underline-offset-4 decoration-primary"
+            to="/docs/part-cuts"
+          >
+            Part Cuts guide
+          </Link>{" "}
+          explains targets and measurement references. A joinery allowance adds
+          blank material; a cut changes the finished shape.
+        </p>
+        <p className="text-muted">
+          With two parts selected, use{" "}
+          <Link
+            className="text-text underline underline-offset-4 decoration-primary"
+            to="/docs/joinery#matching-cuts"
+          >
+            Lay out matching cuts
+          </Link>{" "}
+          to create a complementary pair, or{" "}
+          <Link
+            className="text-text underline underline-offset-4 decoration-primary"
+            to="/docs/joinery#assembly-placement"
+          >
+            Bring pieces together
+          </Link>{" "}
+          to position prepared members. Dowels and other inserts are selectable,
+          stock-backed parts too.
+        </p>
+        <p className="mt-4 text-muted">
+          A round wooden blank has two length grips that remain visible while it
+          is selected on its own. Drag either grip to change that end's length;
+          its diameter stays fixed by the stock. The grips sit outside the end
+          faces so you can distinguish them from rotation controls. Use an
+          oblique view to see the length direction, or enter an exact length in
+          Properties. Purchased fixed-size inserts cannot be resized.
+        </p>
+        <figure className="mt-6">
+          <img
+            src="/screenshots/docs-pin-length-grip.jpg"
+            alt="Carvd Studio showing a selected wooden pin with an offset blue length grip and dimensions of 1 inch long by 1/4 inch diameter."
+            width={3024}
+            height={1642}
+            loading="lazy"
+            className="w-full rounded-lg border border-border"
+          />
+          <figcaption className="mt-2 text-sm text-muted">
+            A real app example: extending the upper end keeps the lower end in
+            place and preserves the pin's alignment with its drilled holes.
+          </figcaption>
+        </figure>
+      </section>
       <DocsPrevNext />
     </section>
   );

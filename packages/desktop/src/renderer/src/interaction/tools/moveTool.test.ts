@@ -20,24 +20,29 @@ function makePart(overrides?: Partial<Part>): Part {
 }
 
 const SETTINGS: AppSettings = {
-  units: 'imperial',
-  defaultStock: 'plywood',
+  defaultUnits: 'imperial',
+  defaultGridSize: 0.0625,
   theme: 'dark',
-  gridSize: 0.0625,
-  snapDistance: 0.125,
-  snapEnabled: false,
-  snapSensitivity: 1.0,
-  showGrid: true,
+  confirmBeforeDelete: true,
+  showHotkeyHints: true,
+  stockConstraints: {
+    constrainDimensions: true,
+    constrainGrain: true,
+    constrainColor: true,
+    preventOverlap: true
+  },
+  liveGridSnap: false,
+  snapSensitivity: 'normal',
+  snapToOrigin: false,
+  dimensionSnapSameTypeOnly: false,
   enableAxisLegacySnaps: false,
   enableSurfaceAnchors: false,
   enableFractionalAnchors: false,
   enableGoldenRatioAnchors: false,
   enableFeatureAnchors: false,
-  snapToOrigin: false,
-  displayMode: 'solid',
   lightingMode: 'default',
   brightnessMultiplier: 1.0
-} as AppSettings;
+};
 
 const NO_GUIDES: SnapGuide[] = [];
 
@@ -154,6 +159,26 @@ describe('moveTool', () => {
       expect(preview.delta).toEqual({ x: 3, y: 0, z: -3 });
       expect(preview.positions.get(part.id)).toEqual({ x: 4, y: 0.375, z: -1 });
       expect(preview.candidate).toEqual({ kind: 'move', delta: preview.delta, positions: preview.positions });
+    });
+
+    it('preserves a socket mate host in the release commit instruction', () => {
+      const part = makePart({ id: 'a', position: { x: 0, y: 2.8, z: 0 } });
+      const state = moveTool.begin(makeInput({ part }));
+      const preview = createMoveCommitPreview({
+        partId: part.id,
+        position: { x: 0, y: 2.375, z: 0 },
+        state,
+        mateHostPartId: 'dado-host'
+      });
+
+      expect(moveTool.commit(state, preview)).toEqual([
+        {
+          kind: 'updatePartPosition',
+          partId: part.id,
+          position: { x: 0, y: 2.375, z: 0 },
+          mateHostPartId: 'dado-host'
+        }
+      ]);
     });
 
     it('createMoveCommitState falls back to the drag start primary position', () => {

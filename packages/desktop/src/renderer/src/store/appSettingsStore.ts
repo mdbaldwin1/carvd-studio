@@ -59,51 +59,60 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
     // Only initialize once
     if (get().isInitialized) return;
 
-    // Set up listener for settings changes from other instances
+    // Set up listener for settings changes from other instances. Cross-instance
+    // sync is a nicety; a bridge that cannot provide it must not stop settings
+    // from loading, and the latch only closes on success so a later init can
+    // still pick the listener up.
     if (!listenerSetup) {
-      listenerSetup = true;
-      window.electronAPI.onSettingsChanged((changes) => {
-        // Only apply changes for app settings keys
-        const appSettingsKeys: (keyof AppSettings)[] = [
-          'theme',
-          'confirmBeforeDelete',
-          'showHotkeyHints',
-          'defaultUnits',
-          'defaultGridSize',
-          'stockConstraints',
-          'liveGridSnap',
-          'snapSensitivity',
-          'snapToOrigin',
-          'dimensionSnapSameTypeOnly',
-          'advancedSnapPreset',
-          'enableSurfaceAnchors',
-          'enableFractionalAnchors',
-          'enableGoldenRatioAnchors',
-          'enableFeatureAnchors',
-          'enableLayoutSnaps',
-          'enableEqualSpacingSnap',
-          'enableDistributionSnap',
-          'enablePatternSnap',
-          'enableAxisLegacySnaps',
-          'showSnapCandidates',
-          'lightingMode',
-          'brightnessMultiplier',
-          'autoSave'
-        ];
+      try {
+        window.electronAPI.onSettingsChanged((changes) => {
+          // Only apply changes for app settings keys
+          const appSettingsKeys: (keyof AppSettings)[] = [
+            'theme',
+            'confirmBeforeDelete',
+            'showHotkeyHints',
+            'defaultUnits',
+            'defaultGridSize',
+            'stockConstraints',
+            'liveGridSnap',
+            'snapSensitivity',
+            'snapToOrigin',
+            'dimensionSnapSameTypeOnly',
+            'advancedSnapPreset',
+            'enableSurfaceAnchors',
+            'enableFractionalAnchors',
+            'enableGoldenRatioAnchors',
+            'enableFeatureAnchors',
+            'enableLayoutSnaps',
+            'enableEqualSpacingSnap',
+            'enableDistributionSnap',
+            'enablePatternSnap',
+            'enableAxisLegacySnaps',
+            'showSnapCandidates',
+            'lightingMode',
+            'brightnessMultiplier',
+            'autoSave'
+          ];
 
-        const relevantChanges: Partial<AppSettings> = {};
-        for (const key of appSettingsKeys) {
-          if (key in changes) {
-            relevantChanges[key] = changes[key] as AppSettings[typeof key];
+          const relevantChanges: Partial<AppSettings> = {};
+          for (const key of appSettingsKeys) {
+            if (key in changes) {
+              // A union key makes the per-key value type unresolvable here;
+              // appSettingsKeys guarantees the key belongs to AppSettings.
+              (relevantChanges as Record<string, unknown>)[key] = changes[key];
+            }
           }
-        }
 
-        // Update state if there are relevant changes
-        if (Object.keys(relevantChanges).length > 0) {
-          const currentSettings = get().settings;
-          set({ settings: { ...currentSettings, ...relevantChanges } });
-        }
-      });
+          // Update state if there are relevant changes
+          if (Object.keys(relevantChanges).length > 0) {
+            const currentSettings = get().settings;
+            set({ settings: { ...currentSettings, ...relevantChanges } });
+          }
+        });
+        listenerSetup = true;
+      } catch (error) {
+        logger.warn('Settings sync between windows unavailable:', error);
+      }
     }
 
     try {
@@ -176,7 +185,12 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
             confirmBeforeDelete !== undefined ? (confirmBeforeDelete as boolean) : DEFAULT_SETTINGS.confirmBeforeDelete,
           showHotkeyHints:
             showHotkeyHints !== undefined ? (showHotkeyHints as boolean) : DEFAULT_SETTINGS.showHotkeyHints,
-          stockConstraints: (stockConstraints as AppSettings['stockConstraints']) || DEFAULT_SETTINGS.stockConstraints,
+          // Settings stored before preventOverlap existed carry only three
+          // keys, so fill from the defaults rather than passing undefined on.
+          stockConstraints: {
+            ...DEFAULT_SETTINGS.stockConstraints,
+            ...((stockConstraints as Partial<AppSettings['stockConstraints']> | null) ?? {})
+          },
           liveGridSnap: liveGridSnap !== undefined ? (liveGridSnap as boolean) : DEFAULT_SETTINGS.liveGridSnap,
           snapSensitivity: (snapSensitivity as AppSettings['snapSensitivity']) || DEFAULT_SETTINGS.snapSensitivity,
           snapToOrigin: snapToOrigin !== undefined ? (snapToOrigin as boolean) : DEFAULT_SETTINGS.snapToOrigin,
@@ -249,37 +263,15 @@ export const useAppSettingsStore = create<AppSettingsState>((set, get) => ({
     set({ settings: newSettings });
 
     try {
-      // Save individual fields for compatibility with main process
-      // Use fallback values to prevent electron-store errors with undefined values
-      await Promise.all([
-        window.electronAPI.setPreference('defaultUnits', newSettings.defaultUnits ?? 'imperial'),
-        window.electronAPI.setPreference('defaultGridSize', newSettings.defaultGridSize ?? 0.0625),
-        window.electronAPI.setPreference('theme', newSettings.theme ?? 'dark'),
-        window.electronAPI.setPreference('confirmBeforeDelete', newSettings.confirmBeforeDelete ?? true),
-        window.electronAPI.setPreference('showHotkeyHints', newSettings.showHotkeyHints ?? true),
-        window.electronAPI.setPreference(
-          'stockConstraints',
-          newSettings.stockConstraints ?? DEFAULT_SETTINGS.stockConstraints
-        ),
-        window.electronAPI.setPreference('liveGridSnap', newSettings.liveGridSnap ?? false),
-        window.electronAPI.setPreference('snapSensitivity', newSettings.snapSensitivity ?? 'normal'),
-        window.electronAPI.setPreference('snapToOrigin', newSettings.snapToOrigin ?? true),
-        window.electronAPI.setPreference('dimensionSnapSameTypeOnly', newSettings.dimensionSnapSameTypeOnly ?? false),
-        window.electronAPI.setPreference('advancedSnapPreset', newSettings.advancedSnapPreset ?? 'precision'),
-        window.electronAPI.setPreference('enableSurfaceAnchors', newSettings.enableSurfaceAnchors ?? true),
-        window.electronAPI.setPreference('enableFractionalAnchors', newSettings.enableFractionalAnchors ?? true),
-        window.electronAPI.setPreference('enableGoldenRatioAnchors', newSettings.enableGoldenRatioAnchors ?? false),
-        window.electronAPI.setPreference('enableFeatureAnchors', newSettings.enableFeatureAnchors ?? true),
-        window.electronAPI.setPreference('enableLayoutSnaps', newSettings.enableLayoutSnaps ?? true),
-        window.electronAPI.setPreference('enableEqualSpacingSnap', newSettings.enableEqualSpacingSnap ?? true),
-        window.electronAPI.setPreference('enableDistributionSnap', newSettings.enableDistributionSnap ?? true),
-        window.electronAPI.setPreference('enablePatternSnap', newSettings.enablePatternSnap ?? true),
-        window.electronAPI.setPreference('enableAxisLegacySnaps', newSettings.enableAxisLegacySnaps ?? true),
-        window.electronAPI.setPreference('showSnapCandidates', newSettings.showSnapCandidates ?? false),
-        window.electronAPI.setPreference('lightingMode', newSettings.lightingMode ?? 'default'),
-        window.electronAPI.setPreference('brightnessMultiplier', newSettings.brightnessMultiplier ?? 1.0),
-        window.electronAPI.setPreference('autoSave', newSettings.autoSave ?? false)
-      ]);
+      // A preset changes several fields in succession. Persist only its supplied
+      // keys: rewriting the entire snapshot for each field floods the main
+      // process with synchronous disk writes and replays stale unrelated values.
+      const keys = (Object.keys(DEFAULT_SETTINGS) as (keyof AppSettings)[]).filter((key) =>
+        Object.prototype.hasOwnProperty.call(updates, key)
+      );
+      await Promise.all(
+        keys.map((key) => window.electronAPI.setPreference(key, newSettings[key] ?? DEFAULT_SETTINGS[key]))
+      );
     } catch (error) {
       logger.error('Failed to save app settings:', error);
       // Revert on error

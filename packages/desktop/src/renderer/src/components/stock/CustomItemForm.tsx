@@ -42,6 +42,7 @@ export function CustomItemForm({ initialData, onSave, onCancel }: CustomItemForm
           type="text"
           className="px-2 py-1.5 text-[13px]"
           placeholder="Item name (e.g., Wood screws #8 x 1-1/4)"
+          aria-label="Item name"
           value={name}
           onChange={(e) => setName(e.target.value)}
           autoFocus
@@ -53,6 +54,7 @@ export function CustomItemForm({ initialData, onSave, onCancel }: CustomItemForm
           type="text"
           className="px-2 py-1.5 text-[13px]"
           placeholder="Description (optional)"
+          aria-label="Description (optional)"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
         />
@@ -64,6 +66,7 @@ export function CustomItemForm({ initialData, onSave, onCancel }: CustomItemForm
             type="number"
             className="w-20 px-2 py-1.5 text-[13px]"
             value={quantity}
+            aria-label="Quantity"
             onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))}
             min={1}
           />
@@ -74,6 +77,7 @@ export function CustomItemForm({ initialData, onSave, onCancel }: CustomItemForm
             type="number"
             className="w-20 px-2 py-1.5 text-[13px]"
             value={unitPrice}
+            aria-label="Unit price"
             onChange={(e) => setUnitPrice(Math.max(0, parseFloat(e.target.value) || 0))}
             min={0}
             step={0.01}
@@ -85,6 +89,7 @@ export function CustomItemForm({ initialData, onSave, onCancel }: CustomItemForm
             type="text"
             className="w-20 px-2 py-1.5 text-[13px]"
             placeholder="e.g., Hardware"
+            aria-label="Category"
             value={category}
             onChange={(e) => setCategory(e.target.value)}
           />

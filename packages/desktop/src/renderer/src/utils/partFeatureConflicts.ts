@@ -1,0 +1,607 @@
+import { CircularCutFeature, EndCutFeature, Part, PartFeature, RectCutFeature } from '@renderer/types';
+import { getFeatureTargetLabel } from '@renderer/utils/partFeatureSummary';
+import {
+  getResolvedRectCutFeature,
+  isBottomTarget,
+  isSideFaceTarget,
+  isTopTarget,
+  validateRectCutFeature
+} from '@renderer/utils/rectCutUtils';
+import { expandCircularCut, validateCircularCut, validateRoundedCut } from '@renderer/utils/roundCutUtils';
+import { getPartMaterialVolume } from '@renderer/utils/partFeatureGeometry';
+import { getPartEdgeBevelProfiles, getPartEndCutProfiles, validateEndCutFeature } from '@renderer/utils/endCutUtils';
+
+export interface PartFeatureConflict {
+  featureId: string;
+  featureIndex: number;
+  relatedFeatureId?: string;
+  relatedFeatureIndex?: number;
+  code:
+    | 'duplicate_end_cut'
+    | 'duplicate_round_cut'
+    | 'rect_consumed'
+    | 'rect_anchor_removed'
+    | 'rect_depth_intersection'
+    | 'rect_perpendicular_intersection'
+    | 'no_material'
+    | 'material_removed';
+  severity: 'warning' | 'error';
+  message: string;
+}
+
+interface RectBounds {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+}
+
+type ReachableSurface = 'top' | 'bottom' | 'front' | 'back';
+type DepthInterval = { min: number; max: number };
+
+function overlaps(a: RectBounds, b: RectBounds): boolean {
+  return a.minX < b.maxX && a.maxX > b.minX && a.minZ < b.maxZ && a.maxZ > b.minZ;
+}
+
+function contains(container: RectBounds, candidate: RectBounds): boolean {
+  return (
+    container.minX <= candidate.minX &&
+    container.maxX >= candidate.maxX &&
+    container.minZ <= candidate.minZ &&
+    container.maxZ >= candidate.maxZ
+  );
+}
+
+/** Exported so the side-face branch can be asserted directly rather than through a conflict. */
+export function getRectFeatureBounds(feature: RectCutFeature, part: Pick<Part, 'length' | 'width'>): RectBounds | null {
+  const resolvedFeature = getResolvedRectCutFeature(feature, { ...part, thickness: 1 });
+  const sizeLength = resolvedFeature.parameters.size.length;
+  const sizeWidth = resolvedFeature.parameters.size.width;
+
+  // Side-face pockets first: cutout and mortise are the only types that can
+  // target front/back, so the general branch below would otherwise swallow
+  // them and read placement.z -- a height across the thickness -- as if it
+  // were a position across the board width.
+  if (isSideFaceTarget(resolvedFeature)) {
+    const depth = Math.min(resolvedFeature.parameters.depth ?? 0, part.width);
+    if (depth <= 0) return null;
+    const front = resolvedFeature.target.type === 'face' && resolvedFeature.target.face === 'front_face';
+    return {
+      minX: resolvedFeature.placement.x,
+      maxX: resolvedFeature.placement.x + sizeLength,
+      minZ: front ? 0 : part.width - depth,
+      maxZ: front ? depth : part.width
+    };
+  }
+
+  if (
+    resolvedFeature.cutType === 'cutout' ||
+    resolvedFeature.cutType === 'dado' ||
+    resolvedFeature.cutType === 'stopped_dado' ||
+    resolvedFeature.cutType === 'groove' ||
+    resolvedFeature.cutType === 'stopped_groove' ||
+    resolvedFeature.cutType === 'mortise'
+  ) {
+    return {
+      minX: resolvedFeature.placement.x,
+      maxX: resolvedFeature.placement.x + sizeLength,
+      minZ: resolvedFeature.placement.z,
+      maxZ: resolvedFeature.placement.z + sizeWidth
+    };
+  }
+
+  if (resolvedFeature.cutType === 'tenon') {
+    // A tenon occupies the whole end region across the blank's width.
+    const isLeft = resolvedFeature.target.type === 'face' && resolvedFeature.target.face === 'left_end';
+    const runLength = Math.min(resolvedFeature.parameters.size.length, part.length);
+    return {
+      minX: isLeft ? 0 : part.length - runLength,
+      maxX: isLeft ? runLength : part.length,
+      minZ: 0,
+      maxZ: part.width
+    };
+  }
+
+  if (resolvedFeature.cutType === 'corner_notch') {
+    if (resolvedFeature.target.type !== 'corner') return null;
+    const right = resolvedFeature.target.corner.includes('right');
+    const back = resolvedFeature.target.corner.startsWith('back_');
+    return {
+      minX: right ? part.length - sizeLength : 0,
+      maxX: right ? part.length : sizeLength,
+      minZ: back ? part.width - sizeWidth : 0,
+      maxZ: back ? part.width : sizeWidth
+    };
+  }
+
+  if (resolvedFeature.target.type !== 'edge') return null;
+
+  if (resolvedFeature.target.edge.includes('front') || resolvedFeature.target.edge.includes('back')) {
+    const back = resolvedFeature.target.edge.includes('back');
+    return {
+      minX: resolvedFeature.placement.x,
+      maxX: resolvedFeature.placement.x + sizeLength,
+      minZ: back ? part.width - sizeWidth : 0,
+      maxZ: back ? part.width : sizeWidth
+    };
+  }
+
+  const right = resolvedFeature.target.edge.includes('right');
+  return {
+    minX: right ? part.length - sizeLength : 0,
+    maxX: right ? part.length : sizeLength,
+    minZ: resolvedFeature.placement.z,
+    maxZ: resolvedFeature.placement.z + sizeWidth
+  };
+}
+
+function getReachableSurfaces(feature: RectCutFeature, resolvedFeature: RectCutFeature): Set<ReachableSurface> {
+  if (resolvedFeature.cutType === 'cutout' && resolvedFeature.parameters.depthMode === 'through') {
+    return new Set<ReachableSurface>(['top', 'bottom']);
+  }
+
+  if (isTopTarget(resolvedFeature)) return new Set<ReachableSurface>(['top']);
+  if (isBottomTarget(resolvedFeature)) return new Set<ReachableSurface>(['bottom']);
+  if (resolvedFeature.target.type === 'face' && resolvedFeature.target.face === 'front_face') {
+    return new Set<ReachableSurface>(['front']);
+  }
+  if (resolvedFeature.target.type === 'face' && resolvedFeature.target.face === 'back_face') {
+    return new Set<ReachableSurface>(['back']);
+  }
+
+  if (feature.target.type === 'face') {
+    if (feature.target.face === 'top_face') return new Set<ReachableSurface>(['top']);
+    if (feature.target.face === 'bottom_face') return new Set<ReachableSurface>(['bottom']);
+  }
+
+  return new Set<ReachableSurface>();
+}
+
+function sharesReachableSurface(
+  priorFeature: RectCutFeature,
+  currentFeature: RectCutFeature,
+  part: Pick<Part, 'length' | 'width' | 'thickness'>
+): boolean {
+  const priorResolved = getResolvedRectCutFeature(priorFeature, { ...part, thickness: 1 });
+  const currentResolved = getResolvedRectCutFeature(currentFeature, { ...part, thickness: 1 });
+  const priorSurfaces = getReachableSurfaces(priorFeature, priorResolved);
+  const currentSurfaces = getReachableSurfaces(currentFeature, currentResolved);
+
+  for (const surface of currentSurfaces) {
+    if (priorSurfaces.has(surface)) return true;
+  }
+  return false;
+}
+
+/**
+ * Whether a later cut inside an earlier one's footprint still removes wood.
+ *
+ * Lying within an earlier opening in plan is not by itself a mistake. A bit
+ * travels through air and then cuts: the pins of a secret mitred dovetail are
+ * chopped in the floor of the rebate that hides them, and the rebate's
+ * footprint holds every one of them. What is wrong is a cut that reaches no
+ * further than the one before it, because that removes nothing at all.
+ */
+function reachesPastFloorOf(
+  prior: RectCutFeature,
+  current: RectCutFeature,
+  part: Pick<Part, 'length' | 'width' | 'thickness'>
+): boolean {
+  const priorDepth = getDepthInterval(prior, part);
+  const currentDepth = getDepthInterval(current, part);
+  // Both are measured from the same end of the thickness, so the later cut
+  // does real work only where its interval runs outside the earlier one's.
+  const DEPTH_EPSILON = 1e-9;
+  return currentDepth.min >= priorDepth.min - DEPTH_EPSILON && currentDepth.max <= priorDepth.max + DEPTH_EPSILON;
+}
+
+function getDepthInterval(feature: RectCutFeature, part: Pick<Part, 'thickness'>): DepthInterval {
+  const depth =
+    getResolvedRectCutFeature(feature, { length: 1, width: 1, thickness: part.thickness }).parameters.depthMode ===
+    'through'
+      ? part.thickness
+      : (feature.parameters.depth ?? 0);
+  const clampedDepth = Math.max(0, Math.min(part.thickness, depth));
+
+  if (feature.parameters.depthMode === 'through') {
+    return { min: 0, max: part.thickness };
+  }
+
+  if (isTopTarget(feature)) {
+    return { min: Math.max(0, part.thickness - clampedDepth), max: part.thickness };
+  }
+
+  if (isBottomTarget(feature)) {
+    return { min: 0, max: clampedDepth };
+  }
+
+  return { min: 0, max: part.thickness };
+}
+
+function getSideDepthInterval(
+  feature: RectCutFeature,
+  part: Pick<Part, 'length' | 'width' | 'thickness'>
+): DepthInterval {
+  const depth = Math.max(0, Math.min(part.width, feature.parameters.depth ?? 0));
+  const front = feature.target.type === 'face' && feature.target.face === 'front_face';
+  return front ? { min: 0, max: depth } : { min: part.width - depth, max: part.width };
+}
+
+function intervalsOverlap(a: DepthInterval, b: DepthInterval): boolean {
+  return a.min < b.max && a.max > b.min;
+}
+
+/**
+ * How far a cut reaches across the thickness.
+ *
+ * A pocket in the top or bottom is bounded by its depth. One in a side face is
+ * bounded by where it sits on that face, since the cut runs into the width
+ * rather than down through the board.
+ */
+function getVerticalInterval(
+  feature: RectCutFeature,
+  part: Pick<Part, 'length' | 'width' | 'thickness'>
+): DepthInterval {
+  const resolved = getResolvedRectCutFeature(feature, part);
+  if (isSideFaceTarget(resolved)) {
+    const min = Math.max(0, resolved.placement.z);
+    return { min, max: Math.min(part.thickness, min + resolved.parameters.size.width) };
+  }
+  return getDepthInterval(resolved, part);
+}
+
+/**
+ * Two cuts entering from faces at right angles, meeting inside the blank.
+ *
+ * This is the leg of a table: the front apron's mortise comes in from one
+ * face and the side apron's from the next one round, at the same height. If
+ * they are deep enough they meet in the corner, and so do the tenons -- which
+ * is why the ends get mitred where they cross.
+ *
+ * It is reported rather than rejected, because meeting is often the intent.
+ */
+function isPerpendicularBlindIntersection(
+  priorFeature: RectCutFeature,
+  currentFeature: RectCutFeature,
+  part: Pick<Part, 'length' | 'width' | 'thickness'>
+): boolean {
+  if (priorFeature.parameters.depthMode !== 'blind' || currentFeature.parameters.depthMode !== 'blind') return false;
+
+  const priorResolved = getResolvedRectCutFeature(priorFeature, part);
+  const currentResolved = getResolvedRectCutFeature(currentFeature, part);
+  // Perpendicular means exactly one of the pair comes in from a side face.
+  if (isSideFaceTarget(priorResolved) === isSideFaceTarget(currentResolved)) return false;
+
+  const a = getRectFeatureBounds(priorFeature, part);
+  const b = getRectFeatureBounds(currentFeature, part);
+  if (!a || !b) return false;
+
+  // The plan bounds already carry each cut's depth on the axis it entered, so
+  // all that is left is the extent across the thickness.
+  return (
+    intervalsOverlap({ min: a.minX, max: a.maxX }, { min: b.minX, max: b.maxX }) &&
+    intervalsOverlap({ min: a.minZ, max: a.maxZ }, { min: b.minZ, max: b.maxZ }) &&
+    intervalsOverlap(getVerticalInterval(priorFeature, part), getVerticalInterval(currentFeature, part))
+  );
+}
+
+function isOpposingBlindIntersection(
+  priorFeature: RectCutFeature,
+  currentFeature: RectCutFeature,
+  part: Pick<Part, 'length' | 'width' | 'thickness'>
+): boolean {
+  if (priorFeature.parameters.depthMode !== 'blind' || currentFeature.parameters.depthMode !== 'blind') return false;
+
+  const priorResolved = getResolvedRectCutFeature(priorFeature, part);
+  const currentResolved = getResolvedRectCutFeature(currentFeature, part);
+  const priorSurfaces = getReachableSurfaces(priorFeature, priorResolved);
+  const currentSurfaces = getReachableSurfaces(currentFeature, currentResolved);
+
+  const isVerticallyOpposed =
+    (priorSurfaces.has('top') && currentSurfaces.has('bottom')) ||
+    (priorSurfaces.has('bottom') && currentSurfaces.has('top'));
+  const isSideOpposed =
+    (priorSurfaces.has('front') && currentSurfaces.has('back')) ||
+    (priorSurfaces.has('back') && currentSurfaces.has('front'));
+  if (!isVerticallyOpposed && !isSideOpposed) return false;
+
+  if (isSideOpposed) {
+    return intervalsOverlap(getSideDepthInterval(priorResolved, part), getSideDepthInterval(currentResolved, part));
+  }
+
+  return intervalsOverlap(getDepthInterval(priorResolved, part), getDepthInterval(currentResolved, part));
+}
+
+function isAnchorDependent(feature: RectCutFeature): boolean {
+  return feature.cutType === 'rabbet' || feature.cutType === 'edge_notch' || feature.cutType === 'corner_notch';
+}
+
+function circularMembersOverlap(
+  first: CircularCutFeature,
+  second: CircularCutFeature,
+  part: Part
+): { overlaps: boolean; duplicate: boolean } {
+  if (first.target.face !== second.target.face) return { overlaps: false, duplicate: false };
+
+  const firstMembers = expandCircularCut(first, part);
+  const secondMembers = expandCircularCut(second, part);
+  const profileDiameter = (feature: CircularCutFeature) =>
+    feature.cutType === 'counterbore'
+      ? (feature.parameters.counterbore?.diameter ?? feature.parameters.diameter)
+      : feature.cutType === 'countersink'
+        ? (feature.parameters.countersink?.majorDiameter ?? feature.parameters.diameter)
+        : feature.parameters.diameter;
+  const radiusSum = (profileDiameter(first) + profileDiameter(second)) / 2;
+  let memberOverlap = false;
+  const matchingMembers = new Set<number>();
+
+  for (const firstMember of firstMembers) {
+    for (const [secondIndex, secondMember] of secondMembers.entries()) {
+      const dx = firstMember.entryPoint.x - secondMember.entryPoint.x;
+      const dy = firstMember.entryPoint.y - secondMember.entryPoint.y;
+      const dz = firstMember.entryPoint.z - secondMember.entryPoint.z;
+      const distance = Math.hypot(dx, dy, dz);
+      if (distance < radiusSum - 1e-9) memberOverlap = true;
+      const axisDot =
+        firstMember.axis.x * secondMember.axis.x +
+        firstMember.axis.y * secondMember.axis.y +
+        firstMember.axis.z * secondMember.axis.z;
+      if (distance < 1e-9 && Math.abs(axisDot - 1) < 1e-9) matchingMembers.add(secondIndex);
+    }
+  }
+
+  const equalDimension = (a: number | undefined, b: number | undefined) =>
+    a === b || (a !== undefined && b !== undefined && Math.abs(a - b) < 1e-9);
+  const sameRecess =
+    first.cutType === 'counterbore'
+      ? equalDimension(first.parameters.counterbore?.diameter, second.parameters.counterbore?.diameter) &&
+        equalDimension(first.parameters.counterbore?.depth, second.parameters.counterbore?.depth)
+      : first.cutType !== 'countersink' ||
+        (equalDimension(first.parameters.countersink?.majorDiameter, second.parameters.countersink?.majorDiameter) &&
+          equalDimension(first.parameters.countersink?.includedAngle, second.parameters.countersink?.includedAngle));
+  const sameShape =
+    sameRecess &&
+    first.cutType === second.cutType &&
+    Math.abs(first.parameters.diameter - second.parameters.diameter) < 1e-9 &&
+    first.parameters.depthMode === second.parameters.depthMode &&
+    (first.parameters.depthMode === 'through' ||
+      Math.abs(Number(first.parameters.depth) - Number(second.parameters.depth)) < 1e-9);
+  return {
+    overlaps: memberOverlap,
+    duplicate:
+      firstMembers.length === secondMembers.length && matchingMembers.size === secondMembers.length && sameShape
+  };
+}
+
+export function getPartFeatureConflicts(
+  features: PartFeature[],
+  part: Pick<Part, 'length' | 'width' | 'thickness'>
+): PartFeatureConflict[] {
+  const conflicts: PartFeatureConflict[] = [];
+  const enabledFeatures = features
+    .map((feature, index) => ({ feature, index }))
+    .filter(({ feature }) => feature.enabled);
+  // Keyed by every face an end cut can target: the ends plus the front and back
+  // faces that carry long-edge bevels.
+  const endCutsByFace = new Map<
+    EndCutFeature['target']['face'],
+    { featureId: string; featureIndex: number; label: string }
+  >();
+  const priorRectCuts: Array<{ feature: RectCutFeature; index: number }> = [];
+  const priorCircularCuts: Array<{ feature: CircularCutFeature; index: number }> = [];
+
+  const featureIssues = new Map<PartFeature, string | null>();
+  for (const { feature, index } of enabledFeatures) {
+    const candidate = { ...part, features } as Part;
+    const materialIssue =
+      feature.kind === 'circular_cut'
+        ? validateCircularCut(feature, candidate)
+        : feature.kind === 'rounded_cut'
+          ? validateRoundedCut(feature, candidate)
+          : feature.kind === 'rect_cut'
+            ? validateRectCutFeature(feature, candidate)
+            : feature.kind === 'end_cut'
+              ? validateEndCutFeature(feature, candidate)
+              : null;
+    featureIssues.set(feature, materialIssue);
+    if (materialIssue?.includes('remaining material'))
+      conflicts.push({
+        featureId: feature.id,
+        featureIndex: index,
+        code: 'material_removed',
+        severity: 'error',
+        message: `Operation ${index + 1}: ${materialIssue}`
+      });
+    if (feature.kind === 'end_cut') {
+      const face = feature.target.face;
+      const prior = endCutsByFace.get(face);
+      if (prior) {
+        const message = `Operation ${index + 1} and Operation ${prior.featureIndex + 1} both use ${getFeatureTargetLabel(feature)}. Only one enabled cut per end or edge is currently supported.`;
+        conflicts.push({
+          featureId: feature.id,
+          featureIndex: index,
+          relatedFeatureId: prior.featureId,
+          relatedFeatureIndex: prior.featureIndex,
+          code: 'duplicate_end_cut',
+          severity: 'error',
+          message
+        });
+        conflicts.push({
+          featureId: prior.featureId,
+          featureIndex: prior.featureIndex,
+          relatedFeatureId: feature.id,
+          relatedFeatureIndex: index,
+          code: 'duplicate_end_cut',
+          severity: 'error',
+          message
+        });
+        continue;
+      }
+
+      endCutsByFace.set(face, {
+        featureId: feature.id,
+        featureIndex: index,
+        label: getFeatureTargetLabel(feature)
+      });
+      continue;
+    }
+
+    if (feature.kind === 'circular_cut') {
+      for (const prior of priorCircularCuts) {
+        const result = circularMembersOverlap(prior.feature, feature, part as Part);
+        // Overlapping round cuts are ordinary -- two bores meeting to form a
+        // slot, say. Only an exact duplicate is worth reporting.
+        if (!result.overlaps || !result.duplicate) continue;
+        const code: PartFeatureConflict['code'] = 'duplicate_round_cut';
+        const severity: PartFeatureConflict['severity'] = 'error';
+        const message = `Operation ${index + 1} duplicates the axis and removal of Operation ${prior.index + 1}.`;
+        conflicts.push({
+          featureId: prior.feature.id,
+          featureIndex: prior.index,
+          relatedFeatureId: feature.id,
+          relatedFeatureIndex: index,
+          code,
+          severity,
+          message
+        });
+        conflicts.push({
+          featureId: feature.id,
+          featureIndex: index,
+          relatedFeatureId: prior.feature.id,
+          relatedFeatureIndex: prior.index,
+          code,
+          severity,
+          message
+        });
+      }
+      priorCircularCuts.push({ feature, index });
+      continue;
+    }
+
+    if (feature.kind !== 'rect_cut') continue;
+    const currentBounds = getRectFeatureBounds(feature, part);
+    if (!currentBounds) {
+      priorRectCuts.push({ feature, index });
+      continue;
+    }
+
+    for (const prior of priorRectCuts) {
+      const priorBounds = getRectFeatureBounds(prior.feature, part);
+      const a = priorBounds;
+      const b = currentBounds;
+      if (!a || !b || !overlaps(a, b)) continue;
+
+      // Removals are built in the authored blank coordinates and composed as
+      // one subtraction, so overlapping cuts commute: a back groove crossing
+      // four shelf dadoes is ordinary joinery with a well-defined result.
+      // Only report an overlap that actually breaks something.
+      let code: PartFeatureConflict['code'] | null = null;
+      let severity: PartFeatureConflict['severity'] = 'error';
+      let message = '';
+
+      if (sharesReachableSurface(prior.feature, feature, part)) {
+        if (isAnchorDependent(feature)) {
+          code = 'rect_anchor_removed';
+          message = `Operation ${index + 1} depends on ${getFeatureTargetLabel(feature)}, but Operation ${prior.index + 1} already removes that anchor material.`;
+        } else if (contains(a, b) && reachesPastFloorOf(prior.feature, feature, part)) {
+          code = 'rect_consumed';
+          message = `Operation ${index + 1} starts inside material already removed by Operation ${prior.index + 1}.`;
+        }
+      } else if (isOpposingBlindIntersection(prior.feature, feature, part)) {
+        code = 'rect_depth_intersection';
+        message = `Operation ${index + 1} intersects Operation ${prior.index + 1} from the opposite face. Combined depths remove the same interior material.`;
+      } else if (isPerpendicularBlindIntersection(prior.feature, feature, part)) {
+        code = 'rect_perpendicular_intersection';
+        // Not an error: two mortises meeting in a leg is ordinary once the
+        // tenon ends are mitred where they cross. Say so rather than refuse.
+        severity = 'warning';
+        message = `Operation ${index + 1} meets Operation ${prior.index + 1} inside the blank, entering from faces at right angles. Shorten one, or mitre the tenon ends where they cross.`;
+      }
+
+      if (!code) continue;
+
+      conflicts.push({
+        featureId: prior.feature.id,
+        featureIndex: prior.index,
+        relatedFeatureId: feature.id,
+        relatedFeatureIndex: index,
+        code,
+        severity,
+        message
+      });
+      conflicts.push({
+        featureId: feature.id,
+        featureIndex: index,
+        relatedFeatureId: prior.feature.id,
+        relatedFeatureIndex: prior.index,
+        code,
+        severity,
+        message
+      });
+    }
+
+    priorRectCuts.push({ feature, index });
+  }
+
+  // Any combination of removal families can consume all remaining stock.
+  // Individual validators own malformed numeric/unsupported inputs; those
+  // must not reach solid evaluation. Valid removals and material-support
+  // failures can still be evaluated to identify complete blank consumption.
+  if (
+    enabledFeatures.length > 0 &&
+    [part.length, part.width, part.thickness].every((value) => Number.isFinite(value) && value > 0) &&
+    enabledFeatures.every(({ feature }) => {
+      const issue = featureIssues.get(feature);
+      return !issue || issue.includes('remaining material') || issue.includes('entire blank');
+    }) &&
+    couldConsumeBlank(features, part) &&
+    getPartMaterialVolume({ ...part, features } as Part) <= part.length * part.width * part.thickness * 1e-12
+  ) {
+    for (const { feature, index } of enabledFeatures) {
+      conflicts.push({
+        featureId: feature.id,
+        featureIndex: index,
+        code: 'no_material',
+        severity: 'error',
+        message: 'These operations remove the entire blank; no material remains. Reduce or disable a cut before saving.'
+      });
+    }
+  }
+  return conflicts;
+}
+
+/** An upper bound only: overlapping cutters are deliberately counted twice.
+ * Most edits cannot remove all stock, so avoid triangulating them to prove it. */
+function couldConsumeBlank(features: PartFeature[], part: Pick<Part, 'length' | 'width' | 'thickness'>): boolean {
+  const ends = getPartEndCutProfiles({ ...part, features });
+  const edges = getPartEdgeBevelProfiles({ ...part, features });
+  let removed =
+    (ends.left.maxInset + ends.right.maxInset) * part.width * part.thickness +
+    (edges.front.inset + edges.back.inset) * part.length * part.thickness;
+  for (const feature of features) {
+    if (!feature.enabled) continue;
+    if (feature.kind === 'rect_cut') {
+      const cut = getResolvedRectCutFeature(feature, part);
+      if (cut.cutType === 'tenon') removed += cut.parameters.size.length * part.width * part.thickness;
+      else
+        removed +=
+          cut.parameters.size.length *
+          cut.parameters.size.width *
+          (cut.parameters.depthMode === 'through' ? part.thickness : Number(cut.parameters.depth));
+    } else if (feature.kind === 'circular_cut') {
+      const diameter = Math.max(
+        feature.parameters.diameter,
+        feature.parameters.counterbore?.diameter ?? 0,
+        feature.parameters.countersink?.majorDiameter ?? 0
+      );
+      removed +=
+        expandCircularCut(feature, part as Part).length *
+        Math.PI *
+        (diameter / 2) ** 2 *
+        Math.hypot(part.length, part.width, part.thickness);
+    } else if (feature.kind === 'rounded_cut') {
+      removed += feature.parameters.length * feature.parameters.width * part.thickness;
+    }
+  }
+  return removed >= part.length * part.width * part.thickness - 1e-12;
+}

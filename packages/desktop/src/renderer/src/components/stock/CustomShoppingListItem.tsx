@@ -18,7 +18,11 @@ export function CustomShoppingListItem({ item, checked, onToggle, onEdit, onDele
       className={`group flex items-start gap-3 py-3 px-4 bg-surface border border-border rounded transition-colors duration-150 ${checked ? 'opacity-50 bg-bg-alt' : ''}`}
     >
       <label className="flex items-center pt-0.5 shrink-0 cursor-pointer">
-        <Checkbox checked={checked} onChange={onToggle} />
+        <Checkbox
+          checked={checked}
+          onChange={onToggle}
+          aria-label={`Mark ${item.name} as ${checked ? 'not purchased' : 'purchased'}`}
+        />
       </label>
 
       <div className="flex-1 min-w-0">

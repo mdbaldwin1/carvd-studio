@@ -56,7 +56,15 @@ describe('snapStore', () => {
 
   describe('setActiveSnapLines', () => {
     it('sets active snap lines', () => {
-      const snapLines = [{ start: { x: 0, y: 0, z: 0 }, end: { x: 10, y: 0, z: 0 }, color: '#ff0000' }];
+      const snapLines = [
+        {
+          axis: 'x' as const,
+          type: 'edge' as const,
+          start: { x: 0, y: 0, z: 0 },
+          end: { x: 10, y: 0, z: 0 },
+          snapValue: 0
+        }
+      ];
 
       useSnapStore.getState().setActiveSnapLines(snapLines);
 
@@ -64,9 +72,15 @@ describe('snapStore', () => {
     });
 
     it('clears active snap lines', () => {
-      useSnapStore
-        .getState()
-        .setActiveSnapLines([{ start: { x: 0, y: 0, z: 0 }, end: { x: 10, y: 0, z: 0 }, color: '#ff0000' }]);
+      useSnapStore.getState().setActiveSnapLines([
+        {
+          axis: 'x' as const,
+          type: 'edge' as const,
+          start: { x: 0, y: 0, z: 0 },
+          end: { x: 10, y: 0, z: 0 },
+          snapValue: 0
+        }
+      ]);
 
       useSnapStore.getState().setActiveSnapLines([]);
 
@@ -98,7 +112,15 @@ describe('snapStore', () => {
 
   describe('setSnapIndicators', () => {
     it('sets both snap lines and reference distances in a single call', () => {
-      const snapLines = [{ start: { x: 0, y: 0, z: 0 }, end: { x: 10, y: 0, z: 0 }, color: '#ff0000' }];
+      const snapLines = [
+        {
+          axis: 'x' as const,
+          type: 'edge' as const,
+          start: { x: 0, y: 0, z: 0 },
+          end: { x: 10, y: 0, z: 0 },
+          snapValue: 0
+        }
+      ];
       const distances = [
         {
           id: 'dist-1',
@@ -121,7 +143,15 @@ describe('snapStore', () => {
 
     it('clears both snap lines and reference distances', () => {
       useSnapStore.setState({
-        activeSnapLines: [{ start: { x: 0, y: 0, z: 0 }, end: { x: 1, y: 0, z: 0 }, color: '#ff0000' }],
+        activeSnapLines: [
+          {
+            axis: 'x' as const,
+            type: 'edge' as const,
+            start: { x: 0, y: 0, z: 0 },
+            end: { x: 1, y: 0, z: 0 },
+            snapValue: 0
+          }
+        ],
         activeReferenceDistances: [
           {
             id: 'dist-1',
@@ -150,8 +180,8 @@ describe('snapStore', () => {
 
   describe('setReferencePartIds', () => {
     it('sets reference part IDs directly', () => {
-      const part1Id = useProjectStore.getState().addPart();
-      const part2Id = useProjectStore.getState().addPart();
+      const part1Id = useProjectStore.getState().addPart()!;
+      const part2Id = useProjectStore.getState().addPart()!;
 
       useSnapStore.getState().setReferencePartIds([part1Id, part2Id]);
 
@@ -159,9 +189,9 @@ describe('snapStore', () => {
     });
 
     it('replaces existing reference part IDs', () => {
-      const part1Id = useProjectStore.getState().addPart();
-      const part2Id = useProjectStore.getState().addPart();
-      const part3Id = useProjectStore.getState().addPart();
+      const part1Id = useProjectStore.getState().addPart()!;
+      const part2Id = useProjectStore.getState().addPart()!;
+      const part3Id = useProjectStore.getState().addPart()!;
       useSnapStore.getState().setReferencePartIds([part1Id, part2Id]);
 
       useSnapStore.getState().setReferencePartIds([part3Id]);
@@ -172,8 +202,8 @@ describe('snapStore', () => {
 
   describe('addToReferences', () => {
     it('adds parts to reference list', () => {
-      const part1Id = useProjectStore.getState().addPart();
-      const part2Id = useProjectStore.getState().addPart();
+      const part1Id = useProjectStore.getState().addPart()!;
+      const part2Id = useProjectStore.getState().addPart()!;
 
       useSnapStore.getState().addToReferences([part1Id, part2Id]);
 
@@ -182,7 +212,7 @@ describe('snapStore', () => {
     });
 
     it('does not add duplicate references', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
       useSnapStore.getState().addToReferences([partId]);
 
       useSnapStore.getState().addToReferences([partId]);
@@ -193,7 +223,7 @@ describe('snapStore', () => {
 
   describe('removeFromReferences', () => {
     it('removes parts from reference list', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
       useSnapStore.getState().addToReferences([partId]);
 
       useSnapStore.getState().removeFromReferences([partId]);
@@ -202,7 +232,7 @@ describe('snapStore', () => {
     });
 
     it('is a no-op when removing parts not in references', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
 
       useSnapStore.getState().removeFromReferences([partId]);
 
@@ -212,7 +242,7 @@ describe('snapStore', () => {
 
   describe('toggleReference', () => {
     it('adds parts to references when none are references', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
 
       useSnapStore.getState().toggleReference([partId]);
 
@@ -220,7 +250,7 @@ describe('snapStore', () => {
     });
 
     it('removes parts from references when all are references', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
       useSnapStore.getState().toggleReference([partId]);
 
       useSnapStore.getState().toggleReference([partId]);
@@ -229,8 +259,8 @@ describe('snapStore', () => {
     });
 
     it('adds all parts when only some are references', () => {
-      const part1Id = useProjectStore.getState().addPart();
-      const part2Id = useProjectStore.getState().addPart();
+      const part1Id = useProjectStore.getState().addPart()!;
+      const part2Id = useProjectStore.getState().addPart()!;
       useSnapStore.getState().addToReferences([part1Id]);
 
       useSnapStore.getState().toggleReference([part1Id, part2Id]);
@@ -242,8 +272,8 @@ describe('snapStore', () => {
 
   describe('clearReferences', () => {
     it('clears all reference parts', () => {
-      const part1Id = useProjectStore.getState().addPart();
-      const part2Id = useProjectStore.getState().addPart();
+      const part1Id = useProjectStore.getState().addPart()!;
+      const part2Id = useProjectStore.getState().addPart()!;
       useSnapStore.getState().addToReferences([part1Id, part2Id]);
 
       useSnapStore.getState().clearReferences();
@@ -281,7 +311,7 @@ describe('snapStore', () => {
 
   describe('updateReferenceDistances', () => {
     it('clears distances when no references are set', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
       useSelectionStore.setState({ selectedPartIds: [partId] });
 
       useSnapStore.getState().updateReferenceDistances();
@@ -290,7 +320,7 @@ describe('snapStore', () => {
     });
 
     it('clears distances when nothing is selected', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
       useSnapStore.setState({ referencePartIds: [partId] });
       useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: [] });
 
@@ -300,7 +330,7 @@ describe('snapStore', () => {
     });
 
     it('clears distances when selected part is also the reference', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
       useSnapStore.setState({ referencePartIds: [partId] });
       useSelectionStore.setState({ selectedPartIds: [partId] });
 
@@ -317,14 +347,14 @@ describe('snapStore', () => {
         length: 10,
         width: 5,
         thickness: 0.75
-      });
+      })!;
       const selPartId = useProjectStore.getState().addPart({
         name: 'Sel',
         position: { x: 15, y: 0.375, z: 0 },
         length: 10,
         width: 5,
         thickness: 0.75
-      });
+      })!;
 
       useSnapStore.setState({ referencePartIds: [refPartId] });
       useSelectionStore.setState({ selectedPartIds: [selPartId] });
@@ -342,7 +372,7 @@ describe('snapStore', () => {
 
   describe('cross-store cleanup', () => {
     it('deletePart removes part from references', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
       useSnapStore.getState().addToReferences([partId]);
 
       expect(useSnapStore.getState().referencePartIds).toContain(partId);
@@ -353,8 +383,8 @@ describe('snapStore', () => {
     });
 
     it('deleteSelectedParts removes parts from references', () => {
-      const part1Id = useProjectStore.getState().addPart({ name: 'Part 1' });
-      const part2Id = useProjectStore.getState().addPart({ name: 'Part 2' });
+      const part1Id = useProjectStore.getState().addPart({ name: 'Part 1' })!;
+      const part2Id = useProjectStore.getState().addPart({ name: 'Part 2' })!;
       useSnapStore.getState().addToReferences([part1Id, part2Id]);
       useSelectionStore.getState().selectParts([part1Id, part2Id]);
 
@@ -366,7 +396,15 @@ describe('snapStore', () => {
     it('newProject resets snap state', () => {
       useSnapStore.setState({
         referencePartIds: ['p1', 'p2'],
-        activeSnapLines: [{ start: { x: 0, y: 0, z: 0 }, end: { x: 1, y: 0, z: 0 }, color: '#f00' }],
+        activeSnapLines: [
+          {
+            axis: 'x' as const,
+            type: 'edge' as const,
+            start: { x: 0, y: 0, z: 0 },
+            end: { x: 1, y: 0, z: 0 },
+            snapValue: 0
+          }
+        ],
         activeReferenceDistances: [
           {
             id: 'd1',
@@ -390,7 +428,7 @@ describe('snapStore', () => {
     });
 
     it('startEditingAssembly clears references', () => {
-      const partId = useProjectStore.getState().addPart();
+      const partId = useProjectStore.getState().addPart()!;
       useSnapStore.getState().addToReferences([partId]);
 
       useAssemblyEditingStore.getState().startEditingAssembly('assembly-123', 'Test Assembly', [
@@ -404,11 +442,95 @@ describe('snapStore', () => {
           rotation: { x: 0, y: 0, z: 0 },
           color: '#8B4513',
           stockId: null,
+          grainSensitive: false,
           grainDirection: 'length'
         }
       ]);
 
       expect(useSnapStore.getState().referencePartIds).toHaveLength(0);
+    });
+  });
+  describe('snap perf sampling', () => {
+    it('accumulates average, max, and over-budget counts', () => {
+      const store = useSnapStore.getState();
+      store.resetSnapPerf();
+      const budget = useSnapStore.getState().snapPerf.budgetMs;
+
+      store.recordSnapPerfSample(budget / 2);
+      store.recordSnapPerfSample(budget * 2);
+
+      const perf = useSnapStore.getState().snapPerf;
+      expect(perf.sampleCount).toBe(2);
+      expect(perf.lastMs).toBeCloseTo(budget * 2);
+      expect(perf.maxMs).toBeCloseTo(budget * 2);
+      expect(perf.avgMs).toBeCloseTo((budget / 2 + budget * 2) / 2);
+      expect(perf.overBudgetCount).toBe(1);
+
+      store.resetSnapPerf();
+      expect(useSnapStore.getState().snapPerf.sampleCount).toBe(0);
+    });
+  });
+
+  describe('indicator setters', () => {
+    it('setSnapIndicatorsWithRulers keeps explicit rulers and pulses on winner change', () => {
+      const store = useSnapStore.getState();
+      const line = {
+        id: 'line-1',
+        axis: 'x' as const,
+        type: 'edge' as const,
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 0, y: 0, z: 4 }
+      };
+      const ruler = {
+        id: 'ruler-1',
+        axis: 'x' as const,
+        start: { x: 0, y: 0, z: 0 },
+        end: { x: 4, y: 0, z: 0 },
+        distance: 4,
+        labelPosition: { x: 2, y: 0.5, z: 0 },
+        fromPartId: 'a',
+        toPartId: 'b'
+      };
+
+      store.setSnapIndicatorsWithRulers([line] as never, [] as never, [ruler] as never);
+
+      const state = useSnapStore.getState();
+      expect(state.activeSnapLines).toHaveLength(1);
+      expect(state.activeReferenceRulers).toHaveLength(1);
+      expect(state.snapPulseAt).toBeGreaterThan(0);
+    });
+
+    it('setFaceLatchActive and setSnapLabelPosition update transient state', () => {
+      const store = useSnapStore.getState();
+      store.setFaceLatchActive(true);
+      store.setSnapLabelPosition({ x: 1, y: 2, z: 3 });
+      expect(useSnapStore.getState().faceLatchActive).toBe(true);
+      expect(useSnapStore.getState().snapLabelPosition).toEqual({ x: 1, y: 2, z: 3 });
+    });
+  });
+
+  describe('updateReferenceDistances early exits', () => {
+    it('clears indicators when references or selection are empty', () => {
+      useSnapStore.setState({
+        referencePartIds: [],
+        activeReferenceDistances: [{ distance: 1 }] as never,
+        activeReferenceRulers: [{ id: 'stale' }] as never
+      });
+      useSelectionStore.setState({ selectedPartIds: [], selectedGroupIds: [] });
+
+      useSnapStore.getState().updateReferenceDistances();
+
+      expect(useSnapStore.getState().activeReferenceDistances).toEqual([]);
+      expect(useSnapStore.getState().activeReferenceRulers).toEqual([]);
+    });
+
+    it('clears indicators when reference ids resolve to nothing', () => {
+      useSnapStore.setState({ referencePartIds: ['ghost-part'] });
+      useSelectionStore.setState({ selectedPartIds: ['also-ghost'], selectedGroupIds: [] });
+
+      useSnapStore.getState().updateReferenceDistances();
+
+      expect(useSnapStore.getState().activeReferenceDistances).toEqual([]);
     });
   });
 });

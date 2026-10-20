@@ -46,6 +46,8 @@ export function SnapAlignmentLines({ data, units, displayMode }: SnapAlignmentLi
         if (line.subtype === 'corner-anchor') return '#69db7c';
         if (line.subtype?.includes('fraction-50')) return '#69db7c';
         return '#ff922b';
+      case 'joinery':
+        return '#c77dff';
       case 'feature':
         return '#ffffff';
       default:
@@ -131,6 +133,18 @@ export function SnapAlignmentLines({ data, units, displayMode }: SnapAlignmentLi
   };
 
   const getSnapToken = (line: SnapLine) => {
+    if (line.family === 'joinery') {
+      if (line.subtype === 'mortise-tenon') return 'TENON → MORTISE';
+      if (line.subtype === 'half-lap') return 'HALF LAP';
+      if (line.subtype === 'dowel') return 'DOWEL MATE';
+      if (line.subtype === 'mitre') return 'MITRE MATE';
+      if (line.subtype === 'bevel') return 'BEVEL MATE';
+      if (line.subtype === 'compound') return 'COMPOUND MATE';
+      if (line.subtype === 'dado' || line.subtype === 'stopped_dado') return 'DADO MATE';
+      if (line.subtype === 'groove' || line.subtype === 'stopped_groove') return 'GROOVE MATE';
+      if (line.subtype === 'rabbet') return 'RABBET MATE';
+      return 'JOINT MATE';
+    }
     if (line.family === 'face') return 'FACE';
     if (line.family === 'surface-anchor') {
       if (line.subtype === 'center-2d') return 'Center-2D';
@@ -174,6 +188,7 @@ export function SnapAlignmentLines({ data, units, displayMode }: SnapAlignmentLi
               : [camera.position.x * 0.1, camera.position.y * 0.1, camera.position.z * 0.1]
           }
           center
+          zIndexRange={[0, 50]}
         >
           <div
             style={{

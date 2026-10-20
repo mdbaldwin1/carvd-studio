@@ -15,8 +15,6 @@ import {
   removeFavoriteProject,
   isFavoriteProject,
   setFavoriteProjects,
-  getNewProjectDefaults,
-  setNewProjectDefaults,
   getWindowBounds,
   setWindowBounds,
   getStockLibrary,
@@ -122,7 +120,7 @@ function createTemplate(overrides: Partial<UserTemplateItem> = {}): UserTemplate
 
 function createValidExport(): AppStateExport {
   return {
-    version: 1,
+    version: 1 as const,
     exportedAt: '2026-01-15T00:00:00Z',
     appVersion: '1.0.0',
     data: {
@@ -539,27 +537,6 @@ describe('store', () => {
   });
 
   // ============================
-  // New Project Defaults
-  // ============================
-
-  describe('new project defaults', () => {
-    it('has default values', () => {
-      const defaults = getNewProjectDefaults();
-      expect(defaults.units).toBe('imperial');
-      expect(defaults.addCommonMaterials).toBe(true);
-      expect(defaults.skipSetupDialog).toBe(false);
-    });
-
-    it('updates partial defaults', () => {
-      setNewProjectDefaults({ units: 'metric', skipSetupDialog: true });
-      const defaults = getNewProjectDefaults();
-      expect(defaults.units).toBe('metric');
-      expect(defaults.skipSetupDialog).toBe(true);
-      expect(defaults.addCommonMaterials).toBe(true); // unchanged
-    });
-  });
-
-  // ============================
   // Window Bounds
   // ============================
 
@@ -601,7 +578,7 @@ describe('store', () => {
 
     it('reports missing version', () => {
       const data = createValidExport();
-      delete (data as Record<string, unknown>).version;
+      delete (data as unknown as Record<string, unknown>).version;
       const result = validateAppStateExport(data);
       expect(result.valid).toBe(false);
       expect(result.errors).toContain('Missing or invalid version field');
@@ -616,14 +593,14 @@ describe('store', () => {
 
     it('reports missing exportedAt', () => {
       const data = createValidExport();
-      delete (data as Record<string, unknown>).exportedAt;
+      delete (data as unknown as Record<string, unknown>).exportedAt;
       const result = validateAppStateExport(data);
       expect(result.errors).toContain('Missing exportedAt timestamp');
     });
 
     it('reports missing data field', () => {
       const data = createValidExport();
-      delete (data as Record<string, unknown>).data;
+      delete (data as unknown as Record<string, unknown>).data;
       const result = validateAppStateExport(data);
       expect(result.valid).toBe(false);
     });
@@ -654,14 +631,14 @@ describe('store', () => {
     it('validates correct template', () => {
       const result = validateTemplateExport({
         type: 'template',
-        version: 1,
+        version: 1 as const,
         data: { id: 't1', name: 'T', project: '{}' }
       });
       expect(result.valid).toBe(true);
     });
 
     it('rejects wrong type', () => {
-      const result = validateTemplateExport({ type: 'assembly', version: 1, data: {} });
+      const result = validateTemplateExport({ type: 'assembly', version: 1 as const, data: {} });
       expect(result.valid).toBe(false);
     });
   });
@@ -670,14 +647,14 @@ describe('store', () => {
     it('validates correct assembly', () => {
       const result = validateAssemblyExport({
         type: 'assembly',
-        version: 1,
+        version: 1 as const,
         data: { id: 'a1', name: 'A', parts: [] }
       });
       expect(result.valid).toBe(true);
     });
 
     it('rejects wrong type', () => {
-      const result = validateAssemblyExport({ type: 'template', version: 1, data: {} });
+      const result = validateAssemblyExport({ type: 'template', version: 1 as const, data: {} });
       expect(result.valid).toBe(false);
     });
   });
@@ -686,14 +663,14 @@ describe('store', () => {
     it('validates correct stocks', () => {
       const result = validateStocksExport({
         type: 'stocks',
-        version: 1,
+        version: 1 as const,
         data: [createStock()]
       });
       expect(result.valid).toBe(true);
     });
 
     it('rejects empty data', () => {
-      const result = validateStocksExport({ type: 'stocks', version: 1, data: [] });
+      const result = validateStocksExport({ type: 'stocks', version: 1 as const, data: [] });
       expect(result.valid).toBe(false);
     });
   });
@@ -870,7 +847,7 @@ describe('store', () => {
   describe('importTemplate', () => {
     it('imports new template', () => {
       const data = {
-        version: 1,
+        version: 1 as const,
         type: 'template' as const,
         exportedAt: '2026-01-01T00:00:00Z',
         appVersion: '1.0.0',
@@ -887,7 +864,7 @@ describe('store', () => {
       addUserTemplate(createTemplate({ id: 'tmpl-1', name: 'Old' }));
 
       const data = {
-        version: 1,
+        version: 1 as const,
         type: 'template' as const,
         exportedAt: '2026-01-01T00:00:00Z',
         appVersion: '1.0.0',
@@ -902,7 +879,7 @@ describe('store', () => {
       addUserTemplate(createTemplate({ id: 'tmpl-1' }));
 
       const data = {
-        version: 1,
+        version: 1 as const,
         type: 'template' as const,
         exportedAt: '2026-01-01T00:00:00Z',
         appVersion: '1.0.0',
@@ -919,7 +896,7 @@ describe('store', () => {
   describe('importStocks', () => {
     it('imports new stocks', () => {
       const data = {
-        version: 1,
+        version: 1 as const,
         type: 'stocks' as const,
         exportedAt: '2026-01-01T00:00:00Z',
         appVersion: '1.0.0',
@@ -935,7 +912,7 @@ describe('store', () => {
       addStockToLibrary(createStock({ id: 'existing' }));
 
       const data = {
-        version: 1,
+        version: 1 as const,
         type: 'stocks' as const,
         exportedAt: '2026-01-01T00:00:00Z',
         appVersion: '1.0.0',
@@ -951,7 +928,7 @@ describe('store', () => {
       addStockToLibrary(createStock({ id: 'existing', name: 'Old' }));
 
       const data = {
-        version: 1,
+        version: 1 as const,
         type: 'stocks' as const,
         exportedAt: '2026-01-01T00:00:00Z',
         appVersion: '1.0.0',
@@ -967,7 +944,7 @@ describe('store', () => {
   describe('importAssembly', () => {
     it('imports assembly with referenced stocks', () => {
       const data = {
-        version: 1,
+        version: 1 as const,
         type: 'assembly' as const,
         exportedAt: '2026-01-01T00:00:00Z',
         appVersion: '1.0.0',

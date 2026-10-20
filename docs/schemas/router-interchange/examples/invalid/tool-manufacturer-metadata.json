@@ -1,0 +1,14 @@
+{
+  "format": "carvd-router-tool",
+  "version": 1,
+  "tool": {
+    "version": 1,
+    "id": "bad-mfg",
+    "name": "Bad Manufacturer Tool",
+    "source": "manufacturer",
+    "profileFamily": "cove",
+    "cutterDiameter": 1,
+    "shankDiameter": 0.5,
+    "cuttingHeight": 0.5
+  }
+}

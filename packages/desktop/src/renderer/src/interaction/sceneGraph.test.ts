@@ -35,7 +35,7 @@ describe('buildWorkspaceSceneGraph', () => {
       const graph = buildWorkspaceSceneGraph({ parts, groups: [], groupMembers: [] });
 
       expect(graph.nodes.size).toBe(3);
-      expect(graph.rootIds.sort()).toEqual(['p1', 'p2', 'p3']);
+      expect([...graph.rootIds].sort()).toEqual(['p1', 'p2', 'p3']);
       for (const id of ['p1', 'p2', 'p3']) {
         const node = graph.findNode(id);
         expect(node).toBeDefined();
@@ -88,7 +88,7 @@ describe('buildWorkspaceSceneGraph', () => {
       const members = [makeMember('m1', 'g1', 'p1'), makeMember('m2', 'g1', 'p2')];
 
       const graph = buildWorkspaceSceneGraph({ parts, groups, groupMembers: members });
-      expect(graph.descendantPartIds('g1').sort()).toEqual(['p1', 'p2']);
+      expect([...graph.descendantPartIds('g1')].sort()).toEqual(['p1', 'p2']);
     });
 
     it('ancestorGroupIds of a child part contains its group', () => {
@@ -137,8 +137,8 @@ describe('buildWorkspaceSceneGraph', () => {
       ];
 
       const graph = buildWorkspaceSceneGraph({ parts, groups, groupMembers: members });
-      expect(graph.descendantPartIds('g-outer').sort()).toEqual(['p-a', 'p-b', 'p-c']);
-      expect(graph.descendantPartIds('g-inner').sort()).toEqual(['p-b', 'p-c']);
+      expect([...graph.descendantPartIds('g-outer')].sort()).toEqual(['p-a', 'p-b', 'p-c']);
+      expect([...graph.descendantPartIds('g-inner')].sort()).toEqual(['p-b', 'p-c']);
       expect(graph.descendantGroupIds('g-outer')).toEqual(['g-inner']);
       expect(graph.descendantGroupIds('p-a')).toEqual([]);
       expect(graph.descendantGroupIds('ghost')).toEqual([]);
@@ -152,7 +152,7 @@ describe('buildWorkspaceSceneGraph', () => {
       const members = [makeMember('m1', 'g1', 'p1'), makeMember('m2', 'g2', 'p2')];
 
       const graph = buildWorkspaceSceneGraph({ parts, groups, groupMembers: members });
-      expect(graph.rootIds.sort()).toEqual(['g1', 'g2']);
+      expect([...graph.rootIds].sort()).toEqual(['g1', 'g2']);
       expect(graph.descendantPartIds('g1')).toEqual(['p1']);
       expect(graph.descendantPartIds('g2')).toEqual(['p2']);
     });
@@ -163,7 +163,7 @@ describe('buildWorkspaceSceneGraph', () => {
       const members = [makeMember('m1', 'g1', 'p-grouped')];
 
       const graph = buildWorkspaceSceneGraph({ parts, groups, groupMembers: members });
-      expect(graph.rootIds.sort()).toEqual(['g1', 'p-free']);
+      expect([...graph.rootIds].sort()).toEqual(['g1', 'p-free']);
       expect(graph.findNode('p-free')?.parentId).toBeNull();
       expect(graph.findNode('p-grouped')?.parentId).toBe('g1');
     });

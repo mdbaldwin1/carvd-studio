@@ -2,6 +2,8 @@ import type { Part, SnapGuide } from '../types';
 import { isAxisAlignedRotation } from './rotation';
 import {
   detectFaceSnaps,
+  detectFeatureMateSnaps,
+  detectGroupFeatureMateSnaps,
   detectFeatureSnaps,
   detectFractionalFaceSnaps,
   detectGuideSnaps,
@@ -9,6 +11,7 @@ import {
   detectSnaps,
   detectSurfaceAnchorSnaps,
   getPartBoundsAtPosition,
+  type MateSnapResult,
   type PartBounds,
   type SnapResult
 } from './snapToPartsUtil';
@@ -25,6 +28,7 @@ export interface InteractionSnapContext {
   guideSnaps?: ReturnType<typeof detectGuideSnaps>;
   originSnaps?: ReturnType<typeof detectOriginSnaps>;
   advancedDetectors: {
+    mate: () => MateSnapResult;
     surface: () => SnapResult;
     fraction: () => SnapResult;
     feature: () => SnapResult | { result: SnapResult; stage: SnapStage };
@@ -47,6 +51,16 @@ function buildProxyPart(bounds: PartBounds, position: Position3D): Part {
     color: '#ffffff'
   };
 }
+
+/**
+ * Joinery mates capture from further out than ordinary snaps. A joint has one
+ * correct position and a user dragging a tenon at a mortise is plainly aiming
+ * for it, so snapping should close the last fraction of an inch rather than
+ * making them land it by hand. Kept modest: a joint that grabs from too far
+ * away fights the user instead of helping. Generic alignment snaps stay
+ * narrower still -- there are many of them and any one is a guess at intent.
+ */
+const JOINERY_CAPTURE_MULTIPLIER = 2;
 
 export function createPartSnapContext(params: {
   part: Part;
@@ -90,6 +104,14 @@ export function createPartSnapContext(params: {
     guideSnaps: snapGuides.length > 0 ? detectGuideSnaps(guideBounds, snapGuides, snapThreshold) : undefined,
     originSnaps: snapToOrigin ? detectOriginSnaps(guideBounds, snapThreshold) : undefined,
     advancedDetectors: {
+      mate: () =>
+        detectFeatureMateSnaps(
+          part,
+          position,
+          referenceParts,
+          movingPartIds,
+          snapThreshold * JOINERY_CAPTURE_MULTIPLIER
+        ),
       surface: () => detectSurfaceAnchorSnaps(part, position, referenceParts, movingPartIds, snapThreshold),
       fraction: () =>
         detectFractionalFaceSnaps(
@@ -174,6 +196,15 @@ export function createGroupProxySnapContext(params: {
     guideSnaps: snapGuides.length > 0 ? detectGuideSnaps(guideBounds, snapGuides, snapThreshold) : undefined,
     originSnaps: snapToOrigin ? detectOriginSnaps(guideBounds, snapThreshold) : undefined,
     advancedDetectors: {
+      mate: () =>
+        detectGroupFeatureMateSnaps(
+          movingParts,
+          delta,
+          featurePosition,
+          referenceParts,
+          movingPartIds,
+          snapThreshold * JOINERY_CAPTURE_MULTIPLIER
+        ),
       surface: () =>
         detectSurfaceAnchorSnaps(subjectPart, featurePosition, referenceParts, movingPartIds, snapThreshold),
       fraction: () =>

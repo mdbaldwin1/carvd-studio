@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { MIN_DIMENSION_INCHES } from '../../constants';
 import { ThreeEvent } from '@react-three/fiber';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Part as PartType } from '../../types';
+import { useAppSettingsStore } from '../../store/appSettingsStore';
 import { useProjectStore } from '../../store/projectStore';
 import { useSnapStore } from '../../store/snapStore';
-import { useAppSettingsStore } from '../../store/appSettingsStore';
+import { Part as PartType } from '../../types';
 import { useInteractionStore } from '../../store/interactionStore';
 import {
   beginResizeInteractionSession,
@@ -41,7 +42,7 @@ export function usePartResize(
   camera: THREE.Camera,
   gl: THREE.WebGLRenderer,
   controls: THREE.EventDispatcher<object> | null,
-  updatePart: (id: string, updates: Partial<PartType>) => void
+  updatePart: (id: string, updates: Partial<PartType>) => boolean
 ) {
   const [isResizing, setIsResizing] = useState(false);
   const snappedDimensionsRef = useRef<{ length: boolean; width: boolean; thickness: boolean }>({
@@ -96,7 +97,7 @@ export function usePartResize(
   );
 
   const getDragPlaneInfo = useCallback(
-    (partPosition: THREE.Vector3) => {
+    (partPosition: THREE.Vector3, handle?: HandlePosition) => {
       _tempForward.current.set(0, 0, -1).applyQuaternion(camera.quaternion);
 
       // Camera-aware local-plane selection improves resize behavior for arbitrarily rotated parts.
@@ -108,7 +109,15 @@ export function usePartResize(
       const dotY = Math.abs(_tempForward.current.dot(yAxis));
       const dotZ = Math.abs(_tempForward.current.dot(zAxis));
 
-      if (dotZ >= dotX && dotZ >= dotY) {
+      if (handle?.x && handle.y === 0 && handle.z === 0) {
+        // An end grip changes length only: its drag plane must contain X,
+        // including when the end cap is the most camera-facing surface.
+        const normal = _tempNormal.current
+          .copy(_tempForward.current)
+          .addScaledVector(xAxis, -_tempForward.current.dot(xAxis));
+        if (normal.lengthSq() < 1e-8) normal.copy(yAxis);
+        planeRef.current.setFromNormalAndCoplanarPoint(normal.normalize(), partPosition);
+      } else if (dotZ >= dotX && dotZ >= dotY) {
         planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current.copy(zAxis), partPosition);
       } else if (dotX >= dotY) {
         planeRef.current.setFromNormalAndCoplanarPoint(_tempNormal.current.copy(xAxis), partPosition);
@@ -129,7 +138,7 @@ export function usePartResize(
     // Get constraint settings from store
     const stockConstraints = useProjectStore.getState().stockConstraints;
     const stocks = useProjectStore.getState().stocks;
-    const assignedStock = part.stockId ? stocks.find((s) => s.id === part.stockId) : null;
+    const assignedStock = part.stockId ? stocks.find((s) => s.id === part.stockId) : undefined;
 
     // Apply dimension matching snap if enabled
     const isSnapEnabled = useSnapStore.getState().snapToPartsEnabled;
@@ -209,7 +218,7 @@ export function usePartResize(
 
     const stockConstraints = useProjectStore.getState().stockConstraints;
     const stocks = useProjectStore.getState().stocks;
-    const assignedStock = part.stockId ? stocks.find((s) => s.id === part.stockId) : null;
+    const assignedStock = part.stockId ? stocks.find((s) => s.id === part.stockId) : undefined;
     const isDimensionConstrained = stockConstraints.constrainDimensions && !!assignedStock;
 
     const maxLength = isDimensionConstrained && assignedStock ? assignedStock.length : Infinity;
@@ -218,18 +227,29 @@ export function usePartResize(
 
     // Preserve live snapped dimensions on commit; otherwise fall back to grid snapping.
     const snappedDimensions = snappedDimensionsRef.current;
+    const gridSize = useProjectStore.getState().gridSize;
     let newLength = Math.min(
       maxLength,
-      Math.max(0.5, snappedDimensions.length ? liveDims.length : snapToGrid(liveDims.length))
+      Math.max(MIN_DIMENSION_INCHES, snappedDimensions.length ? liveDims.length : snapToGrid(liveDims.length, gridSize))
     );
     let newWidth = Math.min(
       maxWidth,
-      Math.max(0.5, snappedDimensions.width ? liveDims.width : snapToGrid(liveDims.width))
+      Math.max(MIN_DIMENSION_INCHES, snappedDimensions.width ? liveDims.width : snapToGrid(liveDims.width, gridSize))
     );
     let newThickness = Math.min(
       maxThickness,
-      Math.max(0.25, snappedDimensions.thickness ? liveDims.thickness : snapToGrid(liveDims.thickness))
+      Math.max(
+        MIN_DIMENSION_INCHES,
+        snappedDimensions.thickness ? liveDims.thickness : snapToGrid(liveDims.thickness, gridSize)
+      )
     );
+
+    // Only dimensions addressed by this handle belong to the resize. In
+    // particular, generic board minima must not enlarge a pin's diameter
+    // when its length-only handle is released with stock constraints off.
+    if (handlePos.x === 0) newLength = partLength;
+    if (handlePos.y === 0) newThickness = partThickness;
+    if (handlePos.z === 0) newWidth = partWidth;
 
     _tempLocalOffset.current.set(
       ((newLength - partLength) / 2) * handlePos.x,
@@ -242,9 +262,9 @@ export function usePartResize(
     let newY = partPos.y + _tempWorldOffset.current.y;
     let newZ = partPos.z + _tempWorldOffset.current.z;
 
-    newX = snapToGrid(newX);
-    newY = snapToGrid(newY);
-    newZ = snapToGrid(newZ);
+    // Dimensions were snapped above. The center is derived from their change
+    // so the opposite physical end remains fixed. Snapping that center again
+    // shifts untouched axes and can push a seated pin sideways out of its bore.
 
     // ADR-006: ground clamp runs through the constraint pipeline. The
     // groundConstraint computes the resized part's world-space minY via the
@@ -276,6 +296,20 @@ export function usePartResize(
         startingPosition: { x: partPos.x, y: partPos.y, z: partPos.z }
       });
     applyCommitInstructions(resizeTool.commit(commitState, commitPreview), { updatePart });
+
+    // Prevent Overlap can reject the dimension commit inside the store; the
+    // store is authoritative after commit, so re-sync the live preview to it
+    // instead of leaving a phantom resize on screen.
+    const latestPart = useProjectStore.getState().parts.find((p) => p.id === part.id) ?? part;
+    setLiveDims((prev) => ({
+      ...prev,
+      x: latestPart.position.x,
+      y: latestPart.position.y,
+      z: latestPart.position.z,
+      length: latestPart.length,
+      width: latestPart.width,
+      thickness: latestPart.thickness
+    }));
 
     setIsResizing(false);
     snappedDimensionsRef.current = { length: false, width: false, thickness: false };
@@ -329,7 +363,7 @@ export function usePartResize(
       e.stopPropagation();
 
       const partPos = new THREE.Vector3(part.position.x, part.position.y, part.position.z);
-      getDragPlaneInfo(partPos);
+      getDragPlaneInfo(partPos, handlePos);
 
       const startPoint = getWorldPoint(e.nativeEvent);
       if (startPoint) {

@@ -1,0 +1,23 @@
+{
+  "format": "carvd-router-profile",
+  "version": 1,
+  "profile": {
+    "version": 1,
+    "id": "custom-cubic-ogee",
+    "name": "Custom Cubic Ogee",
+    "family": "ogee",
+    "source": "generic",
+    "parameters": { "fidelity": "user-authored" },
+    "boundary": {
+      "start": { "u": 0, "v": 0.5 },
+      "segments": [
+        {
+          "kind": "cubicBezier",
+          "control1": { "u": 0.1, "v": 0.5 },
+          "control2": { "u": 0.4, "v": 0 },
+          "to": { "u": 0.5, "v": 0 }
+        }
+      ]
+    }
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://carvd.studio/schemas/router-catalog.schema.json",
+  "title": "Carvd Router Catalog File",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["format", "version", "catalog"],
+  "properties": {
+    "format": { "const": "carvd-router-catalog" },
+    "version": { "const": 1 },
+    "signature": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "algorithm",
+        "publisherKeyId",
+        "publicKeySpki",
+        "publicKeyFingerprint",
+        "payloadHash",
+        "signature",
+        "signedAt"
+      ],
+      "properties": {
+        "algorithm": { "const": "Ed25519" },
+        "publisherKeyId": {
+          "type": "string",
+          "pattern": "\\S",
+          "maxLength": 200
+        },
+        "publicKeySpki": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+          "maxLength": 2048
+        },
+        "publicKeyFingerprint": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "payloadHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "signature": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9+/]+={0,2}$",
+          "maxLength": 512
+        },
+        "signedAt": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T",
+          "maxLength": 100
+        },
+        "certificate": { "type": "string", "maxLength": 4096 },
+        "source": { "type": "string", "maxLength": 1000 }
+      }
+    },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "id", "name", "source", "profiles", "tools"],
+      "properties": {
+        "version": { "const": 1 },
+        "id": { "type": "string", "pattern": "\\S" },
+        "name": { "type": "string", "pattern": "\\S" },
+        "source": { "enum": ["generic", "manufacturer"] },
+        "manufacturer": { "type": "string", "pattern": "\\S" },
+        "sourceUrl": { "type": "string", "pattern": "\\S" },
+        "profiles": {
+          "type": "array",
+          "maxItems": 512,
+          "items": { "$ref": "router-profile.schema.json#/definitions/profile" }
+        },
+        "tools": {
+          "type": "array",
+          "maxItems": 512,
+          "items": { "$ref": "router-tool.schema.json#/definitions/tool" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "source": { "const": "manufacturer" } } },
+          "then": { "required": ["manufacturer"] }
+        }
+      ]
+    }
+  }
+}

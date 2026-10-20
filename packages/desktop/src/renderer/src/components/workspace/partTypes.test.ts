@@ -7,6 +7,7 @@ import {
   ROTATION_RING_THICKNESS,
   ROTATION_COLORS,
   GRAIN_ARROW_MAX_DISTANCE_SQ,
+  resolveLiveGridReleasePosition,
   snapToGrid
 } from './partTypes';
 
@@ -15,6 +16,34 @@ import {
 // ============================================================
 
 describe('partTypes', () => {
+  describe('the project grid', () => {
+    it('rounds to whatever increment the project carries', () => {
+      // Grid Size used to govern only arrow-key nudging: dragging, resizing
+      // and the drawn grid were all pinned to a sixteenth regardless.
+      expect(snapToGrid(3.92, 1 / 4)).toBeCloseTo(4);
+      expect(snapToGrid(3.92, 1 / 8)).toBeCloseTo(3.875);
+      expect(snapToGrid(3.92, 1 / 32)).toBeCloseTo(3.90625);
+    });
+
+    it('falls back to the sixteenth for a caller with no project in hand', () => {
+      expect(snapToGrid(3.92)).toBeCloseTo(snapToGrid(3.92, 1 / 16));
+    });
+
+    it('ignores a nonsensical increment rather than dividing by zero', () => {
+      expect(snapToGrid(3.92, 0)).toBeCloseTo(snapToGrid(3.92, 1 / 16));
+      expect(snapToGrid(3.92, -1)).toBeCloseTo(snapToGrid(3.92, 1 / 16));
+    });
+
+    it('carries the increment through to the release position', () => {
+      const free = { x: false, y: false, z: false };
+      expect(resolveLiveGridReleasePosition({ x: 3.92, y: 1.1, z: 0.3 }, free, true, 1 / 4)).toEqual({
+        x: 4,
+        y: 1,
+        z: 0.25
+      });
+    });
+  });
+
   describe('snapToGrid', () => {
     it('snaps exact grid values to themselves', () => {
       expect(snapToGrid(0)).toBe(0);
@@ -50,6 +79,20 @@ describe('partTypes', () => {
     it('handles large values', () => {
       expect(snapToGrid(100)).toBe(100);
       expect(snapToGrid(99.97)).toBeCloseTo(100); // 99.97 rounds to nearest 1/16
+    });
+  });
+
+  describe('resolveLiveGridReleasePosition', () => {
+    it('preserves part-snapped axes and rounds only unsnapped axes', () => {
+      expect(
+        resolveLiveGridReleasePosition({ x: 4.03, y: 2.41, z: 4.07 }, { x: true, y: false, z: true }, true)
+      ).toEqual({ x: 4.03, y: 2.4375, z: 4.07 });
+    });
+
+    it('preserves every axis when live grid snapping is disabled', () => {
+      expect(
+        resolveLiveGridReleasePosition({ x: 4.03, y: 2.41, z: 4.07 }, { x: false, y: false, z: false }, false)
+      ).toEqual({ x: 4.03, y: 2.41, z: 4.07 });
     });
   });
 
@@ -122,4 +165,19 @@ describe('partTypes', () => {
       expect(ROTATION_COLORS.hover).toBeDefined();
     });
   });
+});
+
+it('preserves coordinates outside the drag plane during grid release', () => {
+  for (const fixed of ['x', 'y', 'z'] as const) {
+    const axes = { x: true, y: true, z: true, [fixed]: false };
+    const result = resolveLiveGridReleasePosition(
+      { x: 0.375, y: 0.375, z: 0.375 },
+      { x: false, y: false, z: false },
+      true,
+      1,
+      axes
+    );
+    expect(result[fixed]).toBe(0.375);
+    for (const axis of ['x', 'y', 'z'] as const) if (axis !== fixed) expect(result[axis]).toBe(0);
+  }
 });

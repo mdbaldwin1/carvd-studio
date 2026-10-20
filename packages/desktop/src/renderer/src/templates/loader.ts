@@ -6,6 +6,7 @@
  */
 
 import { v4 as uuidv4 } from 'uuid';
+import type { StockShape } from '../../../shared/stock';
 import {
   Project,
   Stock,
@@ -17,23 +18,17 @@ import {
   AssemblyGroup,
   AssemblyGroupMember,
   Rotation3D,
-  StockConstraintSettings
+  StockConstraintSettings,
+  PartFeature
 } from '../types';
+import { clonePartFeatures, normalizeAssemblyPart, normalizePart } from '../utils/partFeatures';
 
 // ============================================================
 // JSON Schema Types (what's stored in .template.json files)
 // ============================================================
 
-export interface TemplateStockDefinition {
+export interface TemplateStockDefinition extends StockShape {
   _refId: string;
-  name: string;
-  length: number;
-  width: number;
-  thickness: number;
-  grainDirection: 'length' | 'width' | 'none';
-  pricingUnit: 'board_foot' | 'per_item';
-  pricePerUnit: number;
-  color: string;
 }
 
 export interface TemplatePartDefinition {
@@ -51,6 +46,7 @@ export interface TemplatePartDefinition {
   notes?: string;
   extraLength?: number;
   extraWidth?: number;
+  features?: PartFeature[];
   glueUpPanel?: boolean;
   ignoreOverlap?: boolean;
 }
@@ -107,16 +103,8 @@ export interface AssemblyPartDefinition {
   notes?: string;
   extraLength?: number;
   extraWidth?: number;
-  embeddedStock?: {
-    name: string;
-    length: number;
-    width: number;
-    thickness: number;
-    grainDirection: 'length' | 'width' | 'none';
-    pricingUnit: 'board_foot' | 'per_item';
-    pricePerUnit: number;
-    color: string;
-  };
+  features?: PartFeature[];
+  embeddedStock?: StockShape;
 }
 
 export interface AssemblyGroupDefinition {
@@ -178,24 +166,27 @@ export function loadTemplateFromJSON(data: TemplateDefinition): Project {
   }));
 
   // Transform parts
-  const parts: Part[] = data.parts.map((p) => ({
-    id: refIdMap.get(p._refId)!,
-    name: p.name,
-    length: p.length,
-    width: p.width,
-    thickness: p.thickness,
-    position: { ...p.position },
-    rotation: { ...p.rotation },
-    stockId: p.stockRefId ? (refIdMap.get(p.stockRefId) ?? null) : null,
-    grainSensitive: p.grainSensitive,
-    grainDirection: p.grainDirection,
-    color: p.color,
-    notes: p.notes,
-    extraLength: p.extraLength,
-    extraWidth: p.extraWidth,
-    glueUpPanel: p.glueUpPanel,
-    ignoreOverlap: p.ignoreOverlap
-  }));
+  const parts: Part[] = data.parts.map((p) =>
+    normalizePart({
+      id: refIdMap.get(p._refId)!,
+      name: p.name,
+      length: p.length,
+      width: p.width,
+      thickness: p.thickness,
+      position: { ...p.position },
+      rotation: { ...p.rotation },
+      stockId: p.stockRefId ? (refIdMap.get(p.stockRefId) ?? null) : null,
+      grainSensitive: p.grainSensitive,
+      grainDirection: p.grainDirection,
+      color: p.color,
+      notes: p.notes,
+      extraLength: p.extraLength,
+      extraWidth: p.extraWidth,
+      features: clonePartFeatures(p.features),
+      glueUpPanel: p.glueUpPanel,
+      ignoreOverlap: p.ignoreOverlap
+    })
+  );
 
   // Transform groups
   const groups: Group[] = data.groups.map((g) => ({
@@ -250,7 +241,7 @@ export function loadAssemblyFromJSON(data: AssemblyDefinition): Assembly {
 
   // Transform parts to AssemblyPart format
   const parts: AssemblyPart[] = data.parts.map((p) => {
-    const assemblyPart: AssemblyPart = {
+    const assemblyPart: AssemblyPart = normalizeAssemblyPart({
       name: p.name,
       length: p.length,
       width: p.width,
@@ -263,8 +254,9 @@ export function loadAssemblyFromJSON(data: AssemblyDefinition): Assembly {
       color: p.color,
       notes: p.notes,
       extraLength: p.extraLength,
-      extraWidth: p.extraWidth
-    };
+      extraWidth: p.extraWidth,
+      features: clonePartFeatures(p.features)
+    });
 
     // Add embedded stock if present
     if (p.embeddedStock) {

@@ -1,3 +1,4 @@
+import { waitForJsonFile } from './helpers/files';
 import { expect, test, type Page } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
@@ -38,7 +39,7 @@ async function performProductWorkflows(running: RunningElectronApp, suffix: stri
   const projectPath = path.join(userDataDir, `${suffix}.carvd`);
   await queueSavePath(window, projectPath);
   await window.keyboard.press(process.platform === 'darwin' ? 'Meta+s' : 'Control+s');
-  await expect.poll(() => fs.existsSync(projectPath), { timeout: 5000 }).toBe(true);
+  await waitForJsonFile(projectPath, 5000);
   const importDialog = window.getByRole('dialog', { name: /Import to Library/i });
   await expect(importDialog).toBeVisible();
   await importDialog.getByRole('button', { name: 'Skip' }).click();
@@ -65,7 +66,8 @@ test.describe.serial('privacy-safe desktop analytics', () => {
   });
 
   test('unknown consent appears only after tutorial resolution and records nothing', async () => {
-    running = await launchElectronApp({ analyticsConsent: 'unknown' });
+    // This test is about the tutorial, so opt back into it.
+    running = await launchElectronApp({ analyticsConsent: 'unknown', hasCompletedWelcome: false });
     const { window } = running;
     const api = analyticsApi(window);
 
@@ -81,7 +83,8 @@ test.describe.serial('privacy-safe desktop analytics', () => {
   });
 
   test('denied consent never queues product outcome events', async () => {
-    running = await launchElectronApp({ analyticsConsent: 'unknown' });
+    // Unknown consent is resolved by the onboarding sequence, so keep the tutorial.
+    running = await launchElectronApp({ analyticsConsent: 'unknown', hasCompletedWelcome: false });
     const { window } = running;
     const api = analyticsApi(window);
     await window.evaluate(() => window.electronAPI.setAnalyticsConsent('denied', 'onboarding'));
@@ -91,7 +94,12 @@ test.describe.serial('privacy-safe desktop analytics', () => {
   });
 
   test('offline events survive restart once, keep UUIDs, sanitize properties, and revoke synchronously', async () => {
-    running = await launchElectronApp({ analyticsMode: 'offline', analyticsConsent: 'unknown' });
+    // Unknown consent is resolved by the onboarding sequence, so keep the tutorial.
+    running = await launchElectronApp({
+      analyticsMode: 'offline',
+      analyticsConsent: 'unknown',
+      hasCompletedWelcome: false
+    });
     let api = analyticsApi(running.window);
     await running.window.evaluate(() => window.electronAPI.setAnalyticsConsent('granted', 'onboarding'));
     await performProductWorkflows(running, 'offline');

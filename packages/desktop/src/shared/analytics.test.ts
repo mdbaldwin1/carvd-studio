@@ -27,6 +27,31 @@ describe('sanitizeDesktopAnalyticsEvent', () => {
     });
   });
 
+  it.each([
+    ['part_cuts_opened', { source: 'properties', operation_count_bucket: '1-5' }],
+    ['part_cuts_saved', { operation_count_bucket: '6-20' }]
+  ])('accepts privacy-safe %s properties', (name, properties) => {
+    expect(sanitizeDesktopAnalyticsEvent({ name, properties })).toEqual({ name, properties });
+  });
+
+  it('strips custom cut details from analytics events', () => {
+    expect(
+      sanitizeDesktopAnalyticsEvent({
+        name: 'part_cuts_opened',
+        properties: {
+          source: 'context_menu',
+          operation_count_bucket: '1-5',
+          part_name: 'Secret cabinet side',
+          dimensions: [24, 12, 0.75],
+          cut_parameters: { depth: 0.25 }
+        }
+      })
+    ).toEqual({
+      name: 'part_cuts_opened',
+      properties: { source: 'context_menu', operation_count_bucket: '1-5' }
+    });
+  });
+
   it.each(['projectName', 'filePath', 'notes', 'email', 'licenseKey', 'partCount'])(
     'removes prohibited property %s',
     (property) => {

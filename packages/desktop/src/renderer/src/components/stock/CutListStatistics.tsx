@@ -8,11 +8,11 @@ export function CutListStatistics({ cutList }: { cutList: CutList }) {
         <span className="text-[16px] font-semibold text-text leading-none">{cutList.statistics.totalParts}</span>
       </div>
       <div className="stat-item flex-1 flex flex-col items-center gap-0.5 px-3 border-r border-border">
-        <span className="text-[11px] text-text-muted uppercase tracking-wide">Boards</span>
+        <span className="text-[11px] text-text-muted uppercase tracking-wide">Boards Used</span>
         <span className="text-[16px] font-semibold text-text leading-none">{cutList.statistics.totalStockBoards}</span>
       </div>
       <div className="stat-item flex-1 flex flex-col items-center gap-0.5 px-3 border-r border-border">
-        <span className="text-[11px] text-text-muted uppercase tracking-wide">Board Feet</span>
+        <span className="text-[11px] text-text-muted uppercase tracking-wide">Purchase Board Feet</span>
         <span className="text-[16px] font-semibold text-text leading-none">
           {cutList.statistics.totalBoardFeet.toFixed(2)}
         </span>

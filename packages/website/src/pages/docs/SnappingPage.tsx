@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { Move, MapPin, Ruler } from "lucide-react";
 import SEO from "../../components/SEO";
 import { createBreadcrumbSchema } from "../../utils/jsonLd";
@@ -46,10 +47,12 @@ export default function SnappingPage() {
               </p>
             </div>
             <div>
-              <p className="font-bold mb-xs">Toggle Grid Snap</p>
+              <p className="font-bold mb-xs">Live Grid Snapping</p>
               <p className="text-muted">
-                Hold <code>Shift</code> while dragging to temporarily disable
-                grid snapping for free placement.
+                Enable Live Grid Snapping in App Settings to move in grid
+                increments throughout a drag. With it off, grid placement is
+                resolved on release. The toolbar’s Grid button shows or hides
+                the grid; it is not the part-snapping switch.
               </p>
             </div>
           </div>
@@ -112,7 +115,7 @@ export default function SnappingPage() {
               <p className="font-bold mb-xs">Exact Coordinates</p>
               <p className="text-muted">
                 Enter exact X, Y, Z coordinates in the properties panel for
-                pixel-perfect positioning.
+                precise placement.
               </p>
             </div>
             <div>
@@ -150,6 +153,124 @@ export default function SnappingPage() {
         </div>
       </div>
 
+      <section
+        id="drag-controls"
+        className="site-section p-6 mt-xl scroll-mt-28"
+      >
+        <h3 className="text-2xl font-bold mb-4">Choose how a drag moves</h3>
+        <ul className="list-disc pl-5 space-y-3 text-muted">
+          <li>
+            <strong>Snap in the toolbar:</strong> enables or disables
+            part-to-part snapping.
+          </li>
+          <li>
+            <strong>Alt/Option + drag:</strong> temporarily bypasses part
+            snapping. Grid behavior is controlled separately by Live Grid
+            Snapping.
+          </li>
+          <li>
+            <strong>Shift + drag:</strong> constrains movement to the ground
+            plane (X/Z), useful for sliding a part across the bench without
+            lifting it.
+          </li>
+          <li>
+            <strong>Ordinary drag:</strong> follows the camera-facing drag
+            plane; for a rotated individual part, that plane follows its local
+            orientation.
+          </li>
+        </ul>
+        <p className="text-muted mt-4">
+          Release the mouse to finish the move, then inspect the resulting
+          position. When an exact final coordinate matters, enter it in
+          Properties. Changing the camera view can make the direction you need
+          easier to reach without changing the part’s rotation.
+        </p>
+      </section>
+      <section
+        id="joint-alignment"
+        className="site-section p-6 mt-xl scroll-mt-28"
+      >
+        <h3 className="text-2xl font-bold mb-4">
+          Joint alignment and rotated parts
+        </h3>
+        <p className="text-muted mb-4">
+          Enable Snap when offering a cut part to its mate. Compatible tenons,
+          housings, round inserts, and cut end faces can provide more useful
+          alignment than the original blank’s outside edges. A snap places
+          geometry; it does not make a socket wider or change a tenon’s angle.
+        </p>
+        <p className="text-muted mb-4">
+          For a deliberate assembly, select two parts and use{" "}
+          <Link
+            className="text-text underline underline-offset-4 decoration-primary"
+            to="/docs/joinery#assembly-placement"
+          >
+            Bring pieces together…
+          </Link>
+          . Choose the actual shoulder and opening, inspect registration and
+          insertion, then place. This is especially helpful when several
+          possible mating features are close together.
+        </p>
+        <p className="text-muted mb-4">
+          Joint references follow the boards when they rotate, including
+          non-right-angle and compound orientations. Rotate the complete
+          selection or group to preserve an assembled joint. If only one member
+          is tilted, first align its meeting face with the receiver: translation
+          snapping cannot turn a crooked rectangular tenon into the correct
+          orientation.
+        </p>
+        <h4 className="text-xl font-bold mb-3">A repeatable alignment check</h4>
+        <ol className="list-decimal pl-5 space-y-3 text-muted mb-4">
+          <li>
+            Inspect the cuts separately. Compare the entering cross-section with
+            the opening and check available depth.
+          </li>
+          <li>
+            Choose the moving and receiving references in Bring pieces together.
+            Use the shoulder for a tenon or tongue, and the opening for its
+            socket.
+          </li>
+          <li>
+            Set registration and insertion. Inspect the preview before placing,
+            then use a second camera angle and Ghost or Wire to inspect
+            concealed contact.
+          </li>
+          <li>
+            Select every member of the completed joint before rotating it.
+            Include loose pins, dowels, keys, and splines.
+          </li>
+          <li>
+            After rotation, inspect the same shoulders and openings again.
+            Rotating one member independently changes the joint; orbiting the
+            camera only changes your view.
+          </li>
+        </ol>
+        <p className="text-muted mb-4">
+          If a drag keeps finding the wrong nearby feature, use explicit
+          assembly references. If it catches an outside edge instead of seating
+          a joint, check that the intended cut is enabled and that the parts
+          actually have compatible orientations and dimensions. Increasing snap
+          sensitivity cannot correct those geometry differences.
+        </p>
+        <p className="text-muted">
+          Inspect the joint from two directions, and use Ghost or Wire for
+          concealed surfaces. If it will not seat, check{" "}
+          <Link
+            className="text-text underline underline-offset-4 decoration-primary"
+            to="/docs/joinery#troubleshooting"
+          >
+            fit and alignment troubleshooting
+          </Link>
+          . Use{" "}
+          <Link
+            className="text-text underline underline-offset-4 decoration-primary"
+            to="/docs/parts"
+          >
+            part rotation controls
+          </Link>{" "}
+          for exact angles.
+        </p>
+      </section>
       <DocsPrevNext />
     </section>
   );

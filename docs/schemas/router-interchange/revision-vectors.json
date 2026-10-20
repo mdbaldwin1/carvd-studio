@@ -1,0 +1,56 @@
+{
+  "algorithm": "fnv1a64-carvd-v1",
+  "vectors": [
+    {
+      "name": "basic profile",
+      "definition": {
+        "version": 1,
+        "id": "generic-roundover",
+        "name": "Generic Roundover",
+        "family": "roundover",
+        "source": "generic",
+        "parameters": { "radius": 0.25 },
+        "boundary": {
+          "start": { "u": 0, "v": 0.25 },
+          "segments": [
+            {
+              "kind": "arc",
+              "to": { "u": 0.25, "v": 0 },
+              "radius": 0.25,
+              "clockwise": true
+            }
+          ]
+        }
+      },
+      "canonicalJson": "{\"boundary\":{\"segments\":[{\"clockwise\":true,\"kind\":\"arc\",\"radius\":0.25,\"to\":{\"u\":0.25,\"v\":0}}],\"start\":{\"u\":0,\"v\":0.25}},\"family\":\"roundover\",\"id\":\"generic-roundover\",\"name\":\"Generic Roundover\",\"parameters\":{\"radius\":0.25},\"source\":\"generic\",\"version\":1}",
+      "revision": "fnv1a64:54ea691cf4bd6014"
+    },
+    {
+      "name": "legacy tool",
+      "definition": {
+        "version": 1,
+        "id": "legacy-cove",
+        "name": "Legacy Cove Bit",
+        "source": "generic",
+        "profileFamily": "cove",
+        "cutterDiameter": 1,
+        "shankDiameter": 0.5,
+        "cuttingHeight": 0.5
+      },
+      "canonicalJson": "{\"cutterDiameter\":1,\"cuttingHeight\":0.5,\"id\":\"legacy-cove\",\"name\":\"Legacy Cove Bit\",\"profileFamily\":\"cove\",\"shankDiameter\":0.5,\"source\":\"generic\",\"version\":1}",
+      "revision": "fnv1a64:3dc8ffc45e3a7ca4"
+    },
+    {
+      "name": "tool production linkage",
+      "definition": {
+        "version": 1,
+        "id": "linked-tool",
+        "producedProfiles": [
+          { "profileId": "p", "profileRevision": "fnv1a64:0000000000000000" }
+        ]
+      },
+      "canonicalJson": "{\"id\":\"linked-tool\",\"producedProfiles\":[{\"profileId\":\"p\",\"profileRevision\":\"fnv1a64:0000000000000000\"}],\"version\":1}",
+      "revision": "fnv1a64:035be326fc4e4c43"
+    }
+  ]
+}

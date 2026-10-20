@@ -1,3 +1,4 @@
+import { MIN_DIMENSION_INCHES } from '../constants';
 import { create } from 'zustand';
 import { temporal } from 'zundo';
 import { v4 as uuidv4 } from 'uuid';
@@ -16,7 +17,10 @@ import {
   CutList,
   PartValidationIssue,
   EmbeddedStock,
-  CustomShoppingItem
+  CustomShoppingItem,
+  CircularCutFeature,
+  PartFeature,
+  FaceTarget
 } from '../types';
 import { STOCK_COLORS } from '../constants';
 import { UNTITLED_PROJECT_NAME } from '../constants/appDefaults';
@@ -27,15 +31,57 @@ import { useSelectionStore } from './selectionStore';
 import { useSnapStore } from './snapStore';
 import { useClipboardStore } from './clipboardStore';
 import { useLicenseStore } from './licenseStore';
-import { getPartBounds } from '../utils/snapToPartsUtil';
-import { resolveSafeTranslationDelta, wouldTransformedPartsOverlap } from '../utils/overlapPolicy';
+import { detectGroupFeatureMateSnaps, getPartBounds } from '../utils/snapToPartsUtil';
+import {
+  resolveSafeNudgeTranslationDelta,
+  resolveSafeTranslationDelta,
+  wouldTransformedPartsOverlap
+} from '../utils/overlapPolicy';
+import {
+  clonePartFeaturesForCopy,
+  getAssemblyPartCopyMap,
+  normalizeAssemblyPart,
+  normalizePart
+} from '../utils/partFeatures';
+import { findHolesOffTheFace, findMatingFace, getHolesOnFace, transferHolesToMatingFace } from '../utils/holeTransfer';
+import { FACE_TARGETS } from '../components/part-features/partFeatureEditorState';
+import { planDowelJointMigration } from '../utils/dowelJointMigration';
+import { getJointFitIssues } from '../utils/jointFit';
+import { boreThroughAssembly as boreThroughAssemblyHoles } from '../utils/boreThrough';
+import { planTenonFit, resolveTenonAndMortiseParts } from '../utils/fitJoinery';
+import { findGrainCutMismatches } from '../utils/grainDirectionCuts';
+import { planHousingFit, resolveHousingRoles } from '../utils/fitHousing';
+import { isRoundStock, resolveStockForm } from '../../../shared/stock';
+import { getFactoryBlankShape } from '../utils/partShape';
+import { validateRectCutFeature } from '../utils/rectCutUtils';
+import { normalizeSavedCutList } from '../utils/cutListVersion';
+import { validateRoutedPath } from '../utils/routedPathValidation';
+import { validateEndCutFeature } from '../utils/endCutUtils';
+import { validateCircularCut, validateRoundedCut } from '../utils/roundCutUtils';
+import { getPartFeatureConflicts } from '../utils/partFeatureConflicts';
+import { getFeatureTargetLabel } from '../utils/partFeatureSummary';
+import { analyzeEdgeProfileToolFeasibility } from '../utils/edgeProfileToolFeasibility';
 import { buildWorkspaceSceneGraph } from '../interaction/sceneGraph';
+import { resolveRotateBatchGrounding } from '../utils/interactionMovement';
 import { rotationTool } from '../interaction/tools/rotationTool';
 import { resolveSelectedGroupIdsWithDescendants, resolveTransformSelectedPartIds } from '../utils/interactionSelection';
 import { dragDebug } from '../utils/dragDebug';
+import {
+  createDowelJoint,
+  getDowelRelationshipIssues,
+  reconcileDowelRelationshipRemovals,
+  type CreateDowelJointInput
+} from '../utils/dowelJointUtils';
+
+export type AddDowelJointInput = Omit<CreateDowelJointInput, 'firstPart' | 'secondPart' | 'existingParts'> & {
+  firstPartId: string;
+  secondPartId: string;
+};
 
 interface ProjectState {
   // Project data
+  // Runtime-only ownership token; excluded from files and undo history.
+  documentGeneration: number;
   projectName: string;
   parts: Part[];
   stocks: Stock[];
@@ -67,14 +113,32 @@ interface ProjectState {
 
   // Actions - Parts
   addPart: (part?: Partial<Part>) => string | null;
-  updatePart: (id: string, updates: Partial<Part>) => void;
+  updatePart: (id: string, updates: Partial<Part>, options?: { mateHostPartId?: string }) => boolean;
   updateParts: (ids: string[], updates: Partial<Part>) => void;
   batchUpdateParts: (updates: Array<{ id: string; changes: Partial<Part> }>) => void;
+  addDowelJoint: (input: AddDowelJointInput) => string | null;
+  transferHolesToMate: (partId: string, depth: number, face?: FaceTarget) => number;
+  convertLegacyDowelJoints: () => number;
+  boreThroughAssembly: (partId: string, face?: FaceTarget) => number;
+  fitTenonsToMortise: (firstPartId: string, secondPartId: string) => number;
+  fitHousingToPart: (firstPartId: string, secondPartId: string) => boolean;
   moveSelectedParts: (delta: { x: number; y: number; z: number }) => void;
   rotateSelectedParts: (axis: 'x' | 'y' | 'z', degrees: number, pivot: { x: number; y: number; z: number }) => void;
+  /**
+   * Treat everything until the matching end as one step in the history.
+   *
+   * A gizmo drag asks the store to rotate once per frame so the part turns
+   * under the cursor. Each of those is a change in its own right, so a drag
+   * of thirty degrees left thirty-odd entries behind and one undo stepped
+   * back a fraction of a degree -- which reads, correctly, as undo not
+   * working at all.
+   */
+  beginHistoryStep: () => void;
+  endHistoryStep: () => void;
   deletePart: (id: string) => void;
   deleteSelectedParts: () => void;
   confirmDeleteParts: () => void;
+  confirmDeleteGroups: () => void;
   duplicatePart: (id: string) => string | null;
   duplicateSelectedParts: () => string[];
   resetSelectedPartsToStock: () => void;
@@ -159,20 +223,21 @@ export const generateCopyName = (originalName: string): string => {
   return `${originalName} (copy)`;
 };
 
-const createDefaultPart = (overrides?: Partial<Part>): Part => ({
-  id: uuidv4(),
-  name: 'New Part',
-  length: 24,
-  width: 12,
-  thickness: 0.75,
-  position: { x: 0, y: 0.375, z: 0 }, // y = thickness/2 to sit on ground
-  rotation: { x: 0, y: 0, z: 0 },
-  stockId: null,
-  grainSensitive: true,
-  grainDirection: 'length',
-  color: STOCK_COLORS[0],
-  ...overrides
-});
+const createDefaultPart = (overrides?: Partial<Part>): Part =>
+  normalizePart({
+    id: uuidv4(),
+    name: 'New Part',
+    length: 24,
+    width: 12,
+    thickness: 0.75,
+    position: { x: 0, y: 0.375, z: 0 }, // y = thickness/2 to sit on ground
+    rotation: { x: 0, y: 0, z: 0 },
+    stockId: null,
+    grainSensitive: true,
+    grainDirection: 'length',
+    color: STOCK_COLORS[0],
+    ...overrides
+  });
 
 const createDefaultStock = (overrides?: Partial<Stock>): Stock => ({
   id: uuidv4(),
@@ -230,6 +295,15 @@ function maybeShowOverlapClampToast() {
   if (now - _lastOverlapClampToastAt < OVERLAP_CLAMP_TOAST_COOLDOWN_MS) return;
   _lastOverlapClampToastAt = now;
   useUIStore.getState().showToast('Movement limited to avoid overlap', 'info', { duration: 1200 });
+}
+
+function showOverlapUpdateBlockedToast(updates: Partial<Part>) {
+  const isDimensionChange =
+    updates.length !== undefined || updates.width !== undefined || updates.thickness !== undefined;
+  const label = isDimensionChange ? 'Size' : updates.rotation !== undefined ? 'Rotation' : 'Update';
+  useUIStore
+    .getState()
+    .showToast(`${label} update blocked: it would overlap another part.`, 'info', { duration: 3000 });
 }
 
 const getSceneGraphDescendantPartIds = ({
@@ -293,12 +367,31 @@ const getDuplicateOffset = (partsToDuplicate: Part[]): { x: number; y: number; z
   };
 };
 
+/** Where the history stood when the current drag began; null when idle. */
+let historyStepMark: number | null = null;
+
 /** Validate parts for cut list generation, returning any issues found. */
-export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartValidationIssue[] => {
+/** Keep nesting orientation coherent when a constrained stock is assigned or edited. */
+function withStockGrain(part: Part, stock: Stock | undefined, constrained: boolean): Part {
+  if (!stock || !constrained) return part;
+  return {
+    ...part,
+    grainSensitive: stock.grainDirection !== 'none',
+    grainDirection: stock.grainDirection === 'none' ? part.grainDirection : stock.grainDirection
+  };
+}
+
+export const validatePartsForCutList = (
+  parts: Part[],
+  stocks: Stock[],
+  units: 'imperial' | 'metric' = 'imperial'
+): PartValidationIssue[] => {
   const issues: PartValidationIssue[] = [];
 
   for (const part of parts) {
-    // Check for unassigned stock
+    // Stock availability and authored-operation validity are independent. Keep
+    // checking operations even when a part has not yet been assigned stock.
+    const stock = part.stockId ? stocks.find((candidate) => candidate.id === part.stockId) : undefined;
     if (!part.stockId) {
       issues.push({
         partId: part.id,
@@ -307,11 +400,7 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
         message: 'No stock assigned',
         severity: 'error'
       });
-      continue;
-    }
-
-    const stock = stocks.find((s) => s.id === part.stockId);
-    if (!stock) {
+    } else if (!stock) {
       issues.push({
         partId: part.id,
         partName: part.name,
@@ -319,64 +408,256 @@ export const validatePartsForCutList = (parts: Part[], stocks: Stock[]): PartVal
         message: 'Assigned stock not found',
         severity: 'error'
       });
-      continue;
     }
 
-    const cutLength = part.length + (part.extraLength || 0);
-    const cutWidth = part.width + (part.extraWidth || 0);
+    if (stock) {
+      const cutLength = part.length + (part.extraLength || 0);
+      const cutWidth = part.width + (part.extraWidth || 0);
 
-    // Check thickness
-    if (part.thickness > stock.thickness) {
-      issues.push({
-        partId: part.id,
-        partName: part.name,
-        type: 'exceeds_thickness',
-        message: `Thickness (${part.thickness}") exceeds stock (${stock.thickness}")`,
-        severity: 'error'
-      });
-    }
-
-    // Check dimensions (considering rotation possibility)
-    const fitsNormal = cutLength <= stock.length && cutWidth <= stock.width;
-    const fitsRotated = !part.grainSensitive && cutLength <= stock.width && cutWidth <= stock.length;
-
-    if (!fitsNormal && !fitsRotated) {
-      // Check if it's a glue-up panel that only exceeds width
-      if (part.glueUpPanel && cutLength <= stock.length) {
-        // Glue-up panel that only exceeds width is acceptable - no issue to report
-        // The boards needed calculation is shown in the Properties panel
-      } else {
+      if (
+        resolveStockForm(stock) === 'insert' &&
+        (Math.abs(part.length - stock.length) > 1e-6 ||
+          Math.abs(part.width - stock.width) > 1e-6 ||
+          Math.abs(part.thickness - stock.thickness) > 1e-6 ||
+          part.blankShape !== getFactoryBlankShape(stock) ||
+          part.extraLength ||
+          part.extraWidth)
+      ) {
         issues.push({
           partId: part.id,
           partName: part.name,
-          type: 'exceeds_dimensions',
-          message: `Dimensions (${cutLength}" × ${cutWidth}") exceed stock (${stock.length}" × ${stock.width}")`,
+          type: 'purchased_size_mismatch',
+          severity: 'error',
+          message:
+            'Purchased insert dimensions and shape must match its catalog stock exactly, without blank allowances. Assign matching stock, or use Reset to Stock and recheck its cuts and mating sockets.'
+        });
+      }
+
+      if (
+        isRoundStock(stock) &&
+        (Math.abs(part.width - stock.thickness) > 1e-6 ||
+          Math.abs(part.thickness - stock.thickness) > 1e-6 ||
+          part.extraWidth)
+      ) {
+        issues.push({
+          partId: part.id,
+          partName: part.name,
+          type: 'stock_thickness_mismatch',
+          severity: 'error',
+          message:
+            'Part diameter must match round stock in both width and thickness, without width allowance. Assign stock with the correct diameter, or use Reset to Stock and recheck its cuts and mating sockets.'
+        });
+      }
+
+      // Check thickness
+      if (part.thickness > stock.thickness) {
+        issues.push({
+          partId: part.id,
+          partName: part.name,
+          type: 'exceeds_thickness',
+          message: `Thickness (${part.thickness}") exceeds stock (${stock.thickness}")`,
           severity: 'error'
         });
       }
-    }
 
-    // Check grain mismatch (warning only)
-    if (part.grainSensitive && stock.grainDirection !== 'none') {
-      if (part.grainDirection !== stock.grainDirection) {
+      // Sheet goods cannot be thicknessed like solid lumber. A thinner part
+      // needs its own sheet stock; otherwise its purchase and nesting are wrong.
+      if (resolveStockForm(stock) === 'sheet' && part.thickness < stock.thickness - 0.000001) {
         issues.push({
           partId: part.id,
           partName: part.name,
-          type: 'grain_mismatch',
-          message: `Grain direction (${part.grainDirection}) doesn't match stock (${stock.grainDirection})`,
-          severity: 'warning'
+          type: 'stock_thickness_mismatch',
+          message: `Part thickness (${part.thickness}") differs from sheet stock (${stock.thickness}"). Assign sheet stock with the actual finished thickness.`,
+          severity: 'error'
         });
       }
+
+      // Check dimensions (considering rotation possibility)
+      const fitsNormal = cutLength <= stock.length && cutWidth <= stock.width;
+      const fitsRotated = !part.grainSensitive && cutLength <= stock.width && cutWidth <= stock.length;
+
+      if (!fitsNormal && !fitsRotated) {
+        // Check if it's a glue-up panel that only exceeds width
+        if (part.glueUpPanel && cutLength <= stock.length) {
+          // Glue-up panel that only exceeds width is acceptable - no issue to report
+          // The boards needed calculation is shown in the Properties panel
+        } else {
+          issues.push({
+            partId: part.id,
+            partName: part.name,
+            type: 'exceeds_dimensions',
+            message: `Dimensions (${cutLength}" × ${cutWidth}") exceed stock (${stock.length}" × ${stock.width}")`,
+            severity: 'error'
+          });
+        }
+      }
+
+      // A dado is cut across the grain and a groove runs with it. On a board
+      // whose grain runs across its width those two names come out backwards.
+      for (const mismatch of findGrainCutMismatches(part)) {
+        issues.push({
+          partId: part.id,
+          partName: part.name,
+          type: 'grain_cut_direction',
+          message: mismatch.message,
+          severity: 'warning',
+          featureId: mismatch.featureId
+        });
+      }
+
+      // Check grain mismatch (warning only)
+      if (part.grainSensitive && stock.grainDirection !== 'none') {
+        if (part.grainDirection !== stock.grainDirection) {
+          issues.push({
+            partId: part.id,
+            partName: part.name,
+            type: 'grain_mismatch',
+            message: `Grain direction (${part.grainDirection}) doesn't match stock (${stock.grainDirection})`,
+            severity: 'warning'
+          });
+        }
+      }
+    }
+
+    for (const feature of part.features ?? []) {
+      if (!feature.enabled) continue;
+
+      if (feature.kind === 'edge_profile') {
+        for (const finding of analyzeEdgeProfileToolFeasibility(feature, part)) {
+          if (finding.severity === 'info') continue;
+          issues.push({
+            partId: part.id,
+            partName: part.name,
+            type: 'feature_validation',
+            message: `Router tool feasibility: ${finding.message}`,
+            severity: finding.severity,
+            featureId: feature.id
+          });
+        }
+      }
+
+      const featureIssue =
+        feature.kind === 'rect_cut'
+          ? validateRectCutFeature(feature, part)
+          : feature.kind === 'circular_cut'
+            ? validateCircularCut(feature, part)
+            : feature.kind === 'rounded_cut'
+              ? validateRoundedCut(feature, part)
+              : feature.kind === 'end_cut'
+                ? validateEndCutFeature(feature, part)
+                : feature.kind === 'routed_path'
+                  ? validateRoutedPath(feature, part, units)
+                  : null;
+      if (!featureIssue) continue;
+
+      const featureLabel =
+        feature.label?.trim() ||
+        `${feature.kind === 'routed_path' ? 'routed path' : feature.kind === 'edge_profile' ? feature.profile.replace(/_/g, ' ') : feature.cutType.replace(/_/g, ' ')} on ${getFeatureTargetLabel(feature)}`;
+      issues.push({
+        partId: part.id,
+        partName: part.name,
+        type: 'feature_validation',
+        message: `Operation "${featureLabel}" is invalid: ${featureIssue}`,
+        severity: 'error',
+        featureId: feature.id
+      });
+    }
+
+    const seenConflictMessages = new Set<string>();
+    for (const conflict of getPartFeatureConflicts(part.features ?? [], part)) {
+      const relatedIds = [conflict.featureId, conflict.relatedFeatureId ?? ''].sort().join(':');
+      const key = `${conflict.code}:${relatedIds}`;
+      if (seenConflictMessages.has(key)) continue;
+      seenConflictMessages.add(key);
+      issues.push({
+        partId: part.id,
+        partName: part.name,
+        type: 'feature_validation',
+        message: conflict.message,
+        severity: conflict.severity,
+        featureId: conflict.featureId
+      });
     }
   }
 
+  // A joint's two halves are cut to each other once and not linked after, so
+  // nothing carries a later edit across. Narrowing a mortise does not even go
+  // through the overlap check, which only watches size and position. Measure
+  // the joints that are actually assembled and say when one stopped fitting.
+  for (const issue of getJointFitIssues(parts, units)) {
+    const host = parts.find((part) => part.id === issue.hostPartId);
+    if (!host) continue;
+    issues.push({
+      partId: host.id,
+      partName: host.name,
+      type: 'joint_fit',
+      // A joint that no longer fits is still a drawing you can work from, and
+      // which way to correct it is the maker's call -- recut the housing, or
+      // replane the piece. Say so and leave the decision alone.
+      severity: 'warning',
+      message: issue.message,
+      featureId: issue.hostFeatureId
+    });
+  }
+
+  // Relationships span parts, so validate once after individual operations.
+  // One issue identifies the joint's parts instead of repeating it per mate.
+  const seenRelationships = new Set<string>();
+  for (const relationship of getDowelRelationshipIssues(parts)) {
+    const key = `${[...relationship.partIds].sort().join(':')}:${relationship.message}`;
+    if (seenRelationships.has(key)) continue;
+    seenRelationships.add(key);
+    const relatedParts = parts.filter((part) => relationship.partIds.includes(part.id));
+    const part = relatedParts[0];
+    if (!part) continue;
+    issues.push({
+      partId: part.id,
+      partName: part.name,
+      type: 'feature_validation',
+      severity: 'error',
+      message: `${relationship.message} Parts: ${relatedParts.map((member) => member.name).join(', ')}. Check paired-hole diameter, depth, spacing and alignment before fabrication.`
+    });
+  }
   return issues;
 };
+
+const projectHistoryState = (state: ProjectState) => ({
+  projectName: state.projectName,
+  parts: state.parts,
+  stocks: state.stocks,
+  groups: state.groups,
+  groupMembers: state.groupMembers,
+  assemblies: state.assemblies,
+  units: state.units,
+  gridSize: state.gridSize,
+  kerfWidth: state.kerfWidth,
+  overageFactor: state.overageFactor,
+  projectNotes: state.projectNotes,
+  stockConstraints: state.stockConstraints,
+  snapGuides: state.snapGuides,
+  customShoppingItems: state.customShoppingItems,
+  cutList: state.cutList,
+  version: state.version,
+  createdAt: state.createdAt
+});
+
+// Savepoints belong to the document, never to an undo entry. Timestamps are
+// bookkeeping; returning to the same saved content should remove the dirty dot.
+let savedProjectContent = '';
+function projectContentSnapshot(state: ProjectState): string {
+  return JSON.stringify(projectHistoryState(state));
+}
+function reconcileDirtyAfterHistory(): void {
+  const state = useProjectStore.getState();
+  const isDirty = projectContentSnapshot(state) !== savedProjectContent;
+  if (state.isDirty !== isDirty) useProjectStore.setState({ isDirty });
+}
 
 export const useProjectStore = create<ProjectState>()(
   temporal(
     (set, get) => ({
       // Initial state
+      documentGeneration: 0,
       projectName: UNTITLED_PROJECT_NAME,
       parts: [],
       stocks: [],
@@ -412,7 +693,32 @@ export const useProjectStore = create<ProjectState>()(
           return null;
         }
 
-        const newPart = createDefaultPart(partOverrides);
+        const newPart = withStockGrain(
+          createDefaultPart(partOverrides),
+          get().stocks.find((stock) => stock.id === partOverrides?.stockId),
+          get().stockConstraints.constrainGrain
+        );
+        newPart.blankShape =
+          partOverrides?.blankShape ?? getFactoryBlankShape(get().stocks.find((stock) => stock.id === newPart.stockId));
+        const insertStock = get().stocks.find((stock) => stock.id === newPart.stockId);
+        if (insertStock && isRoundStock(insertStock))
+          Object.assign(newPart, { width: insertStock.thickness, thickness: insertStock.thickness });
+        if (insertStock?.form === 'insert')
+          Object.assign(newPart, {
+            length: insertStock.length,
+            width: insertStock.width,
+            thickness: insertStock.thickness
+          });
+        if (!partOverrides?.position) {
+          const bounds = getPartBounds(newPart);
+          newPart.position.y -= bounds.minY;
+          if (parts.length > 0) {
+            // Put fresh stock beside the work, with room to pick it up and
+            // size it before assembly. Explicit drop/import positions win.
+            const rightEdge = Math.max(...parts.map((part) => getPartBounds(part).maxX));
+            newPart.position.x += rightEdge + 2 - bounds.minX;
+          }
+        }
         set((state) => ({
           parts: [...state.parts, newPart],
           isDirty: true
@@ -422,23 +728,46 @@ export const useProjectStore = create<ProjectState>()(
         return newPart.id;
       },
 
-      updatePart: (id, updates) => {
+      updatePart: (id, updates, options) => {
         let didUpdate = false;
         set((state) => {
           const existingPart = state.parts.find((p) => p.id === id);
           if (!existingPart) return state;
 
           let nextPart = { ...existingPart, ...updates };
+          if (updates.stockId !== undefined && updates.stockId !== existingPart.stockId) {
+            const stock = state.stocks.find((stock) => stock.id === updates.stockId);
+            nextPart = withStockGrain(nextPart, stock, state.stockConstraints.constrainGrain);
+            nextPart.blankShape = getFactoryBlankShape(stock);
+            if (stock && isRoundStock(stock))
+              Object.assign(nextPart, { width: stock.thickness, thickness: stock.thickness });
+            if (stock?.form === 'insert')
+              Object.assign(nextPart, { length: stock.length, width: stock.width, thickness: stock.thickness });
+            if (!updates.position && Math.abs(getPartBounds(existingPart).minY) < 1e-7) {
+              nextPart = {
+                ...nextPart,
+                position: { ...nextPart.position, y: nextPart.position.y - getPartBounds(nextPart).minY }
+              };
+            }
+          }
           const affectsOverlap =
-            updates.position !== undefined || updates.rotation !== undefined || updates.ignoreOverlap !== undefined;
+            updates.position !== undefined ||
+            updates.rotation !== undefined ||
+            updates.ignoreOverlap !== undefined ||
+            updates.length !== undefined ||
+            updates.width !== undefined ||
+            updates.thickness !== undefined ||
+            updates.stockId !== undefined ||
+            updates.blankShape !== undefined;
 
           if (state.stockConstraints.preventOverlap && affectsOverlap) {
             const transformed = new Map<string, Part>([[id, nextPart]]);
             if (wouldTransformedPartsOverlap(state.parts, transformed)) {
               const isPositionOnlyMove =
-                updates.position !== undefined && updates.rotation === undefined && updates.ignoreOverlap === undefined;
+                updates.position !== undefined && Object.keys(updates).every((key) => key === 'position');
               if (!isPositionOnlyMove) {
                 dragDebug('projectStore:updatePart:rejectOverlap', { id, updates });
+                showOverlapUpdateBlockedToast(updates);
                 return state;
               }
 
@@ -447,7 +776,13 @@ export const useProjectStore = create<ProjectState>()(
                 y: updates.position!.y - existingPart.position.y,
                 z: updates.position!.z - existingPart.position.z
               };
-              const safeDelta = resolveSafeTranslationDelta(state.parts, new Set([id]), proposedDelta);
+              const safeDelta = resolveSafeTranslationDelta(
+                state.parts,
+                new Set([id]),
+                proposedDelta,
+                undefined,
+                options?.mateHostPartId
+              );
               if (!safeDelta) {
                 dragDebug('projectStore:updatePart:noSafeDelta', { id, proposedDelta });
                 return state;
@@ -479,13 +814,17 @@ export const useProjectStore = create<ProjectState>()(
           }
 
           didUpdate = true;
+          const proposedParts = state.parts.map((part) => (part.id === id ? nextPart : part));
           return {
-            parts: state.parts.map((p) => (p.id === id ? nextPart : p)),
+            parts:
+              updates.features === undefined
+                ? proposedParts
+                : reconcileDowelRelationshipRemovals(state.parts, proposedParts),
             isDirty: true
           };
         });
 
-        if (!didUpdate) return;
+        if (!didUpdate) return false;
 
         get().markCutListStale();
         if (
@@ -497,13 +836,21 @@ export const useProjectStore = create<ProjectState>()(
         ) {
           useSnapStore.getState().updateReferenceDistances();
         }
+
+        return true;
       },
 
       updateParts: (ids, updates) => {
-        set((state) => ({
-          parts: state.parts.map((p) => (ids.includes(p.id) ? { ...p, ...updates } : p)),
-          isDirty: true
-        }));
+        set((state) => {
+          const proposedParts = state.parts.map((part) => (ids.includes(part.id) ? { ...part, ...updates } : part));
+          return {
+            parts:
+              updates.features === undefined
+                ? proposedParts
+                : reconcileDowelRelationshipRemovals(state.parts, proposedParts),
+            isDirty: true
+          };
+        });
         get().markCutListStale();
       },
 
@@ -520,11 +867,26 @@ export const useProjectStore = create<ProjectState>()(
             const changes = updateMap.get(part.id);
             if (!changes) continue;
 
-            transformed.set(part.id, { ...part, ...changes });
+            const proposed = { ...part, ...changes };
+            transformed.set(
+              part.id,
+              changes.stockId !== undefined
+                ? withStockGrain(
+                    proposed,
+                    state.stocks.find((stock) => stock.id === changes.stockId),
+                    state.stockConstraints.constrainGrain
+                  )
+                : proposed
+            );
             if (
               changes.position !== undefined ||
               changes.rotation !== undefined ||
-              changes.ignoreOverlap !== undefined
+              changes.ignoreOverlap !== undefined ||
+              changes.length !== undefined ||
+              changes.width !== undefined ||
+              changes.thickness !== undefined ||
+              changes.stockId !== undefined ||
+              Object.prototype.hasOwnProperty.call(changes, 'blankShape')
             ) {
               affectsOverlap = true;
             }
@@ -532,13 +894,22 @@ export const useProjectStore = create<ProjectState>()(
 
           if (state.stockConstraints.preventOverlap && affectsOverlap) {
             if (wouldTransformedPartsOverlap(state.parts, transformed)) {
+              // Silently dropping a whole batch is indistinguishable from the
+              // move never happening, so say so in the drag trace.
+              dragDebug('projectStore:batchUpdateParts:rejectOverlap', {
+                partIds: [...transformed.keys()]
+              });
               return state;
             }
           }
 
           didUpdate = true;
+          const proposedParts = state.parts.map((part) => transformed.get(part.id) ?? part);
+          const replacesFeatures = [...transformed.entries()].some(
+            ([partId]) => updateMap.get(partId)?.features !== undefined
+          );
           return {
-            parts: state.parts.map((p) => transformed.get(p.id) ?? p),
+            parts: replacesFeatures ? reconcileDowelRelationshipRemovals(state.parts, proposedParts) : proposedParts,
             isDirty: true
           };
         });
@@ -546,6 +917,259 @@ export const useProjectStore = create<ProjectState>()(
         if (!didUpdate) return;
         get().markCutListStale();
         useSnapStore.getState().updateReferenceDistances();
+      },
+
+      addDowelJoint: (input) => {
+        const { parts } = get();
+        const firstPart = parts.find((part) => part.id === input.firstPartId);
+        const secondPart = parts.find((part) => part.id === input.secondPartId);
+        if (!firstPart || !secondPart || firstPart.id === secondPart.id) return null;
+
+        try {
+          const result = createDowelJoint({
+            ...input,
+            existingParts: parts,
+            firstPart,
+            secondPart
+          });
+          set((state) => ({
+            parts: state.parts.map((part) => {
+              if (part.id === firstPart.id) {
+                return { ...part, features: [...(part.features ?? []), ...result.firstFeatures] };
+              }
+              if (part.id === secondPart.id) {
+                return { ...part, features: [...(part.features ?? []), ...result.secondFeatures] };
+              }
+              return part;
+            }),
+            isDirty: true
+          }));
+          get().markCutListStale();
+          return result.jointId;
+        } catch (error) {
+          useUIStore
+            .getState()
+            .showToast(error instanceof Error ? error.message : 'Unable to create the dowel joint.', 'warning');
+          return null;
+        }
+      },
+
+      /**
+       * Dowel centres: mark the holes already bored in one part onto whatever
+       * is pressed against it. Returns how many marks landed.
+       */
+      /**
+       * Replace dowel joints authored the old way with real dowels.
+       *
+       * Offered rather than applied on open: rewriting someone's project the
+       * moment they look at it is not the app's call to make, and this way it
+       * lands on the undo stack like any other edit.
+       */
+      convertLegacyDowelJoints: () => {
+        const { parts, stocks, units } = get();
+        const plan = planDowelJointMigration(parts, stocks, units);
+        if (plan.jointCount === 0) return 0;
+
+        set({
+          parts: [...plan.updatedParts, ...plan.newParts],
+          stocks: [...stocks, ...plan.newStocks],
+          isDirty: true
+        });
+        get().markCutListStale();
+        useUIStore
+          .getState()
+          .showToast(
+            `Converted ${plan.jointCount} dowel joint${plan.jointCount === 1 ? '' : 's'} into ${plan.newParts.length} dowel${plan.newParts.length === 1 ? '' : 's'}`,
+            'success'
+          );
+        return plan.jointCount;
+      },
+
+      /**
+       * Clamp up and drill through: every part stacked behind a through hole
+       * gets the same hole, made by the same pass.
+       */
+      boreThroughAssembly: (partId, face) => {
+        const { parts } = get();
+        const source = parts.find((part) => part.id === partId);
+        if (!source) return 0;
+
+        const faces = face ? [face] : FACE_TARGETS;
+        const bored = faces.flatMap((candidate) => boreThroughAssemblyHoles(source, candidate, parts));
+
+        if (bored.length === 0) {
+          useUIStore.getState().showToast('Nothing is stacked behind a through hole on this part.', 'warning');
+          return 0;
+        }
+
+        const additions = new Map<string, CircularCutFeature[]>();
+        for (const entry of bored) {
+          additions.set(entry.partId, [...(additions.get(entry.partId) ?? []), entry.feature]);
+        }
+
+        set((state) => ({
+          parts: state.parts.map((part) => {
+            const extra = additions.get(part.id);
+            return extra ? { ...part, features: [...(part.features ?? []), ...extra] } : part;
+          }),
+          isDirty: true
+        }));
+        get().markCutListStale();
+        return bored.length;
+      },
+
+      /**
+       * Cut the tenon to the mortise, the way you would at the bench: the
+       * mortise is the harder half to alter, so the tenon is what gets fitted.
+       */
+      fitTenonsToMortise: (firstPartId, secondPartId) => {
+        const { parts } = get();
+        const first = parts.find((part) => part.id === firstPartId);
+        const second = parts.find((part) => part.id === secondPartId);
+        if (!first || !second) return 0;
+
+        const roles = resolveTenonAndMortiseParts(first, second);
+        if (!roles) {
+          useUIStore.getState().showToast('Select the rail with the tenon and the part with the mortise.', 'warning');
+          return 0;
+        }
+
+        const plan = planTenonFit(roles.tenonPart, roles.mortisePart);
+        if (!plan) return 0;
+
+        const fitted = plan.tenons.filter((tenon) => tenon.changed);
+        if (fitted.length === 0) {
+          useUIStore.getState().showToast('That tenon already fits its mortise.', 'info');
+          return 0;
+        }
+
+        const byId = new Map(plan.tenons.map((tenon) => [tenon.featureId, tenon.parameters]));
+        const fitFeatures = (features: PartFeature[]): PartFeature[] =>
+          features.map((feature) => {
+            if (feature.kind !== 'rect_cut') return feature;
+            const parameters = byId.get(feature.id);
+            return parameters ? { ...feature, parameters } : feature;
+          });
+
+        set((state) => ({
+          parts: state.parts.map((part) =>
+            part.id === plan.tenonPartId ? { ...part, features: fitFeatures(part.features ?? []) } : part
+          ),
+          isDirty: true
+        }));
+        get().markCutListStale();
+        return fitted.length;
+      },
+
+      /**
+       * Cut the housing to the piece that goes in it -- the other half of the
+       * rule behind fitting a tenon. A shelf's thickness is the stock you
+       * bought and cannot be altered, so the dado is what moves.
+       */
+      fitHousingToPart: (firstPartId, secondPartId) => {
+        const { parts } = get();
+        const first = parts.find((part) => part.id === firstPartId);
+        const second = parts.find((part) => part.id === secondPartId);
+        if (!first || !second) return false;
+
+        const roles = resolveHousingRoles(first, second, get().stocks);
+        if (!roles) {
+          useUIStore
+            .getState()
+            .showToast('Select the piece and the part whose dado or groove it goes into.', 'warning');
+          return false;
+        }
+
+        const plan = planHousingFit(roles.shelfPart, roles.housingPart, get().stocks);
+        if (!plan) return false;
+        if (!plan.changed) {
+          useUIStore.getState().showToast('That housing already fits.', 'info');
+          return false;
+        }
+
+        set((state) => ({
+          parts: state.parts.map((part) =>
+            part.id === plan.housingPartId
+              ? {
+                  ...part,
+                  features: (part.features ?? []).map((feature) =>
+                    feature.kind === 'rect_cut' && feature.id === plan.housingFeatureId
+                      ? {
+                          ...feature,
+                          parameters: {
+                            ...feature.parameters,
+                            size: { ...feature.parameters.size, [plan.field]: plan.width }
+                          }
+                        }
+                      : feature
+                  )
+                }
+              : part
+          ),
+          isDirty: true
+        }));
+        get().markCutListStale();
+        return true;
+      },
+
+      transferHolesToMate: (partId, depth, face) => {
+        const { parts } = get();
+        const source = parts.find((part) => part.id === partId);
+        if (!source) return 0;
+
+        // With no face named, mark from every bored face at once -- the same as
+        // dropping centres into every hole and pressing the pieces together.
+        const faces = face ? [face] : FACE_TARGETS;
+        const bored = faces.filter((candidate) => getHolesOnFace(source, candidate).length > 0);
+        if (bored.length === 0) {
+          useUIStore.getState().showToast('Bore the holes first, then transfer them.', 'warning');
+          return 0;
+        }
+
+        const additions = new Map<string, CircularCutFeature[]>();
+        let landedCount = 0;
+        let missedCount = 0;
+        let matedFaces = 0;
+
+        for (const boredFace of bored) {
+          const mate = findMatingFace(source, boredFace, parts);
+          if (!mate) continue;
+          matedFaces += 1;
+
+          const transferred = transferHolesToMatingFace(source, boredFace, mate.part, mate.face, depth);
+          const missed = new Set(findHolesOffTheFace(mate.part, mate.face, transferred));
+          missedCount += missed.size;
+
+          const landed = transferred.filter((entry) => !missed.has(entry)).map((entry) => entry.feature);
+          if (landed.length === 0) continue;
+          landedCount += landed.length;
+          additions.set(mate.part.id, [...(additions.get(mate.part.id) ?? []), ...landed]);
+        }
+
+        if (matedFaces === 0) {
+          useUIStore
+            .getState()
+            .showToast('Put the parts together first — there is nothing against the bored face.', 'warning');
+          return 0;
+        }
+
+        if (landedCount > 0) {
+          set((state) => ({
+            parts: state.parts.map((part) => {
+              const extra = additions.get(part.id);
+              return extra ? { ...part, features: [...(part.features ?? []), ...extra] } : part;
+            }),
+            isDirty: true
+          }));
+          get().markCutListStale();
+        }
+
+        if (missedCount > 0) {
+          useUIStore
+            .getState()
+            .showToast(`${missedCount} hole${missedCount === 1 ? '' : 's'} landed off the mating part.`, 'warning');
+        }
+        return landedCount;
       },
 
       moveSelectedParts: (delta) => {
@@ -558,8 +1182,36 @@ export const useProjectStore = create<ProjectState>()(
         if (partIdsToMove.size === 0) return;
 
         let effectiveDelta = delta;
+        let mateInsertionNormal: { x: number; y: number; z: number } | undefined;
+        if (useSnapStore.getState().snapToPartsEnabled) {
+          const movingParts = parts.filter((part) => partIdsToMove.has(part.id));
+          const anchorPart = movingParts[0];
+          if (anchorPart) {
+            const anchorPosition = {
+              x: anchorPart.position.x + delta.x,
+              y: anchorPart.position.y + delta.y,
+              z: anchorPart.position.z + delta.z
+            };
+            const mate = detectGroupFeatureMateSnaps(
+              movingParts,
+              delta,
+              anchorPosition,
+              parts.filter((part) => !partIdsToMove.has(part.id)),
+              [...partIdsToMove],
+              0.5
+            );
+            if (mate.mateHostPartId) {
+              mateInsertionNormal = mate.mateInsertionNormal;
+              effectiveDelta = {
+                x: delta.x + mate.adjustedPosition.x - anchorPosition.x,
+                y: delta.y + mate.adjustedPosition.y - anchorPosition.y,
+                z: delta.z + mate.adjustedPosition.z - anchorPosition.z
+              };
+            }
+          }
+        }
         if (stockConstraints.preventOverlap) {
-          const safeDelta = resolveSafeTranslationDelta(parts, partIdsToMove, delta);
+          const safeDelta = resolveSafeNudgeTranslationDelta(parts, partIdsToMove, effectiveDelta, mateInsertionNormal);
           if (!safeDelta) {
             dragDebug('projectStore:moveSelectedParts:noSafeDelta', {
               requestedDelta: delta,
@@ -568,9 +1220,9 @@ export const useProjectStore = create<ProjectState>()(
             return;
           }
           if (
-            Math.abs(safeDelta.x - delta.x) > 1e-6 ||
-            Math.abs(safeDelta.y - delta.y) > 1e-6 ||
-            Math.abs(safeDelta.z - delta.z) > 1e-6
+            Math.abs(safeDelta.x - effectiveDelta.x) > 1e-6 ||
+            Math.abs(safeDelta.y - effectiveDelta.y) > 1e-6 ||
+            Math.abs(safeDelta.z - effectiveDelta.z) > 1e-6
           ) {
             maybeShowOverlapClampToast();
             dragDebug('projectStore:moveSelectedParts:clampedToSafeDelta', {
@@ -597,6 +1249,22 @@ export const useProjectStore = create<ProjectState>()(
           isDirty: true
         }));
         useSnapStore.getState().updateReferenceDistances();
+      },
+
+      beginHistoryStep: () => {
+        historyStepMark = useProjectStore.temporal.getState().pastStates.length;
+      },
+
+      endHistoryStep: () => {
+        if (historyStepMark === null) return;
+        const mark = historyStepMark;
+        historyStepMark = null;
+        const { pastStates } = useProjectStore.temporal.getState();
+        // The first entry pushed during the drag holds the state as it was
+        // before it began; the rest are frames. Keep that one and drop them.
+        if (pastStates.length > mark + 1) {
+          useProjectStore.temporal.setState({ pastStates: pastStates.slice(0, mark + 1) });
+        }
       },
 
       rotateSelectedParts: (axis, degrees, pivot) => {
@@ -649,6 +1317,23 @@ export const useProjectStore = create<ProjectState>()(
           });
         }
 
+        // Ground the selection as one rigid assembly before per-part render
+        // effects see it. Independent corrections would pull seated joints apart.
+        const grounded = resolveRotateBatchGrounding({
+          startingParts: parts.filter((part) => partIdsToRotate.has(part.id)),
+          projectParts: parts,
+          groupMembers,
+          updates: [...transformed.values()].map((part) => ({
+            partId: part.id,
+            position: part.position,
+            rotation: part.rotation
+          }))
+        });
+        for (const update of grounded.updates) {
+          const part = transformed.get(update.partId)!;
+          transformed.set(update.partId, { ...part, position: update.position });
+        }
+
         if (stockConstraints.preventOverlap && wouldTransformedPartsOverlap(parts, transformed)) {
           return;
         }
@@ -663,12 +1348,15 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       deletePart: (id) => {
-        set((state) => ({
-          parts: state.parts.filter((p) => p.id !== id),
-          // Remove from any groups
-          groupMembers: state.groupMembers.filter((gm) => !(gm.memberType === 'part' && gm.memberId === id)),
-          isDirty: true
-        }));
+        set((state) => {
+          const survivingParts = state.parts.filter((part) => part.id !== id);
+          return {
+            parts: reconcileDowelRelationshipRemovals(state.parts, survivingParts),
+            // Remove from any groups
+            groupMembers: state.groupMembers.filter((gm) => !(gm.memberType === 'part' && gm.memberId === id)),
+            isDirty: true
+          };
+        });
         useSelectionStore.setState((state) => ({
           selectedPartIds: state.selectedPartIds.filter((pid) => pid !== id)
         }));
@@ -681,14 +1369,17 @@ export const useProjectStore = create<ProjectState>()(
       deleteSelectedParts: () => {
         const { selectedPartIds } = useSelectionStore.getState();
         if (selectedPartIds.length === 0) return;
-        set((state) => ({
-          parts: state.parts.filter((p) => !selectedPartIds.includes(p.id)),
-          // Remove from any groups
-          groupMembers: state.groupMembers.filter(
-            (gm) => !(gm.memberType === 'part' && selectedPartIds.includes(gm.memberId))
-          ),
-          isDirty: true
-        }));
+        set((state) => {
+          const survivingParts = state.parts.filter((part) => !selectedPartIds.includes(part.id));
+          return {
+            parts: reconcileDowelRelationshipRemovals(state.parts, survivingParts),
+            // Remove from any groups
+            groupMembers: state.groupMembers.filter(
+              (gm) => !(gm.memberType === 'part' && selectedPartIds.includes(gm.memberId))
+            ),
+            isDirty: true
+          };
+        });
         useSelectionStore.setState({ selectedPartIds: [] });
         useSnapStore.setState((state) => ({
           referencePartIds: state.referencePartIds.filter((id) => !selectedPartIds.includes(id))
@@ -699,14 +1390,17 @@ export const useProjectStore = create<ProjectState>()(
       confirmDeleteParts: () => {
         const { pendingDeletePartIds } = useUIStore.getState();
         if (!pendingDeletePartIds || pendingDeletePartIds.length === 0) return;
-        set((state) => ({
-          parts: state.parts.filter((p) => !pendingDeletePartIds.includes(p.id)),
-          // Remove from any groups
-          groupMembers: state.groupMembers.filter(
-            (gm) => !(gm.memberType === 'part' && pendingDeletePartIds.includes(gm.memberId))
-          ),
-          isDirty: true
-        }));
+        set((state) => {
+          const survivingParts = state.parts.filter((part) => !pendingDeletePartIds.includes(part.id));
+          return {
+            parts: reconcileDowelRelationshipRemovals(state.parts, survivingParts),
+            // Remove from any groups
+            groupMembers: state.groupMembers.filter(
+              (gm) => !(gm.memberType === 'part' && pendingDeletePartIds.includes(gm.memberId))
+            ),
+            isDirty: true
+          };
+        });
         useSelectionStore.setState((state) => ({
           selectedPartIds: state.selectedPartIds.filter((id) => !pendingDeletePartIds.includes(id))
         }));
@@ -714,6 +1408,19 @@ export const useProjectStore = create<ProjectState>()(
           referencePartIds: state.referencePartIds.filter((id) => !pendingDeletePartIds.includes(id))
         }));
         useUIStore.getState().cancelDeleteParts();
+        get().markCutListStale();
+      },
+
+      confirmDeleteGroups: () => {
+        const { pendingDeleteGroupIds } = useUIStore.getState();
+        if (!pendingDeleteGroupIds || pendingDeleteGroupIds.length === 0) return;
+        // The confirmation offers to delete each group "and all its contents",
+        // so this is the recursive delete, which already reconciles members,
+        // selection and snap references for every descendant.
+        for (const groupId of pendingDeleteGroupIds) {
+          get().deleteGroup(groupId, 'recursive');
+        }
+        useUIStore.getState().cancelDeleteGroups();
         get().markCutListStale();
       },
 
@@ -730,18 +1437,19 @@ export const useProjectStore = create<ProjectState>()(
         const part = parts.find((p) => p.id === id);
         if (!part) return null;
         const duplicateOffset = getDuplicateOffset([part]);
+        const newPartId = uuidv4();
+        const partIdMap = new Map([[part.id, newPartId]]);
 
-        // Destructure to exclude `id` so createDefaultPart generates a new one
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { id: _oldId, ...partWithoutId } = part;
         const newPart = createDefaultPart({
-          ...partWithoutId,
+          ...part,
+          id: newPartId,
           name: generateCopyName(part.name),
           position: {
             x: part.position.x + duplicateOffset.x,
             y: part.position.y + duplicateOffset.y,
             z: part.position.z + duplicateOffset.z
-          }
+          },
+          features: clonePartFeaturesForCopy(part.features, partIdMap, new Map())
         });
 
         set((state) => ({
@@ -792,8 +1500,10 @@ export const useProjectStore = create<ProjectState>()(
         }
 
         // Create ID mappings
-        const partIdMap = new Map<string, string>();
+        const selectedParts = parts.filter((p) => partIdsToDupe.has(p.id));
+        const partIdMap = new Map(selectedParts.map((part) => [part.id, uuidv4()]));
         const groupIdMap = new Map<string, string>();
+        const jointIdMap = new Map<string, string>();
 
         // Get group members that will be duplicated to identify child items
         const selectedGroupMembers = groupMembers.filter((gm) => groupIdsToDupe.has(gm.groupId));
@@ -809,13 +1519,11 @@ export const useProjectStore = create<ProjectState>()(
 
         // Duplicate parts with offset
         // Only top-level parts (not in any group being duplicated) get "(copy)" appended
-        const selectedParts = parts.filter((p) => partIdsToDupe.has(p.id));
         const duplicateOffset = getDuplicateOffset(selectedParts);
         const newParts = selectedParts.map((part) => {
-          const newId = uuidv4();
-          partIdMap.set(part.id, newId);
+          const newId = partIdMap.get(part.id)!;
           const isChild = childPartIds.has(part.id);
-          return {
+          return normalizePart({
             ...part,
             id: newId,
             name: isChild ? part.name : generateCopyName(part.name),
@@ -823,8 +1531,9 @@ export const useProjectStore = create<ProjectState>()(
               x: part.position.x + duplicateOffset.x,
               y: part.position.y + duplicateOffset.y,
               z: part.position.z + duplicateOffset.z
-            }
-          };
+            },
+            features: clonePartFeaturesForCopy(part.features, partIdMap, jointIdMap)
+          });
         });
 
         // Duplicate groups
@@ -895,13 +1604,18 @@ export const useProjectStore = create<ProjectState>()(
 
             return {
               ...p,
+              blankShape: getFactoryBlankShape(stock),
               length: stock.length,
               width: stock.width,
               thickness: stock.thickness,
               color: stock.color,
-              grainDirection: stock.grainDirection === 'none' ? p.grainDirection : stock.grainDirection
+              grainDirection: stock.grainDirection === 'none' ? p.grainDirection : stock.grainDirection,
+              grainSensitive: stock.grainDirection !== 'none',
+              extraLength: 0,
+              extraWidth: 0
             };
           }),
+          cutList: state.cutList ? { ...state.cutList, isStale: true } : null,
           isDirty: true
         }));
       },
@@ -929,16 +1643,25 @@ export const useProjectStore = create<ProjectState>()(
         // Validate dimensions are > 0
         const validatedUpdates = { ...updates };
         if (validatedUpdates.length !== undefined) {
-          validatedUpdates.length = Math.max(0.001, validatedUpdates.length);
+          validatedUpdates.length = Math.max(MIN_DIMENSION_INCHES, validatedUpdates.length);
         }
         if (validatedUpdates.width !== undefined) {
-          validatedUpdates.width = Math.max(0.001, validatedUpdates.width);
+          validatedUpdates.width = Math.max(MIN_DIMENSION_INCHES, validatedUpdates.width);
         }
         if (validatedUpdates.thickness !== undefined) {
-          validatedUpdates.thickness = Math.max(0.001, validatedUpdates.thickness);
+          validatedUpdates.thickness = Math.max(MIN_DIMENSION_INCHES, validatedUpdates.thickness);
         }
         set((state) => ({
           stocks: state.stocks.map((s) => (s.id === id ? { ...s, ...validatedUpdates } : s)),
+          parts:
+            validatedUpdates.grainDirection === undefined
+              ? state.parts
+              : state.parts.map((part) => {
+                  const stock = state.stocks.find((candidate) => candidate.id === id);
+                  return part.stockId === id && stock
+                    ? withStockGrain(part, { ...stock, ...validatedUpdates }, state.stockConstraints.constrainGrain)
+                    : part;
+                }),
           isDirty: true
         }));
         get().markCutListStale();
@@ -955,36 +1678,33 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       assignStockToSelectedParts: (stockId) => {
-        const { stocks } = get();
+        const state = get();
         const { selectedPartIds } = useSelectionStore.getState();
-        if (selectedPartIds.length === 0) return;
-
-        if (stockId === null) {
-          // Unassign stock from all selected parts
-          set((state) => ({
-            parts: state.parts.map((p) => (selectedPartIds.includes(p.id) ? { ...p, stockId: null } : p)),
-            isDirty: true
-          }));
-        } else {
-          const stock = stocks.find((s) => s.id === stockId);
-          if (!stock) return;
-
-          // Assign stock and inherit color + grain direction
-          set((state) => ({
-            parts: state.parts.map((p) =>
-              selectedPartIds.includes(p.id)
-                ? {
-                    ...p,
-                    stockId,
-                    color: stock.color,
-                    grainDirection: stock.grainDirection === 'none' ? p.grainDirection : stock.grainDirection
-                  }
-                : p
-            ),
-            isDirty: true
-          }));
-        }
-        get().markCutListStale();
+        const stock = state.stocks.find((candidate) => candidate.id === stockId);
+        if (!selectedPartIds.length || (stockId !== null && !stock)) return;
+        const updates = state.parts
+          .filter((part) => selectedPartIds.includes(part.id))
+          .map((part) => {
+            const changes: Partial<Part> = { stockId, blankShape: getFactoryBlankShape(stock) };
+            if (stock) {
+              changes.color = stock.color;
+              if (state.stockConstraints.constrainGrain) {
+                changes.grainDirection = stock.grainDirection === 'none' ? part.grainDirection : stock.grainDirection;
+                changes.grainSensitive = stock.grainDirection !== 'none';
+              }
+              if (isRoundStock(stock)) Object.assign(changes, { width: stock.thickness, thickness: stock.thickness });
+              if (stock.form === 'insert')
+                Object.assign(changes, { length: stock.length, width: stock.width, thickness: stock.thickness });
+              if (Math.abs(getPartBounds(part).minY) < 1e-7) {
+                changes.position = {
+                  ...part.position,
+                  y: part.position.y - getPartBounds({ ...part, ...changes }).minY
+                };
+              }
+            }
+            return { id: part.id, changes };
+          });
+        state.batchUpdateParts(updates);
       },
 
       // Assembly actions
@@ -1073,6 +1793,8 @@ export const useProjectStore = create<ProjectState>()(
 
         // Create part index map for group member references
         const partIdToIndex = new Map<string, number>();
+        const assemblyPartIds = new Map(selectedParts.map((part, index) => [part.id, `part:${index}`]));
+        const assemblyJointIds = new Map<string, string>();
         const assemblyParts: AssemblyPart[] = selectedParts.map((part, index) => {
           partIdToIndex.set(part.id, index);
 
@@ -1097,12 +1819,15 @@ export const useProjectStore = create<ProjectState>()(
             },
             rotation: part.rotation,
             stockId: part.stockId,
+            blankShape: part.blankShape,
             grainSensitive: part.grainSensitive,
             grainDirection: part.grainDirection,
             color: part.color,
             notes: part.notes,
             extraLength: part.extraLength,
             extraWidth: part.extraWidth,
+            localId: assemblyPartIds.get(part.id),
+            features: clonePartFeaturesForCopy(part.features, assemblyPartIds, assemblyJointIds),
             embeddedStock
           };
         });
@@ -1246,10 +1971,13 @@ export const useProjectStore = create<ProjectState>()(
         // Create ID mappings
         const partIdMap = new Map<number, string>(); // index -> new ID
         const groupIdMap = new Map<number, string>(); // index -> new ID
+        const newPartIdentities = assembly.parts.map(() => uuidv4());
+        const assemblyCopyMap = getAssemblyPartCopyMap(assembly.parts, newPartIdentities);
+        const placedJointIds = new Map<string, string>();
 
         // Create new parts with resolved stock IDs
         const newParts: Part[] = assembly.parts.map((cp, index) => {
-          const newId = uuidv4();
+          const newId = newPartIdentities[index];
           partIdMap.set(index, newId);
 
           // Resolve the stockId
@@ -1259,7 +1987,7 @@ export const useProjectStore = create<ProjectState>()(
             resolvedStockId = resolved || null; // Empty string means clear the stock
           }
 
-          return {
+          return normalizePart({
             id: newId,
             name: cp.name,
             length: cp.length,
@@ -1272,13 +2000,15 @@ export const useProjectStore = create<ProjectState>()(
             },
             rotation: cp.rotation,
             stockId: resolvedStockId,
+            blankShape: cp.blankShape,
             grainSensitive: cp.grainSensitive,
             grainDirection: cp.grainDirection,
             color: cp.color,
             notes: cp.notes,
             extraLength: cp.extraLength,
-            extraWidth: cp.extraWidth
-          };
+            extraWidth: cp.extraWidth,
+            features: clonePartFeaturesForCopy(cp.features, assemblyCopyMap, placedJointIds)
+          });
         });
 
         // Create new groups
@@ -1330,6 +2060,7 @@ export const useProjectStore = create<ProjectState>()(
       newProject: (defaults) => {
         const now = new Date().toISOString();
         set({
+          documentGeneration: get().documentGeneration + 1,
           projectName: UNTITLED_PROJECT_NAME,
           parts: [],
           stocks: [],
@@ -1356,6 +2087,7 @@ export const useProjectStore = create<ProjectState>()(
           customShoppingItems: [],
           cutList: null
         });
+        get().markClean();
         useClipboardStore.getState().clearClipboard();
         useSelectionStore.setState({
           selectedPartIds: [],
@@ -1373,12 +2105,17 @@ export const useProjectStore = create<ProjectState>()(
 
       loadProject: (project, filePath) => {
         set({
+          documentGeneration: get().documentGeneration + 1,
           projectName: project.name,
-          parts: project.parts,
-          stocks: project.stocks,
-          groups: project.groups,
+          parts: (project.parts ?? []).map((part) => normalizePart(part)),
+          stocks: project.stocks ?? [],
+          groups: project.groups ?? [],
           groupMembers: project.groupMembers || [],
-          assemblies: project.assemblies || [],
+          assemblies:
+            project.assemblies?.map((assembly) => ({
+              ...assembly,
+              parts: assembly.parts.map((part) => normalizeAssemblyPart(part))
+            })) || [],
           filePath: filePath || null,
           isDirty: false,
           // Load project settings or use defaults
@@ -1401,8 +2138,9 @@ export const useProjectStore = create<ProjectState>()(
           modifiedAt: project.modifiedAt || new Date().toISOString(),
           snapGuides: project.snapGuides || [],
           customShoppingItems: project.customShoppingItems || [],
-          cutList: project.cutList || null
+          cutList: normalizeSavedCutList(project.cutList)
         });
+        get().markClean();
         useClipboardStore.getState().clearClipboard();
         useSelectionStore.setState({
           selectedPartIds: [],
@@ -1424,7 +2162,10 @@ export const useProjectStore = create<ProjectState>()(
 
       setFilePath: (path) => set({ filePath: path }),
       markDirty: () => set({ isDirty: true, modifiedAt: new Date().toISOString() }),
-      markClean: () => set({ isDirty: false }),
+      markClean: () => {
+        savedProjectContent = projectContentSnapshot(get());
+        set({ isDirty: false });
+      },
 
       // Project settings actions
       setProjectName: (projectName) => set({ projectName, isDirty: true }),
@@ -1439,7 +2180,22 @@ export const useProjectStore = create<ProjectState>()(
         get().markCutListStale();
       },
       setProjectNotes: (projectNotes) => set({ projectNotes, isDirty: true }),
-      setStockConstraints: (stockConstraints) => set({ stockConstraints, isDirty: true }),
+      setStockConstraints: (stockConstraints) =>
+        set((state) => ({
+          stockConstraints,
+          parts:
+            !state.stockConstraints.constrainGrain && stockConstraints.constrainGrain
+              ? state.parts.map((part) =>
+                  withStockGrain(
+                    part,
+                    state.stocks.find((stock) => stock.id === part.stockId),
+                    true
+                  )
+                )
+              : state.parts,
+          cutList: state.cutList ? { ...state.cutList, isStale: true } : null,
+          isDirty: true
+        })),
 
       // Snap guide actions
       addSnapGuide: (axis, position, label) => {
@@ -1561,17 +2317,20 @@ export const useProjectStore = create<ProjectState>()(
           }));
         } else {
           // 'recursive' - delete group AND all member parts
-          set((state) => ({
-            groups: state.groups.filter((g) => !descendantGroupIds.includes(g.id)),
-            // Remove memberships inside deleted groups AND memberships that reference deleted groups as members
-            groupMembers: state.groupMembers.filter((gm) => {
-              if (descendantGroupIds.includes(gm.groupId)) return false;
-              if (gm.memberType === 'group' && descendantGroupIds.includes(gm.memberId)) return false;
-              return true;
-            }),
-            parts: state.parts.filter((p) => !descendantPartIds.includes(p.id)),
-            isDirty: true
-          }));
+          set((state) => {
+            const survivingParts = state.parts.filter((part) => !descendantPartIds.includes(part.id));
+            return {
+              groups: state.groups.filter((g) => !descendantGroupIds.includes(g.id)),
+              // Remove memberships inside deleted groups AND memberships that reference deleted groups as members
+              groupMembers: state.groupMembers.filter((gm) => {
+                if (descendantGroupIds.includes(gm.groupId)) return false;
+                if (gm.memberType === 'group' && descendantGroupIds.includes(gm.memberId)) return false;
+                return true;
+              }),
+              parts: reconcileDowelRelationshipRemovals(state.parts, survivingParts),
+              isDirty: true
+            };
+          });
           useSelectionStore.setState((state) => ({
             selectedPartIds: state.selectedPartIds.filter((id) => !descendantPartIds.includes(id)),
             selectedGroupIds: state.selectedGroupIds.filter((id) => !descendantGroupIds.includes(id)),
@@ -1762,16 +2521,18 @@ export const useProjectStore = create<ProjectState>()(
       },
 
       markCutListStale: () => {
-        // Use functional setter to avoid race condition with concurrent state updates
-        set((state) => {
-          if (state.cutList && !state.cutList.isStale) {
-            return {
-              cutList: { ...state.cutList, isStale: true },
-              isDirty: true
-            };
-          }
-          return {};
-        });
+        if (!get().cutList || get().cutList?.isStale) return;
+        // Invalidation is derived from the preceding edit, not a second undo
+        // step. Otherwise Undo can mark an obsolete report current while the
+        // edited model remains unchanged. Preserve an existing history pause.
+        const history = useProjectStore.temporal.getState();
+        const wasTracking = history.isTracking;
+        if (wasTracking) history.pause();
+        try {
+          set((state) => (state.cutList ? { cutList: { ...state.cutList, isStale: true }, isDirty: true } : {}));
+        } finally {
+          if (wasTracking) history.resume();
+        }
       },
 
       clearCutList: () => {
@@ -1806,26 +2567,23 @@ export const useProjectStore = create<ProjectState>()(
       }
     }),
     {
-      partialize: (state) => ({
-        projectName: state.projectName,
-        parts: state.parts,
-        stocks: state.stocks,
-        groups: state.groups,
-        groupMembers: state.groupMembers,
-        assemblies: state.assemblies,
-        units: state.units,
-        gridSize: state.gridSize,
-        kerfWidth: state.kerfWidth,
-        overageFactor: state.overageFactor,
-        projectNotes: state.projectNotes,
-        stockConstraints: state.stockConstraints,
-        snapGuides: state.snapGuides,
-        customShoppingItems: state.customShoppingItems,
-        cutList: state.cutList,
-        version: state.version,
-        createdAt: state.createdAt,
-        modifiedAt: state.modifiedAt
-      }),
+      partialize: projectHistoryState,
+      wrapTemporal: (initialize) => (set, get, store) => {
+        const history = initialize(set, get, store);
+        return {
+          ...history,
+          undo: (steps) => {
+            const changed = get().pastStates.length > 0;
+            history.undo(steps);
+            if (changed) reconcileDirtyAfterHistory();
+          },
+          redo: (steps) => {
+            const changed = get().futureStates.length > 0;
+            history.redo(steps);
+            if (changed) reconcileDirtyAfterHistory();
+          }
+        };
+      },
       limit: 100,
       equality: (pastState, currentState) => JSON.stringify(pastState) === JSON.stringify(currentState)
     }
@@ -1833,3 +2591,5 @@ export const useProjectStore = create<ProjectState>()(
 );
 
 // Selection change subscription bridge is in selectionStore.ts to avoid circular init issues
+
+savedProjectContent = projectContentSnapshot(useProjectStore.getState());

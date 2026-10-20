@@ -73,13 +73,13 @@ describe('uiStore', () => {
         expect(useUIStore.getState().contextMenu).toEqual(menuData);
       });
 
-      it('opens context menu with group data', () => {
+      it('opens context menu with guide data', () => {
         const store = useUIStore.getState();
         const menuData = {
-          type: 'group' as const,
+          type: 'guide' as const,
           x: 150,
           y: 250,
-          groupId: 'group-456'
+          guideId: 'guide-456'
         };
 
         store.openContextMenu(menuData);
@@ -94,8 +94,7 @@ describe('uiStore', () => {
         store.openContextMenu({
           type: 'part',
           x: 100,
-          y: 200,
-          partId: 'part-123'
+          y: 200
         });
 
         store.closeContextMenu();
@@ -437,6 +436,96 @@ describe('uiStore', () => {
       expect(useUIStore.getState().toast).toBeNull();
 
       vi.useRealTimers();
+    });
+  });
+
+  describe('modals and pending deletes', () => {
+    it('opens and closes the cut list', () => {
+      useUIStore.getState().openCutListModal();
+      expect(useUIStore.getState().cutListModalOpen).toBe(true);
+      useUIStore.getState().closeCutListModal();
+      expect(useUIStore.getState().cutListModalOpen).toBe(false);
+    });
+
+    it('opens the issues list on a particular part when asked', () => {
+      // Clicking an issue is meant to land on the part it belongs to.
+      useUIStore.getState().openIssuesModal('part-7');
+      expect(useUIStore.getState().issuesModalOpen).toBe(true);
+      expect(useUIStore.getState().issuesModalFocusPartId).toBe('part-7');
+    });
+
+    it('opens the issues list on nothing in particular otherwise', () => {
+      useUIStore.getState().openIssuesModal();
+      expect(useUIStore.getState().issuesModalFocusPartId).toBeNull();
+    });
+
+    it('forgets the focused part when the issues list closes', () => {
+      useUIStore.getState().openIssuesModal('part-7');
+      useUIStore.getState().closeIssuesModal();
+      expect(useUIStore.getState().issuesModalOpen).toBe(false);
+      expect(useUIStore.getState().issuesModalFocusPartId).toBeNull();
+    });
+
+    it('calls off a pending delete', () => {
+      useUIStore.getState().requestDeleteParts(['p1']);
+      useUIStore.getState().cancelDeleteParts();
+      // Null rather than an empty list: nothing is pending at all.
+      expect(useUIStore.getState().pendingDeletePartIds).toBeNull();
+
+      useUIStore.getState().requestDeleteGroups(['g1']);
+      useUIStore.getState().cancelDeleteGroups();
+      expect(useUIStore.getState().pendingDeleteGroupIds).toBeNull();
+    });
+
+    it('ignores a delete request for nothing', () => {
+      useUIStore.setState({ pendingDeletePartIds: null, pendingDeleteGroupIds: null });
+      useUIStore.getState().requestDeleteParts([]);
+      useUIStore.getState().requestDeleteGroups([]);
+      expect(useUIStore.getState().pendingDeletePartIds).toBeNull();
+      expect(useUIStore.getState().pendingDeleteGroupIds).toBeNull();
+    });
+  });
+
+  describe('the stock highlighted in the sidebar', () => {
+    it('selects one', () => {
+      useUIStore.getState().setSelectedSidebarStockId('stock-1');
+      expect(useUIStore.getState().selectedSidebarStockId).toBe('stock-1');
+    });
+
+    it('clears it when the same one is picked again', () => {
+      useUIStore.getState().setSelectedSidebarStockId('stock-1');
+      useUIStore.getState().toggleSelectedSidebarStockId('stock-1');
+      expect(useUIStore.getState().selectedSidebarStockId).toBeNull();
+    });
+
+    it('moves the highlight when a different one is picked', () => {
+      useUIStore.getState().setSelectedSidebarStockId('stock-1');
+      useUIStore.getState().toggleSelectedSidebarStockId('stock-2');
+      expect(useUIStore.getState().selectedSidebarStockId).toBe('stock-2');
+    });
+  });
+
+  describe('a toast with something to press', () => {
+    it('runs the action without letting the click reach what is behind it', () => {
+      const onClick = vi.fn();
+      const preventDefault = vi.fn();
+      const stopPropagation = vi.fn();
+      useUIStore.getState().showToast('Deleted', 'success', { action: { label: 'Undo', onClick } });
+
+      const options = mockSonnerToast.success.mock.calls.at(-1)?.[1];
+      options?.action?.onClick({ preventDefault, stopPropagation });
+
+      expect(onClick).toHaveBeenCalledTimes(1);
+      expect(preventDefault).toHaveBeenCalled();
+      expect(stopPropagation).toHaveBeenCalled();
+    });
+
+    it('runs the action even when handed no event at all', () => {
+      const onClick = vi.fn();
+      useUIStore.getState().showToast('Deleted', 'success', { action: { label: 'Undo', onClick } });
+      const options = mockSonnerToast.success.mock.calls.at(-1)?.[1];
+      options?.action?.onClick();
+      expect(onClick).toHaveBeenCalledTimes(1);
     });
   });
 });

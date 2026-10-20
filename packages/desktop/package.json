@@ -1,6 +1,6 @@
 {
   "name": "@carvd/desktop",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "An offline-only desktop app for designing and planning custom furniture and cabinetry.",
   "private": true,
   "type": "module",
@@ -18,16 +18,15 @@
     "predev": "node scripts/ensure-dev-runtime.cjs",
     "dev": "unset ELECTRON_RUN_AS_NODE && electron-vite dev",
     "dev:debug": "unset ELECTRON_RUN_AS_NODE && electron-vite dev --inspect",
-    "build": "electron-vite build",
+    "build": "node scripts/update-license-inventory.cjs --check && electron-vite build",
     "preview": "unset ELECTRON_RUN_AS_NODE && electron-vite preview",
-    "prepare:runtime-deps": "npm install --omit=dev --workspaces=false --legacy-peer-deps",
-    "package": "npm run build && npm run prepare:runtime-deps && electron-builder --mac zip --arm64",
-    "package:mac": "npm run build && npm run prepare:runtime-deps && electron-builder --mac --arm64 --x64",
-    "package:mac:dmg": "npm run build && npm run prepare:runtime-deps && electron-builder --mac dmg --arm64",
-    "package:mac:x64": "npm run build && npm run prepare:runtime-deps && electron-builder --mac --x64",
-    "package:mac:universal": "npm run build && npm run prepare:runtime-deps && electron-builder --mac --universal",
-    "package:win": "npm run build && npm run prepare:runtime-deps && electron-builder --win",
-    "package:linux": "npm run build && npm run prepare:runtime-deps && electron-builder --linux --x64",
+    "package": "npm run build && electron-builder --mac zip --arm64",
+    "package:mac": "npm run build && electron-builder --mac --arm64 --x64",
+    "package:mac:dmg": "npm run build && electron-builder --mac dmg --arm64",
+    "package:mac:x64": "npm run build && electron-builder --mac --x64",
+    "package:mac:universal": "npm run build && electron-builder --mac --universal",
+    "package:win": "npm run build && electron-builder --win",
+    "package:linux": "npm run build && electron-builder --linux --x64",
     "generate-keys": "node scripts/generate-license-keys.cjs",
     "generate-test-license": "node scripts/generate-test-license.cjs",
     "test:license": "node scripts/test-license-flow.cjs",
@@ -37,7 +36,7 @@
     "lint:fix": "eslint src --fix",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
     "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run && vitest run --config vitest.main.config.ts && npm run test:e2e",
     "test:unit": "vitest run && vitest run --config vitest.main.config.ts",
     "test:main": "vitest run --config vitest.main.config.ts",
@@ -48,7 +47,8 @@
     "test:e2e:headed": "cross-env MAIN_VITE_ANALYTICS_E2E=1 PRELOAD_VITE_ANALYTICS_E2E=1 npm run build && playwright test --headed",
     "test:e2e:debug": "cross-env MAIN_VITE_ANALYTICS_E2E=1 PRELOAD_VITE_ANALYTICS_E2E=1 npm run build && playwright test --debug",
     "verify:production-analytics-boundary": "npm run build && node scripts/assert-no-analytics-e2e-controls.cjs",
-    "analyze": "ANALYZE=true electron-vite build"
+    "analyze": "ANALYZE=true electron-vite build",
+    "licenses:update": "node scripts/update-license-inventory.cjs"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
@@ -68,9 +68,10 @@
     "clsx": "^2.1.1",
     "electron-log": "^5.4.3",
     "electron-store": "^11.0.2",
-    "electron-updater": "^6.8.3",
+    "electron-updater": "^6.8.9",
     "jspdf": "^4.2.1",
     "lucide-react": "^0.575.0",
+    "polygon-clipping": "0.15.7",
     "posthog-node": "5.51.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
@@ -78,7 +79,9 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.4.1",
     "three": "^0.183.2",
-    "uuid": "^13.0.0",
+    "three-bvh-csg": "^0.0.18",
+    "three-mesh-bvh": "0.9.7",
+    "uuid": "^13.0.2",
     "zundo": "^2.3.0",
     "zustand": "^5.0.1"
   },
@@ -98,11 +101,11 @@
     "@typescript-eslint/eslint-plugin": "^8.56.0",
     "@typescript-eslint/parser": "^8.58.0",
     "@vitejs/plugin-react": "^5.1.4",
-    "@vitest/coverage-v8": "^4.1.2",
-    "@vitest/ui": "^4.0.18",
+    "@vitest/coverage-v8": "^4.1.11",
+    "@vitest/ui": "^4.1.11",
     "cross-env": "^10.1.0",
-    "electron": "41.1.1",
-    "electron-builder": "^26.8.1",
+    "electron": "43.7.9",
+    "electron-builder": "^26.17.0",
     "electron-vite": "^5.0.0",
     "eslint": "^9.39.3",
     "eslint-config-prettier": "^10.1.8",
@@ -118,7 +121,7 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.6.3",
     "vite": "^7.3.2",
-    "vitest": "^4.0.18"
+    "vitest": "^4.1.11"
   },
   "build": {
     "appId": "com.carvd-studio.app",
@@ -127,7 +130,7 @@
       "output": "dist"
     },
     "files": [
-      "out/**/*",
+      "out{,/**/*}",
       "package.json",
       "node_modules/**/*"
     ],
@@ -194,13 +197,16 @@
       "target": [
         "AppImage",
         "deb"
-      ]
+      ],
+      "executableName": "carvd-studio",
+      "syncDesktopName": true
     },
     "appImage": {
       "artifactName": "Carvd.Studio-${version}-x86_64.${ext}"
     },
     "deb": {
-      "artifactName": "Carvd.Studio-${version}-amd64.${ext}"
+      "artifactName": "Carvd.Studio-${version}-amd64.${ext}",
+      "packageName": "carvd-studio"
     },
     "nsis": {
       "artifactName": "Carvd.Studio.Setup.${version}.${ext}",
@@ -215,8 +221,11 @@
         "ext": "carvd",
         "name": "Carvd Studio Project",
         "description": "Carvd Studio Project File",
-        "role": "Editor"
+        "role": "Editor",
+        "mimeType": "application/x-carvd-studio-project"
       }
-    ]
-  }
+    ],
+    "npmRebuild": false
+  },
+  "desktopName": "carvd-studio.desktop"
 }

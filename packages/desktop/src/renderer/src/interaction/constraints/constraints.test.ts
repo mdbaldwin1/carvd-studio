@@ -121,7 +121,7 @@ describe('groundConstraint — move', () => {
 
   it('lifts a multi-part move by the deepest dip', () => {
     const partA = makePart({ id: 'a', position: { x: 0, y: 0.375, z: 0 } });
-    const partB = makePart({ id: 'b', position: { x: 10, y: 0.375, z: 0 }, thickness: 1.5 });
+    const partB = makePart({ id: 'b', position: { x: 10, y: 0.75, z: 0 }, thickness: 1.5 });
     // Candidate dips a slightly, b more.
     const positions = new Map([
       ['a', { x: 0, y: 0.25, z: 0 }], // a minY = -0.125

@@ -11,7 +11,7 @@ export interface ReferenceInteractionState {
   latchedAxis: 'x' | 'y' | 'z' | null;
 }
 
-function createEmptyReferenceInteractionState(): ReferenceInteractionState {
+export function createEmptyReferenceInteractionState(): ReferenceInteractionState {
   return {
     selectionEntities: [],
     referenceEntities: [],
@@ -24,6 +24,7 @@ function createEmptyReferenceInteractionState(): ReferenceInteractionState {
 
 export interface MoveInteractionSession {
   kind: 'move';
+  moveOwner: 'part' | 'group';
   affectedPartIds: string[];
   primaryPartId: string | null;
   delta: { x: number; y: number; z: number };
@@ -57,6 +58,7 @@ interface InteractionStoreState {
   beginMoveSession: (params: {
     affectedPartIds: string[];
     primaryPartId?: string | null;
+    moveOwner?: 'part' | 'group';
     initialDelta?: { x: number; y: number; z: number };
     referenceState?: Partial<ReferenceInteractionState>;
   }) => void;
@@ -89,10 +91,17 @@ interface InteractionStoreState {
 export const useInteractionStore = create<InteractionStoreState>((set) => ({
   activeSession: null,
 
-  beginMoveSession: ({ affectedPartIds, primaryPartId = null, initialDelta = { x: 0, y: 0, z: 0 }, referenceState }) =>
+  beginMoveSession: ({
+    affectedPartIds,
+    primaryPartId = null,
+    moveOwner = 'part',
+    initialDelta = { x: 0, y: 0, z: 0 },
+    referenceState
+  }) =>
     set({
       activeSession: {
         kind: 'move',
+        moveOwner,
         affectedPartIds: [...new Set(affectedPartIds)],
         primaryPartId,
         delta: initialDelta,

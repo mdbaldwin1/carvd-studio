@@ -1,0 +1,16 @@
+{
+  "format": "carvd-router-profile",
+  "version": 1,
+  "profile": {
+    "version": 1,
+    "id": "off-axis",
+    "name": "Off Axis",
+    "family": "custom",
+    "source": "generic",
+    "parameters": {},
+    "boundary": {
+      "start": { "u": 0.1, "v": 0.5 },
+      "segments": [{ "kind": "line", "to": { "u": 0.5, "v": 0.1 } }]
+    }
+  }
+}

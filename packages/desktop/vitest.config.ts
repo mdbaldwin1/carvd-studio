@@ -7,6 +7,8 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     globals: true,
+    // Geometry suites are CPU-heavy; avoid runner contention and timing failures.
+    maxWorkers: process.env.CI ? 2 : undefined,
     setupFiles: ['./tests/setup.ts'],
     exclude: ['**/node_modules/**', '**/e2e/**', '**/tests/e2e/**', 'src/main/**'],
     coverage: {

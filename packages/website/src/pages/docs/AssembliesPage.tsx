@@ -93,6 +93,14 @@ export default function AssembliesPage() {
         </div>
       </div>
 
+      <p className="text-muted mt-xl">
+        Custom shopping items are separate project entries. Saving, inserting,
+        or duplicating an assembly does not attach or multiply its hardware and
+        supplies. After adding another drawer, for example, update the slide and
+        screw quantities in the Shopping List. Grouping also does not create
+        moving hinges or assembly constraints; inspect the fit and movement of
+        each instance.
+      </p>
       <DocsPrevNext />
     </section>
   );

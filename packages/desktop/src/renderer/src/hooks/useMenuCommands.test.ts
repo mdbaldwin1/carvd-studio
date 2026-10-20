@@ -1,3 +1,4 @@
+import { createTestPart } from '../../../../tests/helpers/factories';
 import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { renderHook } from '@testing-library/react';
 import { useProjectStore } from '../store/projectStore';
@@ -126,19 +127,25 @@ describe('useMenuCommands', () => {
       expect(requestDeleteParts).not.toHaveBeenCalled();
     });
 
+    it('selects focused position text without selecting project parts', async () => {
+      const input = document.createElement('input');
+      input.value = '3/8';
+      document.body.append(input);
+      input.focus();
+      const selectParts = vi.fn();
+      useSelectionStore.setState({ selectParts });
+      renderHook(() => useMenuCommands());
+      await menuCommandHandler('select-all');
+      expect(input.selectionStart).toBe(0);
+      expect(input.selectionEnd).toBe(3);
+      expect(selectParts).not.toHaveBeenCalled();
+      input.remove();
+    });
+
     it('handles select-all command', async () => {
       const selectParts = vi.fn();
       useProjectStore.setState({
-        parts: [
-          {
-            id: 'p1',
-            name: 'Part 1'
-          },
-          {
-            id: 'p2',
-            name: 'Part 2'
-          }
-        ]
+        parts: [createTestPart({ id: 'p1', name: 'Part 1' }), createTestPart({ id: 'p2', name: 'Part 2' })]
       });
       useSelectionStore.setState({ selectParts });
 
@@ -162,6 +169,40 @@ describe('useMenuCommands', () => {
   });
 
   describe('file commands', () => {
+    it.each([
+      'new-project',
+      'new-from-template',
+      'open-project',
+      'open-recent',
+      'save-project',
+      'save-project-as',
+      'close-project',
+      'request-reload'
+    ])('M3 blocks native %s while a close-save is pending', async (command) => {
+      const onAction = vi.fn().mockResolvedValue(undefined);
+      renderHook(() =>
+        useMenuCommands({
+          isFileActionBusy: () => true,
+          onNewProject: onAction,
+          onOpenProject: onAction,
+          onOpenRecentProject: onAction,
+          onOpenTemplateBrowser: onAction,
+          onCloseProject: onAction,
+          onReload: onAction
+        })
+      );
+      await menuCommandHandler(command, '/tmp/recent.carvd');
+      expect.soft(onAction).not.toHaveBeenCalled();
+      expect.soft(saveProject).not.toHaveBeenCalled();
+      expect(saveProjectAs).not.toHaveBeenCalled();
+    });
+    it('L2 native Save As delegates to the same guarded active-cut file route', async () => {
+      const onSavePartCutsAs = vi.fn().mockResolvedValue(undefined);
+      renderHook(() => useMenuCommands({ isEditingPartCuts: true, onSavePartCutsAs }));
+      await menuCommandHandler('save-project-as');
+      expect(onSavePartCutsAs).toHaveBeenCalledOnce();
+      expect(saveProjectAs).not.toHaveBeenCalled();
+    });
     it('handles new-project with provided handler', async () => {
       const onNewProject = vi.fn().mockResolvedValue(undefined);
       renderHook(() => useMenuCommands({ onNewProject }));
@@ -179,6 +220,34 @@ describe('useMenuCommands', () => {
 
       expect(saveProject).toHaveBeenCalled();
       expect(showToast).toHaveBeenCalledWith('Project saved', 'success');
+    });
+
+    it('ignores a repeated native-menu save while the first save is unresolved', async () => {
+      let finishSave!: (value: { success: boolean; canceled?: boolean }) => void;
+      (saveProject as ReturnType<typeof vi.fn>).mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            finishSave = resolve;
+          })
+      );
+      renderHook(() => useMenuCommands());
+
+      const first = menuCommandHandler('save-project');
+      await menuCommandHandler('save-project');
+      expect(saveProject).toHaveBeenCalledTimes(1);
+
+      finishSave({ success: false, canceled: true });
+      await first;
+    });
+
+    it('routes save-project to part cuts save when active', async () => {
+      const onSavePartCuts = vi.fn();
+
+      renderHook(() => useMenuCommands({ isEditingPartCuts: true, onSavePartCuts }));
+      await menuCommandHandler('save-project');
+
+      expect(onSavePartCuts).toHaveBeenCalled();
+      expect(saveProject).not.toHaveBeenCalled();
     });
 
     it('handles save-project error', async () => {
@@ -206,12 +275,35 @@ describe('useMenuCommands', () => {
       expect(showToast).toHaveBeenCalledWith('Project saved', 'success');
     });
 
+    it('blocks save-project-as while editing part cuts', async () => {
+      const showToast = vi.fn();
+      useUIStore.setState({ showToast });
+
+      renderHook(() => useMenuCommands({ isEditingPartCuts: true }));
+      await menuCommandHandler('save-project-as');
+
+      expect(showToast).toHaveBeenCalledWith('Use "Save" to commit part cuts before saving the project', 'info');
+      expect(saveProjectAs).not.toHaveBeenCalled();
+    });
+
     it('handles open-project with provided handler', async () => {
       const onOpenProject = vi.fn().mockResolvedValue(undefined);
       renderHook(() => useMenuCommands({ onOpenProject }));
       await menuCommandHandler('open-project');
 
       expect(onOpenProject).toHaveBeenCalled();
+    });
+
+    it('blocks open-project while editing part cuts', async () => {
+      const showToast = vi.fn();
+      useUIStore.setState({ showToast });
+      const onOpenProject = vi.fn();
+
+      renderHook(() => useMenuCommands({ isEditingPartCuts: true, onOpenProject }));
+      await menuCommandHandler('open-project');
+
+      expect(onOpenProject).not.toHaveBeenCalled();
+      expect(showToast).toHaveBeenCalledWith('Save or discard part cuts before changing projects.', 'warning');
     });
 
     it('handles open-project without handler', async () => {

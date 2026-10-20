@@ -1,3 +1,4 @@
+import { createTestAssemblyPart } from '../../../../../tests/helpers/factories';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { ImportToLibraryDialog } from './ImportToLibraryDialog';
@@ -12,10 +13,9 @@ describe('ImportToLibraryDialog', () => {
     width: 24,
     thickness: 0.75,
     color: '#c4a574',
-    material: 'plywood',
     grainDirection: 'length',
-    costPerSheet: 50,
-    isAvailable: true
+    pricingUnit: 'per_item',
+    pricePerUnit: 50
   };
 
   const mockStock2: Stock = {
@@ -25,31 +25,16 @@ describe('ImportToLibraryDialog', () => {
     width: 6,
     thickness: 1,
     color: '#8b5a2b',
-    material: 'hardwood',
     grainDirection: 'length',
-    costPerSheet: 30,
-    isAvailable: true
+    pricingUnit: 'per_item',
+    pricePerUnit: 30
   };
 
   const mockAssembly: Assembly = {
     id: 'assembly-1',
     name: 'Bookshelf',
     description: 'A simple bookshelf',
-    parts: [
-      {
-        id: 'part-1',
-        name: 'Side',
-        width: 12,
-        height: 36,
-        depth: 0.75,
-        color: '#c4a574',
-        x: 0,
-        y: 0,
-        z: 0,
-        rotationY: 0,
-        grainDirection: 'height'
-      }
-    ],
+    parts: [createTestAssemblyPart({ name: 'Side', length: 36, width: 12, thickness: 0.75 })],
     groups: [],
     groupMembers: [],
     createdAt: new Date().toISOString(),

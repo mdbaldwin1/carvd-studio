@@ -2,7 +2,11 @@ import { useThree } from '@react-three/fiber';
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import { resolveMeasurementSelectionEntities } from '../../utils/interactionSelection';
-import { getProjectedMeasurementLength, resolveMeasurementOverlayLayout } from '../../utils/measurementOverlayLayout';
+import {
+  getProjectedMeasurementLength,
+  type MeasurementOverlayPlacement,
+  resolveMeasurementOverlayLayout
+} from '../../utils/measurementOverlayLayout';
 import { getBoundingBoxDimensionPlacements } from '../../utils/measurementPlacement';
 import { getBoundingMeasurementPriority } from '../../utils/measurementPriority';
 import { DimensionLabel } from './DimensionLabel';
@@ -156,7 +160,9 @@ export function MultiSelectionDimensions({ data }: MultiSelectionDimensionsProps
 
   const dimensionLayout = useMemo(() => {
     if (!boundsData) {
-      return new Set<string>();
+      // Same shape as the resolved layout below; the component bails out before
+      // reading this, but a Set here would make every lookup a runtime error.
+      return new Map<string, MeasurementOverlayPlacement>();
     }
 
     const { minX, maxX, minY, maxY, minZ, maxZ, gaps } = boundsData;
