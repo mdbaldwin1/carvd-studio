@@ -24,6 +24,7 @@ function xmlEscape(value) {
 }
 
 const coreRoutes = [
+  { path: "/learn/woodworking-software-for-mac", changefreq: "monthly", priority: "0.7" },
   { path: "/learn", changefreq: "monthly", priority: "0.7" },
   { path: "/learn/heron-wall-cabinet", changefreq: "monthly", priority: "0.7" },
   { path: "/learn/matching-joints", changefreq: "monthly", priority: "0.7" },

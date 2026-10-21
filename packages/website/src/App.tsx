@@ -12,6 +12,10 @@ import NotFoundPage from "./pages/NotFoundPage";
 import ScrollToHash from "./components/ScrollToHash";
 import { PostHogPageviews } from "./analytics/PostHogPageviews";
 
+const WoodworkingSoftwarePage = lazy(
+  () => import("./pages/WoodworkingSoftwarePage"),
+);
+
 const LearnPage = lazy(() => import("./pages/LearnPage"));
 
 const FeaturesPage = lazy(() => import("./pages/FeaturesPage"));
@@ -57,6 +61,10 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/updates/1-3-0" element={<Release130Page />} />
+          <Route
+            path="/learn/woodworking-software-for-mac"
+            element={<WoodworkingSoftwarePage />}
+          />
           <Route path="/learn" element={<LearnPage />} />
           <Route
             path="/learn/desktop-shelf"
