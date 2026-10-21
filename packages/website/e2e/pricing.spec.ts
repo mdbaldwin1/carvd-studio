@@ -13,14 +13,14 @@ test.describe("Pricing Page", () => {
 
     test("displays value proposition badge", async ({ page }) => {
       await expect(
-        page.locator("text=Less Than 6 Months").first(),
-      ).toContainText("Less Than 6 Months");
+        page.locator("text=One Payment. Every Project.").first(),
+      ).toContainText("One Payment. Every Project.");
     });
   });
 
   test.describe("Pricing Card", () => {
     test("displays price", async ({ page }) => {
-      await expect(page.locator("text=$59.99").first()).toBeVisible();
+      await expect(page.locator("text=$99.99").first()).toBeVisible();
     });
 
     test("displays one-time payment messaging", async ({ page }) => {
@@ -42,7 +42,11 @@ test.describe("Pricing Page", () => {
       await expect(
         page.locator("text=Intelligent cut list optimizer"),
       ).toBeVisible();
-      await expect(page.locator("text=Free lifetime updates")).toBeVisible();
+      await expect(
+        page.getByText("Free lifetime updates with new features", {
+          exact: true,
+        }),
+      ).toBeVisible();
       await expect(
         page.locator("text=Install on up to 3 devices"),
       ).toBeVisible();
@@ -67,19 +71,19 @@ test.describe("Pricing Page", () => {
   test.describe("Value Comparison Section", () => {
     test("displays break-even heading", async ({ page }) => {
       await expect(
-        page.locator("text=The Break-Even Point? 6 Months."),
+        page.locator("text=One Payment. Long-Term Value."),
       ).toBeVisible();
     });
 
     test("displays subscription vs one-time comparison", async ({ page }) => {
       await expect(
-        page.locator("text=Monthly Subscription").first(),
+        page.locator("text=Example Subscription").first(),
       ).toBeVisible();
       await expect(page.locator("text=$10/mo").first()).toBeVisible();
     });
 
     test("displays savings callout", async ({ page }) => {
-      await expect(page.locator("text=Save $540 over 5 years")).toBeVisible();
+      await expect(page.locator("text=Save $500 over 5 years")).toBeVisible();
     });
   });
 

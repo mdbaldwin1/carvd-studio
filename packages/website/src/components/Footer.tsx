@@ -42,6 +42,12 @@ export default function Footer() {
               Free plans & tutorials
             </a>
             <a
+              href="/learn/woodworking-software-for-mac"
+              className="inline-flex min-h-11 items-center rounded-md px-2 py-1 font-medium text-text transition-colors hover:text-highlight"
+            >
+              Choosing design software
+            </a>
+            <a
               href="/support"
               className="inline-flex min-h-11 items-center rounded-md px-2 py-1 font-medium text-text transition-colors hover:text-highlight"
             >
