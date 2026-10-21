@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Updated the one-time price for new Carvd Studio licenses to $99.99; existing licenses keep their access and free updates.
+
 ### Added
 - Practical Mac woodworking software guide comparing workflows, device requirements and shop output, with official competitor sources.
 - Free Heron oak-and-walnut cabinet design study with an editable Carvd project, cut-list report, real app views and a joinery walkthrough; replaces the desktop shelf showcase.

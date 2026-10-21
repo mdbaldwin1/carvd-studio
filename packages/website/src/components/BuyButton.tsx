@@ -41,7 +41,7 @@ export default function BuyButton({
   return (
     <Button asChild size={size} className={cn(className)}>
       <a href="/pricing" onClick={handleClick}>
-        {children || `Buy License - $59.99`}
+        {children || `Buy License - $99.99`}
       </a>
     </Button>
   );

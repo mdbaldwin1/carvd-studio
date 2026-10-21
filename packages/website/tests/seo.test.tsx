@@ -167,7 +167,7 @@ describe("JSON-LD Helpers", () => {
       expect(schema.name).toBe("Carvd Studio");
       expect(schema.applicationCategory).toBe("DesignApplication");
       expect(schema.operatingSystem).toBe("macOS, Windows, Linux");
-      expect(schema.offers.price).toBe("59.99");
+      expect(schema.offers.price).toBe("99.99");
       expect(schema.offers.priceCurrency).toBe("USD");
     });
   });

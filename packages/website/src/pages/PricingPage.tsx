@@ -17,7 +17,7 @@ export default function PricingPage() {
     <div className="site-shell">
       <SEO
         title="Pricing"
-        description="One-time purchase, no subscription. Carvd Studio woodworking design software for $59.99. Own it forever with free updates."
+        description="One-time purchase, no subscription. Carvd Studio woodworking design software for $99.99. Own it forever with free updates."
         path="/pricing"
         jsonLd={createFAQSchema(pricingFAQs)}
       />
@@ -27,7 +27,7 @@ export default function PricingPage() {
         <div className="py-16">
           <div className="mx-auto max-w-4xl text-center">
             <Badge variant="outline" className="hero-kicker mx-auto mb-6 gap-1">
-              <Coins size={16} /> Less Than 6 Months of Subscription Software
+              <Coins size={16} /> One Payment. Every Project.
             </Badge>
             <h1 className="mb-6 text-6xl font-bold">
               Pay Once.
@@ -35,9 +35,8 @@ export default function PricingPage() {
               <span className="text-highlight">Own It Forever.</span>
             </h1>
             <p className="mx-auto mb-16 max-w-2xl text-center text-xl text-text-muted">
-              Even the cheapest furniture design subscriptions start at
-              $10/month. That's $60 after 6 months. Carvd Studio costs $59.99
-              once—and you own it forever.
+              Carvd Studio costs $99.99 once, with free updates and no recurring
+              subscription. Design your next project—and the one after that.
             </p>
 
             <PricingCard />

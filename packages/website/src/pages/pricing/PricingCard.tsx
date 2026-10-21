@@ -21,29 +21,25 @@ export default function PricingCard() {
             variant="outline"
             className="mx-auto mb-4 gap-1 border-warning bg-[rgba(255,210,31,0.2)] text-warning"
           >
-            <Rocket size={16} /> Launch Special — Price increases to $99 soon
+            <Rocket size={16} /> One license. Free lifetime updates.
           </Badge>
           <h2 className="mb-4 text-4xl font-bold">Carvd Studio</h2>
           <div className="mb-4 flex items-center justify-center gap-4">
-            <span className="text-6xl font-bold text-highlight">$59.99</span>
+            <span className="text-6xl font-bold text-highlight">$99.99</span>
             <div className="text-left">
               <div className="text-lg font-bold">one-time payment</div>
               <div className="text-sm text-text-muted">yours forever</div>
             </div>
           </div>
-          <div className="mb-6 text-sm text-text-muted">
-            <span className="line-through">$99</span> — Early adopter pricing
-          </div>
           <p className="mb-4 flex items-center justify-center gap-1 text-sm text-success">
-            <Lightbulb size={16} /> The cut list optimizer alone typically saves
-            more than $59 in wasted lumber on a single project
+            <Lightbulb size={16} /> Plan your cuts before you buy your lumber
           </p>
           <div
             className="mb-8 rounded-lg border p-4"
             style={accentBoxHighlightStyle}
           >
             <p className="text-center text-lg font-semibold">
-              Lock in launch pricing before it goes up
+              Includes updates. No subscription required.
             </p>
           </div>
         </div>
@@ -60,7 +56,7 @@ export default function PricingCard() {
               "Real-time material cost tracking and project estimating",
               "Custom materials library with your supplier prices",
               "Reusable assembly library for common components",
-              "Joinery allowances for extra material on tenons, dados, etc.",
+              "Part Cuts and matching joinery layouts for dados, tenons, and more",
               "Professional PDF export for cut sheets and presentations",
               "Core project editing works offline; internet supports activation, updates, and optional consented analytics",
               "Complete data privacy—your designs stay on your computer",

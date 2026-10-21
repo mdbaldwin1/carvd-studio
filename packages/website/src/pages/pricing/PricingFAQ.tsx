@@ -9,7 +9,7 @@ export const pricingFAQs = [
   {
     question: "Is this really a one-time payment?",
     answer:
-      "Yes. $59.99 once, and you own Carvd Studio forever. No monthly fees, no annual renewals, no surprise charges.",
+      "Yes. $99.99 once, and you own Carvd Studio forever. No monthly fees, no annual renewals, no surprise charges.",
   },
   {
     question: "Do I get future updates?",
@@ -48,7 +48,7 @@ export default function PricingFAQ() {
             Is this really a one-time payment?
           </AccordionTrigger>
           <AccordionContent className="text-text-muted">
-            Yes. $59.99 once, and you own Carvd Studio forever. No monthly fees,
+            Yes. $99.99 once, and you own Carvd Studio forever. No monthly fees,
             no annual renewals, no surprise charges. We hate subscriptions as
             much as you do.
           </AccordionContent>
