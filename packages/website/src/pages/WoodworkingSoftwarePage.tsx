@@ -34,16 +34,31 @@ export default function WoodworkingSoftwarePage() {
             </p>
           </header>
           <figure className="site-section mb-10 overflow-hidden">
-            <img
-              src="/screenshots/heron-front.png"
-              alt="Heron wall cabinet designed in Carvd Studio, with a framed door and two drawers"
-              width="1512"
-              height="982"
+            <video
+              controls
+              playsInline
+              preload="none"
+              poster="/screenshots/heron-front.png"
+              aria-label="28-second Heron cabinet visual walkthrough"
               className="w-full h-auto"
-            />
+              width="1920"
+              height="1256"
+            >
+              <source src="/videos/heron-walkthrough.mp4" type="video/mp4" />
+              <track
+                kind="captions"
+                src="/videos/heron-walkthrough.vtt"
+                srcLang="en"
+                label="English"
+              />
+              <a href="/videos/heron-walkthrough.mp4">
+                Download the Heron walkthrough
+              </a>
+            </video>
             <figcaption className="p-5 text-sm text-text-muted">
-              Heron is a 29-part cabinet design study. Download its editable
-              model and PDF report to see the output before choosing a tool.
+              A 28-second visual walkthrough using real app views. Heron is a
+              29-part cabinet design study. Download its editable model and PDF
+              report to see the output before choosing a tool.
             </figcaption>
           </figure>
           <section className="site-section mb-8 p-8 max-sm:p-5">
