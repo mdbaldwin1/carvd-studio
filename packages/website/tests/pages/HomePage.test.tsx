@@ -240,7 +240,7 @@ describe("HomePage", () => {
     it("renders pricing comparison table", () => {
       renderHomePage();
       expect(screen.getByText(/The Math Is Simple/i)).toBeInTheDocument();
-      expect(screen.getByText(/\$59\.99 once/i)).toBeInTheDocument();
+      expect(screen.getByText(/\$99\.99 once/i)).toBeInTheDocument();
     });
   });
 
