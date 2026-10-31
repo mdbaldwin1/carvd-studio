@@ -37,9 +37,11 @@ export function BrightnessPopup({ isOpen, onClose }: BrightnessPopupProps) {
       }
     };
 
+    // Only the outside click needs to wait for the opening interaction.
+    // Escape must keep working immediately, including after a parent rerender.
+    document.addEventListener('keydown', handleEscape);
     const timer = setTimeout(() => {
       document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('keydown', handleEscape);
     }, 0);
 
     return () => {
