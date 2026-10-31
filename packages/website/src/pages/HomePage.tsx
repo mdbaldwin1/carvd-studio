@@ -344,9 +344,8 @@ export default function HomePage() {
               The Math Is Simple
             </h2>
             <p className="mx-auto mb-8 max-w-2xl text-center text-xl text-text-muted">
-              Most furniture design software charges $10/month. That's $60 after
-              6 months, $120 per year. Carvd Studio?{" "}
-              <span className="font-bold text-highlight">$59.99 once.</span> Own
+              A $10/month subscription adds up to $120 per year. Carvd Studio?{" "}
+              <span className="font-bold text-highlight">$99.99 once.</span> Own
               it forever.
             </p>
             <div className="w-full overflow-x-auto [-webkit-overflow-scrolling:touch]">
@@ -357,7 +356,7 @@ export default function HomePage() {
                       <span className="sr-only">Time Period</span>
                     </th>
                     <th className="whitespace-nowrap border-b border-border bg-surface p-4 text-left font-bold text-text max-md:p-2 max-md:text-sm max-sm:p-1 max-sm:text-xs">
-                      Monthly Subscription
+                      Example: $10/month subscription
                     </th>
                     <th className="whitespace-nowrap border-b border-border bg-surface p-4 text-left font-bold text-text max-md:p-2 max-md:text-sm max-sm:p-1 max-sm:text-xs">
                       Carvd Studio
@@ -373,7 +372,7 @@ export default function HomePage() {
                       $60
                     </td>
                     <td className="whitespace-nowrap border-b border-border p-4 font-bold text-highlight max-md:p-2 max-md:text-sm max-sm:p-1 max-sm:text-xs">
-                      $59.99 ✓
+                      $99.99 ✓
                     </td>
                   </tr>
                   <tr className="hover:bg-surface">
@@ -384,7 +383,7 @@ export default function HomePage() {
                       $120
                     </td>
                     <td className="whitespace-nowrap border-b border-border p-4 font-bold text-highlight max-md:p-2 max-md:text-sm max-sm:p-1 max-sm:text-xs">
-                      $59.99 ✓
+                      $99.99 ✓
                     </td>
                   </tr>
                   <tr className="hover:bg-surface">
@@ -395,7 +394,7 @@ export default function HomePage() {
                       $240
                     </td>
                     <td className="whitespace-nowrap border-b border-border p-4 font-bold text-highlight max-md:p-2 max-md:text-sm max-sm:p-1 max-sm:text-xs">
-                      $59.99 ✓
+                      $99.99 ✓
                     </td>
                   </tr>
                   <tr className="hover:bg-surface">
@@ -406,7 +405,7 @@ export default function HomePage() {
                       $600
                     </td>
                     <td className="whitespace-nowrap border-b border-border p-4 font-bold text-highlight max-md:p-2 max-md:text-sm max-sm:p-1 max-sm:text-xs">
-                      $59.99 ✓
+                      $99.99 ✓
                     </td>
                   </tr>
                   <tr className="hover:bg-surface">
@@ -429,9 +428,9 @@ export default function HomePage() {
                 style={accentBoxHighlightStyle}
               >
                 <p className="text-2xl font-bold">
-                  If you'll use this software for more than 6 months
+                  Less than 10 months of a $10/month subscription.
                   <br />
-                  (and you will), Carvd Studio is the obvious choice.
+                  Yours for every project after that.
                 </p>
               </div>
             </div>

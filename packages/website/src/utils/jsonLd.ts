@@ -21,7 +21,7 @@ export function createSoftwareAppSchema() {
       "Design furniture in 3D, generate optimized cut lists, and track material costs.",
     offers: {
       "@type": "Offer",
-      price: "59.99",
+      price: "99.99",
       priceCurrency: "USD",
     },
   };

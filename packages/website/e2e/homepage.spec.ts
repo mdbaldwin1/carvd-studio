@@ -172,7 +172,7 @@ test.describe("Homepage", () => {
     });
 
     test("highlights one-time payment value", async ({ page }) => {
-      await expect(page.locator("text=$59.99 once")).toBeVisible();
+      await expect(page.locator("text=$99.99 once")).toBeVisible();
     });
   });
 
