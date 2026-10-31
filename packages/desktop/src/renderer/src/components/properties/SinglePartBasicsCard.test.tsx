@@ -30,6 +30,14 @@ function setup(form?: 'rod' | 'insert') {
 }
 
 describe('small woodworking components', () => {
+  it('keeps fractional dimensions readable in the fixed-width properties row', () => {
+    setup();
+
+    for (const label of ['Part length', 'Part width', 'Part thickness']) {
+      expect(screen.getByRole('textbox', { name: label })).toHaveClass('min-w-0', 'px-2');
+    }
+  });
+
   it('accepts the T-slot runner finished dimensions', () => {
     const handlers = setup();
     for (const [label, value, handler] of [

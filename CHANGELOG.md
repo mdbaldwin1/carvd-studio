@@ -8,9 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
 - Free Heron oak-and-walnut cabinet design study with an editable Carvd project, cut-list report, real app views and a joinery walkthrough; replaces the desktop shelf showcase.
 - Visual tutorials for matching joints and printable cut lists on the website.
-
 
 ### Added
 
@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Keep long fractional dimensions fully visible in the fixed-width Properties panel fields.
 - Keep Escape dismissal available immediately when the lighting popup opens or rerenders.
 
 ## [1.3.0] - 2026-10-19

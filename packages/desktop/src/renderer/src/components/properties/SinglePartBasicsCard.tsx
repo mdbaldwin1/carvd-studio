@@ -120,6 +120,7 @@ export function SinglePartBasicsCard({
             onChange={onLengthChange}
             min={MIN_DIMENSION_INCHES}
             disabled={Boolean(assignedStock && isStockDimensionFixed(assignedStock, 'length'))}
+            className="min-w-0 px-2"
           />
           <span>×</span>
           <FractionInput
@@ -129,6 +130,7 @@ export function SinglePartBasicsCard({
             onChange={onWidthChange}
             min={MIN_DIMENSION_INCHES}
             disabled={Boolean(assignedStock && isStockDimensionFixed(assignedStock, 'width'))}
+            className="min-w-0 px-2"
           />
           <span>×</span>
           <FractionInput
@@ -138,6 +140,7 @@ export function SinglePartBasicsCard({
             onChange={onThicknessChange}
             min={MIN_DIMENSION_INCHES}
             disabled={Boolean(assignedStock && isStockDimensionFixed(assignedStock, 'thickness'))}
+            className="min-w-0 px-2"
           />
         </div>
         {isDimensionConstrained && assignedStock && (
